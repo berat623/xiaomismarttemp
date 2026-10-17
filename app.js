@@ -879,6 +879,22 @@ class AppController {
       valFirmwareBadge: document.getElementById('valFirmwareBadge'),
       bleLiveStatusTag: document.getElementById('bleLiveStatusTag'),
 
+      // Signal Bar Meters
+      signalBarsHeader: document.getElementById('signalBarsHeader'),
+      signalBarsMobile: document.getElementById('signalBarsMobile'),
+      signalBarsCard: document.getElementById('signalBarsCard'),
+
+      // Chart Live Statistics Summary Strip
+      chartStatAvgTemp: document.getElementById('chartStatAvgTemp'),
+      chartStatTempUnit: document.getElementById('chartStatTempUnit'),
+      chartStatTempMinMax: document.getElementById('chartStatTempMinMax'),
+      chartStatAvgHum: document.getElementById('chartStatAvgHum'),
+      chartStatHumMinMax: document.getElementById('chartStatHumMinMax'),
+      chartStatAvgDew: document.getElementById('chartStatAvgDew'),
+      chartStatDewUnit: document.getElementById('chartStatDewUnit'),
+      chartStatPoints: document.getElementById('chartStatPoints'),
+      chartStatTimeSpan: document.getElementById('chartStatTimeSpan'),
+
       // Card 1: Sıcaklık
       valTemp: document.getElementById('valTemp'),
       lblTempUnit: document.getElementById('lblTempUnit'),
@@ -1219,6 +1235,8 @@ class AppController {
       if (this.dom.signalPill) this.dom.signalPill.classList.remove('hidden');
       if (this.dom.signalPillMobile) this.dom.signalPillMobile.classList.remove('hidden');
       if (this.dom.signalPillMobile) this.dom.signalPillMobile.classList.add('flex');
+
+      this.updateSignalBars(rssi);
     }
 
     if (this.dom.valFirmwareBadge) {
@@ -1230,6 +1248,36 @@ class AppController {
         this.dom.valFirmwareBadge.className = 'text-[10px] font-mono px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 font-bold';
       }
     }
+  }
+
+  updateSignalBars(rssi) {
+    if (rssi == null) return;
+    let activeBars = 1;
+    if (rssi >= -65) {
+      activeBars = 4;
+    } else if (rssi >= -75) {
+      activeBars = 3;
+    } else if (rssi >= -85) {
+      activeBars = 2;
+    } else {
+      activeBars = 1;
+    }
+
+    const setBars = (container) => {
+      if (!container) return;
+      const bars = container.querySelectorAll('.signal-bar');
+      bars.forEach((bar, idx) => {
+        if (idx < activeBars) {
+          bar.classList.add('active');
+        } else {
+          bar.classList.remove('active');
+        }
+      });
+    };
+
+    setBars(this.dom.signalBarsHeader);
+    setBars(this.dom.signalBarsMobile);
+    setBars(this.dom.signalBarsCard);
   }
 
   handleHistoryProgress({ active, percent, message }) {
@@ -1255,6 +1303,19 @@ class AppController {
   }
 
   renderTelemetryCards(data) {
+    // Value flash animation trigger on newly updated value fields
+    const triggerFlash = (el) => {
+      if (!el) return;
+      el.classList.remove('value-flash');
+      void el.offsetWidth;
+      el.classList.add('value-flash');
+    };
+    triggerFlash(this.dom.valTemp);
+    triggerFlash(this.dom.valHum);
+    triggerFlash(this.dom.valApparentTemp);
+    triggerFlash(this.dom.valDewPointCard);
+    triggerFlash(this.dom.valVaporPressure);
+
     // 1. Sıcaklık Kartı
     let displayTemp = data.temperature;
     if (this.currentUnit === 'F') {
@@ -1349,8 +1410,11 @@ class AppController {
     if (data.voltage != null) {
       this.dom.valVoltage.textContent = `${data.voltage.toFixed(2)} V`;
     }
-    if (data.rssi != null && this.dom.valRssi) {
-      this.dom.valRssi.textContent = `${data.rssi} dBm`;
+    if (data.rssi != null) {
+      if (this.dom.valRssi) this.dom.valRssi.textContent = `${data.rssi} dBm`;
+      if (this.dom.signalRssiText) this.dom.signalRssiText.textContent = `${data.rssi} dBm`;
+      if (this.dom.signalRssiTextMobile) this.dom.signalRssiTextMobile.textContent = `${data.rssi} dBm`;
+      this.updateSignalBars(data.rssi);
     }
 
     if (this.dom.valFirmwareBadge) {
@@ -1653,15 +1717,40 @@ class AppController {
             }
           },
           tooltip: {
-            backgroundColor: isDark ? '#0f172a' : '#ffffff',
-            borderColor: isDark ? '#334155' : '#cbd5e1',
+            backgroundColor: isDark ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.97)',
+            borderColor: isDark ? 'rgba(51, 65, 85, 0.8)' : 'rgba(226, 232, 240, 0.95)',
             borderWidth: 1,
             titleColor: isDark ? '#f8fafc' : '#0f172a',
             bodyColor: isDark ? '#cbd5e1' : '#334155',
-            padding: 10,
-            cornerRadius: 12,
-            bodyFont: { family: 'Poppins' },
-            titleFont: { family: 'Poppins', weight: 'bold' }
+            footerColor: isDark ? '#94a3b8' : '#64748b',
+            padding: 12,
+            boxPadding: 4,
+            cornerRadius: 14,
+            bodyFont: { family: 'Poppins', size: 11 },
+            titleFont: { family: 'Poppins', size: 12, weight: '700' },
+            footerFont: { family: 'Poppins', size: 10, weight: '500' },
+            callbacks: {
+              label: (context) => {
+                const label = context.dataset.label || '';
+                const val = context.parsed.y;
+                if (val == null) return null;
+                return ` ${label}: ${Number(val).toFixed(1)}`;
+              },
+              footer: (items) => {
+                if (!items || items.length === 0) return '';
+                const tempItem = items.find(i => i.datasetIndex === 0 && !i.dataset.hidden);
+                const dewItem = items.find(i => i.datasetIndex === 2 && !i.dataset.hidden);
+                if (tempItem && dewItem) {
+                  const spread = tempItem.parsed.y - dewItem.parsed.y;
+                  if (spread <= 2.5) {
+                    return '⚠️ Dikkat: Yoğuşma / Rutubet riski!';
+                  } else if (spread >= 8) {
+                    return '✅ Ferah ve dengeli atmosfer';
+                  }
+                }
+                return '';
+              }
+            }
           }
         },
         scales: {
@@ -1734,10 +1823,11 @@ class AppController {
     const isDark = this.currentTheme === 'dark';
 
     this.chart.options.plugins.legend.labels.color = isDark ? '#94a3b8' : '#475569';
-    this.chart.options.plugins.tooltip.backgroundColor = isDark ? '#0f172a' : '#ffffff';
-    this.chart.options.plugins.tooltip.borderColor = isDark ? '#334155' : '#cbd5e1';
+    this.chart.options.plugins.tooltip.backgroundColor = isDark ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.97)';
+    this.chart.options.plugins.tooltip.borderColor = isDark ? 'rgba(51, 65, 85, 0.8)' : 'rgba(226, 232, 240, 0.95)';
     this.chart.options.plugins.tooltip.titleColor = isDark ? '#f8fafc' : '#0f172a';
     this.chart.options.plugins.tooltip.bodyColor = isDark ? '#cbd5e1' : '#334155';
+    this.chart.options.plugins.tooltip.footerColor = isDark ? '#94a3b8' : '#64748b';
 
     this.chart.options.scales.x.grid.color = isDark ? 'rgba(51, 65, 85, 0.3)' : 'rgba(203, 213, 225, 0.5)';
     this.chart.options.scales.yTemp.grid.color = isDark ? 'rgba(51, 65, 85, 0.25)' : 'rgba(203, 213, 225, 0.4)';
@@ -1878,6 +1968,44 @@ class AppController {
     }
 
     scales.yTemp.title.text = `Sıcaklık (°${this.currentUnit})`;
+
+    // Calculate Live Statistics for the Summary Strip
+    if (records.length > 0) {
+      const avgT = (tempData.reduce((a, b) => a + b, 0) / tempData.length);
+      const minT = Math.min(...tempData);
+      const maxT = Math.max(...tempData);
+
+      const avgH = Math.round(humData.reduce((a, b) => a + b, 0) / humData.length);
+      const minH = Math.min(...humData);
+      const maxH = Math.max(...humData);
+
+      const avgD = (dewData.reduce((a, b) => a + b, 0) / dewData.length);
+
+      if (this.dom.chartStatAvgTemp) this.dom.chartStatAvgTemp.textContent = avgT.toFixed(1);
+      if (this.dom.chartStatTempUnit) this.dom.chartStatTempUnit.textContent = `°${this.currentUnit}`;
+      if (this.dom.chartStatTempMinMax) this.dom.chartStatTempMinMax.textContent = `(${minT.toFixed(1)} / ${maxT.toFixed(1)})`;
+
+      if (this.dom.chartStatAvgHum) this.dom.chartStatAvgHum.textContent = avgH;
+      if (this.dom.chartStatHumMinMax) this.dom.chartStatHumMinMax.textContent = `(%${minH} / %${maxH})`;
+
+      if (this.dom.chartStatAvgDew) this.dom.chartStatAvgDew.textContent = avgD.toFixed(1);
+      if (this.dom.chartStatDewUnit) this.dom.chartStatDewUnit.textContent = `°${this.currentUnit}`;
+
+      if (this.dom.chartStatPoints) this.dom.chartStatPoints.textContent = records.length;
+      if (this.dom.chartStatTimeSpan) {
+        const spanLabels = { '1h': 'Son 1 Saat', '24h': 'Son 24 Saat', '7d': 'Son 7 Gün', 'all': 'Tüm Arşiv' };
+        this.dom.chartStatTimeSpan.textContent = spanLabels[this.chartRange] || this.chartRange;
+      }
+    } else {
+      if (this.dom.chartStatAvgTemp) this.dom.chartStatAvgTemp.textContent = '--.-';
+      if (this.dom.chartStatTempMinMax) this.dom.chartStatTempMinMax.textContent = '(-- / --)';
+      if (this.dom.chartStatAvgHum) this.dom.chartStatAvgHum.textContent = '--';
+      if (this.dom.chartStatHumMinMax) this.dom.chartStatHumMinMax.textContent = '(-- / --)';
+      if (this.dom.chartStatAvgDew) this.dom.chartStatAvgDew.textContent = '--.-';
+      if (this.dom.chartStatPoints) this.dom.chartStatPoints.textContent = '0';
+      if (this.dom.chartStatTimeSpan) this.dom.chartStatTimeSpan.textContent = '--';
+    }
+
     this.chart.update('none');
   }
 

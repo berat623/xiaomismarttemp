@@ -98,9 +98,14 @@
           <span id="lastUpdatedAgo" class="text-slate-400 hidden">• Az önce</span>
         </div>
 
-        <!-- Live Signal / RSSI Pill (Desktop) -->
-        <div id="signalPill" class="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 text-xs font-mono font-semibold text-emerald-600 dark:text-emerald-400" title="Bluetooth Sinyal Gücü (RSSI)">
-          <i data-lucide="radio" class="w-3.5 h-3.5 text-emerald-500 animate-pulse"></i>
+        <!-- Live Signal / RSSI Pill (Desktop) with 4-Bar Signal Meter -->
+        <div id="signalPill" class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 text-xs font-mono font-semibold text-emerald-600 dark:text-emerald-400" title="Bluetooth Sinyal Gücü (RSSI)">
+          <div class="signal-bars" id="signalBarsHeader">
+            <span class="signal-bar"></span>
+            <span class="signal-bar"></span>
+            <span class="signal-bar"></span>
+            <span class="signal-bar"></span>
+          </div>
           <span id="signalRssiText">-- dBm</span>
         </div>
 
@@ -143,8 +148,14 @@
         <span>Geçmiş</span>
       </button>
 
-      <!-- Live Signal on Mobile -->
-      <div id="signalPillMobile" class="hidden px-2.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 items-center justify-center font-mono text-[11px] font-bold text-emerald-600 dark:text-emerald-400" title="Bluetooth Sinyal Gücü">
+      <!-- Live Signal on Mobile with 4-Bar Signal Meter -->
+      <div id="signalPillMobile" class="hidden px-2.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 items-center gap-1.5 font-mono text-[11px] font-bold text-emerald-600 dark:text-emerald-400" title="Bluetooth Sinyal Gücü">
+        <div class="signal-bars" id="signalBarsMobile">
+          <span class="signal-bar"></span>
+          <span class="signal-bar"></span>
+          <span class="signal-bar"></span>
+          <span class="signal-bar"></span>
+        </div>
         <span id="signalRssiTextMobile">-- dBm</span>
       </div>
 
@@ -379,8 +390,14 @@
         </div>
 
         <div class="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800/60 text-xs text-slate-500 dark:text-slate-400">
-          <div class="flex items-center gap-1.5">
-            <span class="text-slate-400 dark:text-slate-500">Sinyal (RSSI):</span>
+          <div class="flex items-center gap-2">
+            <span class="text-slate-400 dark:text-slate-500">Sinyal:</span>
+            <div class="signal-bars" id="signalBarsCard">
+              <span class="signal-bar"></span>
+              <span class="signal-bar"></span>
+              <span class="signal-bar"></span>
+              <span class="signal-bar"></span>
+            </div>
             <span id="valRssi" class="font-mono font-bold text-emerald-600 dark:text-emerald-400">-- dBm</span>
           </div>
           <span id="valFirmwareBadge" class="text-[10px] font-mono px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 font-medium">
@@ -421,16 +438,81 @@
           </div>
 
           <!-- Parameter Toggle Filters (Touch-scrollable on mobile) -->
-          <div class="inline-flex rounded-xl bg-slate-100 dark:bg-slate-800/80 p-1 border border-slate-200 dark:border-slate-700/60 text-xs overflow-x-auto max-w-full">
+          <div class="inline-flex rounded-xl bg-slate-100 dark:bg-slate-800/80 p-1 border border-slate-200 dark:border-slate-700/60 text-xs overflow-x-auto max-w-full touch-scroll gap-1">
             <button class="mode-btn active px-2 sm:px-2.5 py-1 rounded-lg font-medium transition-all" data-mode="all">Tümü</button>
-            <button class="mode-btn px-2 sm:px-2.5 py-1 rounded-lg font-medium transition-all" data-mode="temps">Sıcaklıklar</button>
-            <button class="mode-btn px-2 sm:px-2.5 py-1 rounded-lg font-medium transition-all" data-mode="temp">Sıcaklık</button>
-            <button class="mode-btn px-2 sm:px-2.5 py-1 rounded-lg font-medium transition-all" data-mode="apparent">Hissedilen</button>
-            <button class="mode-btn px-2 sm:px-2.5 py-1 rounded-lg font-medium transition-all" data-mode="dew">Çiğ N.</button>
-            <button class="mode-btn px-2 sm:px-2.5 py-1 rounded-lg font-medium transition-all" data-mode="hum">Nem</button>
-            <button class="mode-btn px-2 sm:px-2.5 py-1 rounded-lg font-medium transition-all" data-mode="press">Buhar B.</button>
+            <button class="mode-btn px-2 sm:px-2.5 py-1 rounded-lg font-medium transition-all flex items-center gap-1.5" data-mode="temps" title="Tüm Sıcaklık Parametreleri (Aynı °C Ölçeğinde)">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              <span>Sıcaklıklar</span>
+            </button>
+            <button class="mode-btn px-2 sm:px-2.5 py-1 rounded-lg font-medium transition-all flex items-center gap-1.5" data-mode="temp">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              <span>Sıcaklık</span>
+            </button>
+            <button class="mode-btn px-2 sm:px-2.5 py-1 rounded-lg font-medium transition-all flex items-center gap-1.5" data-mode="apparent">
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+              <span>Hissedilen</span>
+            </button>
+            <button class="mode-btn px-2 sm:px-2.5 py-1 rounded-lg font-medium transition-all flex items-center gap-1.5" data-mode="dew">
+              <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+              <span>Çiğ Noktası</span>
+            </button>
+            <button class="mode-btn px-2 sm:px-2.5 py-1 rounded-lg font-medium transition-all flex items-center gap-1.5" data-mode="hum">
+              <span class="w-1.5 h-1.5 rounded-full bg-cyan-500"></span>
+              <span>Nem</span>
+            </button>
+            <button class="mode-btn px-2 sm:px-2.5 py-1 rounded-lg font-medium transition-all flex items-center gap-1.5" data-mode="press">
+              <span class="w-1.5 h-1.5 rounded-full bg-pink-500"></span>
+              <span>Buhar B.</span>
+            </button>
           </div>
 
+        </div>
+      </div>
+
+      <!-- Chart Live Statistics Summary Strip -->
+      <div id="chartStatsStrip" class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-2xl bg-slate-50/90 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800/80 text-xs">
+        <div class="flex flex-col">
+          <span class="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-sans font-medium flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            Ortalama Sıcaklık
+          </span>
+          <div class="flex items-baseline gap-1 mt-0.5">
+            <span id="chartStatAvgTemp" class="font-mono font-bold text-sm sm:text-base text-emerald-600 dark:text-emerald-400">--.-</span>
+            <span class="text-[10px] font-bold text-emerald-600 dark:text-emerald-400" id="chartStatTempUnit">°C</span>
+            <span id="chartStatTempMinMax" class="text-[10px] font-mono text-slate-400 dark:text-slate-500 ml-auto truncate">(-- / --)</span>
+          </div>
+        </div>
+        <div class="flex flex-col">
+          <span class="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-sans font-medium flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-cyan-500"></span>
+            Ortalama Bağıl Nem
+          </span>
+          <div class="flex items-baseline gap-1 mt-0.5">
+            <span id="chartStatAvgHum" class="font-mono font-bold text-sm sm:text-base text-cyan-600 dark:text-cyan-400">--</span>
+            <span class="text-[10px] font-bold text-cyan-600 dark:text-cyan-400">%</span>
+            <span id="chartStatHumMinMax" class="text-[10px] font-mono text-slate-400 dark:text-slate-500 ml-auto truncate">(-- / --)</span>
+          </div>
+        </div>
+        <div class="flex flex-col">
+          <span class="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-sans font-medium flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+            Ortalama Çiğ Noktası
+          </span>
+          <div class="flex items-baseline gap-1 mt-0.5">
+            <span id="chartStatAvgDew" class="font-mono font-bold text-sm sm:text-base text-purple-600 dark:text-purple-400">--.-</span>
+            <span class="text-[10px] font-bold text-purple-600 dark:text-purple-400" id="chartStatDewUnit">°C</span>
+          </div>
+        </div>
+        <div class="flex flex-col">
+          <span class="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-sans font-medium flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+            Grafik Penceresi
+          </span>
+          <div class="flex items-baseline gap-1 mt-0.5">
+            <span id="chartStatPoints" class="font-mono font-bold text-sm sm:text-base text-slate-700 dark:text-slate-200">0</span>
+            <span class="text-[10px] text-slate-400 dark:text-slate-500">nokta</span>
+            <span id="chartStatTimeSpan" class="text-[10px] font-mono text-slate-400 dark:text-slate-500 ml-auto truncate">--</span>
+          </div>
         </div>
       </div>
 

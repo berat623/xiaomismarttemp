@@ -1,4 +1,4 @@
-/* Xiaomi SmartTemp Pro — Mobile-First Flawless Styles */
+/* Xiaomi SmartTemp Pro — Ultra-Modern Mobile-First Stylesheet */
 
 /* Base Typography & Mobile Rendering */
 *, *::before, *::after {
@@ -9,6 +9,7 @@
 html {
   -webkit-text-size-adjust: 100%;
   touch-action: manipulation;
+  scroll-behavior: smooth;
 }
 
 body {
@@ -18,7 +19,7 @@ body {
   padding-bottom: max(2rem, env(safe-area-inset-bottom));
 }
 
-/* Custom Scrollbars */
+/* Custom Sleek Scrollbars */
 ::-webkit-scrollbar {
   width: 5px;
   height: 5px;
@@ -28,16 +29,54 @@ body {
 }
 ::-webkit-scrollbar-thumb {
   background: #cbd5e1;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 .dark ::-webkit-scrollbar-thumb {
-  background: #1e293b;
+  background: #334155;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
 .dark ::-webkit-scrollbar-thumb:hover {
-  background: #334155;
+  background: #475569;
+}
+
+/* Glassmorphism & Card Styles */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(226, 232, 240, 0.85);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.03), 0 2px 6px -1px rgba(0, 0, 0, 0.02);
+}
+
+.dark .glass-panel {
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(51, 65, 85, 0.6);
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.4);
+}
+
+/* Metric Cards Hover & Active Touch */
+.metric-card {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.22s ease, box-shadow 0.22s ease;
+}
+
+@media (hover: hover) {
+  .metric-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 28px -5px rgba(0, 0, 0, 0.08);
+  }
+  .dark .metric-card:hover {
+    box-shadow: 0 12px 30px -5px rgba(0, 0, 0, 0.5);
+  }
+}
+
+.metric-card:active {
+  transform: scale(0.99);
 }
 
 /* Filter and Mode Toggle Buttons (Light Mode) */
@@ -45,6 +84,7 @@ body {
   color: #64748b;
   font-weight: 500;
   touch-action: manipulation;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .filter-btn:hover {
   color: #0f172a;
@@ -53,13 +93,15 @@ body {
   background-color: #22c55e;
   color: #ffffff;
   font-weight: 700;
-  box-shadow: 0 4px 10px rgba(34, 197, 94, 0.3);
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.35);
 }
 
 .mode-btn {
   color: #64748b;
   font-weight: 500;
   touch-action: manipulation;
+  white-space: nowrap;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .mode-btn:hover {
   color: #0f172a;
@@ -68,7 +110,7 @@ body {
   background-color: #0891b2;
   color: #ffffff;
   font-weight: 700;
-  box-shadow: 0 4px 10px rgba(8, 145, 178, 0.3);
+  box-shadow: 0 4px 12px rgba(8, 145, 178, 0.35);
 }
 
 /* Dark Mode Overrides for Filter/Mode Buttons */
@@ -82,6 +124,7 @@ body {
   background-color: #22c55e;
   color: #020617;
   font-weight: 700;
+  box-shadow: 0 4px 14px rgba(34, 197, 94, 0.45);
 }
 
 .dark .mode-btn {
@@ -94,16 +137,7 @@ body {
   background-color: #06b6d4;
   color: #020617;
   font-weight: 700;
-}
-
-/* Metric Cards Hover & Active Touch */
-.metric-card {
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease, box-shadow 0.2s ease;
-}
-@media (hover: hover) {
-  .metric-card:hover {
-    transform: translateY(-2px);
-  }
+  box-shadow: 0 4px 14px rgba(6, 182, 212, 0.45);
 }
 
 /* Pulsing Status Dot */
@@ -113,8 +147,8 @@ body {
     transform: scale(1);
   }
   50% {
-    opacity: 0.6;
-    transform: scale(1.25);
+    opacity: 0.55;
+    transform: scale(1.28);
   }
 }
 .dot-live {
@@ -124,7 +158,7 @@ body {
 /* Toast Animation */
 @keyframes slideInUp {
   from {
-    transform: translateY(1rem);
+    transform: translateY(1.2rem);
     opacity: 0;
   }
   to {
@@ -134,6 +168,43 @@ body {
 }
 .toast-animate {
   animation: slideInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* 4-Bar Signal Strength Meter Styles */
+.signal-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 14px;
+}
+.signal-bar {
+  width: 3px;
+  background-color: #cbd5e1;
+  border-radius: 1px;
+  transition: background-color 0.3s ease, height 0.3s ease;
+}
+.dark .signal-bar {
+  background-color: #334155;
+}
+.signal-bar.active {
+  background-color: #10b981;
+}
+.dark .signal-bar.active {
+  background-color: #34d399;
+}
+.signal-bar:nth-child(1) { height: 4px; }
+.signal-bar:nth-child(2) { height: 7px; }
+.signal-bar:nth-child(3) { height: 10px; }
+.signal-bar:nth-child(4) { height: 14px; }
+
+/* Numeric Flash Animation on Live Reading Arrival */
+@keyframes valueFlash {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.03); color: #10b981; }
+  100% { transform: scale(1); }
+}
+.value-flash {
+  animation: valueFlash 0.4s ease-out;
 }
 
 /* Mobile-Specific Tweaks */
@@ -149,11 +220,20 @@ body {
   }
   
   body {
-    padding-bottom: max(2.5rem, env(safe-area-inset-bottom));
+    padding-bottom: max(3rem, env(safe-area-inset-bottom));
   }
 
-  /* Larger touch targets for buttons */
+  /* Ergonomic touch targets */
   button {
-    min-height: 38px;
+    min-height: 40px;
+  }
+
+  /* Smooth scroll container for buttons */
+  .touch-scroll {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .touch-scroll::-webkit-scrollbar {
+    display: none;
   }
 }
