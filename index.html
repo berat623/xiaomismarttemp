@@ -98,6 +98,12 @@
           <span id="lastUpdatedAgo" class="text-slate-400 hidden">• Az önce</span>
         </div>
 
+        <!-- Live Signal / RSSI Pill (Desktop) -->
+        <div id="signalPill" class="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 text-xs font-mono font-semibold text-emerald-600 dark:text-emerald-400" title="Bluetooth Sinyal Gücü (RSSI)">
+          <i data-lucide="radio" class="w-3.5 h-3.5 text-emerald-500 animate-pulse"></i>
+          <span id="signalRssiText">-- dBm</span>
+        </div>
+
         <!-- Desktop Action Buttons -->
         <div class="hidden sm:flex items-center gap-2">
           <button id="btnConnect" class="px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 bg-emerald-500 hover:bg-emerald-600 dark:bg-gradient-to-r dark:from-emerald-500 dark:to-teal-500 text-white dark:text-slate-950 shadow-md shadow-emerald-500/20 transition-all active:scale-95">
@@ -137,6 +143,11 @@
         <span>Geçmiş</span>
       </button>
 
+      <!-- Live Signal on Mobile -->
+      <div id="signalPillMobile" class="hidden px-2.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 items-center justify-center font-mono text-[11px] font-bold text-emerald-600 dark:text-emerald-400" title="Bluetooth Sinyal Gücü">
+        <span id="signalRssiTextMobile">-- dBm</span>
+      </div>
+
       <div class="px-2.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center" title="Bağlantı Durumu">
         <span id="connectionDotMobile" class="w-2.5 h-2.5 rounded-full bg-slate-400 dark:bg-slate-500"></span>
       </div>
@@ -157,6 +168,26 @@
       </div>
       <div class="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
         <div id="syncProgressBar" class="h-full bg-gradient-to-r from-cyan-500 to-emerald-400 rounded-full transition-all duration-300" style="width: 0%"></div>
+      </div>
+    </div>
+
+    <!-- BLE Multi-Protocol & Signal Status Banner -->
+    <div id="bleModeBanner" class="p-3 sm:p-3.5 rounded-2xl bg-white/90 dark:bg-slate-900/70 border border-emerald-500/30 backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <div class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse flex-shrink-0"></div>
+        <div class="min-w-0">
+          <p class="font-semibold text-slate-800 dark:text-slate-200">
+            <span class="text-emerald-600 dark:text-emerald-400">Çoklu BLE Uyumluluğu:</span> ATC Modlu Firmware & Xiaomi Orijinal LYWSD03MMC
+          </p>
+          <p class="text-[11px] text-slate-500 dark:text-slate-400">
+            Cihaza Bağlan dediğinizde çevredeki tüm BLE cihazları listelenir; <strong class="text-emerald-600 dark:text-emerald-400">ATC_...</strong> cihazınızı seçtiğinizde yayın sinyalleri ve sensör verileri anında yakalanır.
+          </p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <span id="bleLiveStatusTag" class="font-mono text-[10px] uppercase px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-bold border border-emerald-500/20">
+          Sinyal Dinleme Hazır
+        </span>
       </div>
     </div>
 
@@ -345,6 +376,16 @@
             <span class="text-slate-400 dark:text-slate-500">Kayıt:</span>
             <span id="totalPointsCount" class="font-mono font-medium text-slate-700 dark:text-slate-300">0</span>
           </div>
+        </div>
+
+        <div class="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800/60 text-xs text-slate-500 dark:text-slate-400">
+          <div class="flex items-center gap-1.5">
+            <span class="text-slate-400 dark:text-slate-500">Sinyal (RSSI):</span>
+            <span id="valRssi" class="font-mono font-bold text-emerald-600 dark:text-emerald-400">-- dBm</span>
+          </div>
+          <span id="valFirmwareBadge" class="text-[10px] font-mono px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 font-medium">
+            Otomatik Algılama
+          </span>
         </div>
       </div>
 

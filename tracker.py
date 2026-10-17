@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """
-Xiaomi LYWSD03MMC SmartTemp Tracker (Python BLE Client)
-Reads real-time data & downloads internal flash history records via Bleak.
-Calculates accurate derived meteorological parameters:
-  - Dew Point (Çiğ Noktası) via Alduchov & Eskridge (1996) Magnus formula
-  - Apparent Temperature (Hissedilen Sıcaklık) via Steadman (1984) & NOAA Rothfusz
-  - Vapor Pressure (Buhar Basıncı & VPD) via Buck (1981)
+Xiaomi LYWSD03MMC & ATC / PVVX Modded Firmware SmartTemp Tracker (Python BLE Client)
+Reads real-time data & downloads history via Bleak.
+Supports:
+  1. BLE Advertisement Listening (--listen): Catches live broadcast packets without connection!
+  2. GATT Connection (--live): Supports both Xiaomi Stock (ebe0ccb0) and ATC Modded Firmware (0x181A, 0x1F10)
+  3. Accurate Scientific Atmospheric Metrics:
+     - Dew Point (Alduchov & Eskridge 1996 Magnus)
+     - Apparent Temperature (Steadman 1984 & NOAA Rothfusz)
+     - Vapor Pressure & VPD (Buck 1981)
 Saves to SQLite database and CSV.
 """
 
@@ -22,29 +25,34 @@ from typing import Optional, List, Tuple
 try:
     from bleak import BleakClient, BleakScanner
     from bleak.backends.characteristic import BleakGATTCharacteristic
+    from bleak.backends.scanner import AdvertisementData
+    from bleak.backends.device import BLEDevice
 except ImportError:
     print("HATA: 'bleak' kütüphanesi yüklü değil. Kurmak için:")
     print("pip install -r requirements.txt")
     sys.exit(1)
 
-# UUIDs for Xiaomi Mijia LYWSD03MMC
-SERVICE_UUID = "ebe0ccb0-7a0a-4b0c-8a1a-6ff2997da3a6"
-CHAR_LIVE_DATA = "ebe0ccc1-7a0a-4b0c-8a1a-6ff2997da3a6"       # 5 bytes: [temp, hum, volt]
-CHAR_BATTERY = "ebe0ccc4-7a0a-4b0c-8a1a-6ff2997da3a6"         # 1 byte %
-CHAR_TIMESTAMP = "ebe0ccb7-7a0a-4b0c-8a1a-6ff2997da3a6"       # 4 bytes uint32 epoch sec
-CHAR_FIRST_REC_IDX = "ebe0ccba-7a0a-4b0c-8a1a-6ff2997da3a6"   # 4 bytes uint32
-CHAR_LAST_CALC_IDX = "ebe0ccb9-7a0a-4b0c-8a1a-6ff2997da3a6"   # 8 bytes: [last_calc_idx, last_rec_idx]
-CHAR_HISTORY_STREAM = "ebe0ccbc-7a0a-4b0c-8a1a-6ff2997da3a6"  # 14 bytes: [idx, ts, tMax, hMax, tMin, hMin]
-CHAR_LAST_HOUR_DATA = "ebe0ccbb-7a0a-4b0c-8a1a-6ff2997da3a6"   # 14 bytes
+# Service and Characteristic UUIDs
+SERVICE_STOCK_XIAOMI = "ebe0ccb0-7a0a-4b0c-8a1a-6ff2997da3a6"
+CHAR_STOCK_LIVE = "ebe0ccc1-7a0a-4b0c-8a1a-6ff2997da3a6"       # 5 bytes: [temp, hum, volt]
+CHAR_STOCK_TIMESTAMP = "ebe0ccb7-7a0a-4b0c-8a1a-6ff2997da3a6"  # 4 bytes uint32
+CHAR_STOCK_HISTORY = "ebe0ccbc-7a0a-4b0c-8a1a-6ff2997da3a6"    # 14 bytes
+CHAR_STOCK_LAST_HOUR = "ebe0ccbb-7a0a-4b0c-8a1a-6ff2997da3a6"  # 14 bytes
+
+# ATC / PVVX Standard Characteristics
+UUID_ENV_SENSING = "0000181a-0000-1000-8000-00805f9b34fb"
+CHAR_TEMP_HIGH_RES = "00002a6e-0000-1000-8000-00805f9b34fb"    # int16 / 100
+CHAR_TEMP_STD = "00002a1f-0000-1000-8000-00805f9b34fb"         # int16 / 10
+CHAR_HUMIDITY = "00002a6f-0000-1000-8000-00805f9b34fb"         # uint16 / 100 or uint8
+CHAR_BATTERY = "00002a19-0000-1000-8000-00805f9b34fb"          # uint8 %
+CHAR_ATC_CUSTOM = "00001f1f-0000-1000-8000-00805f9b34fb"
 
 DB_FILE = "xiaomi_temp.db"
 CSV_FILE = "xiaomi_measurements.csv"
 
 
 def calc_dew_point(temp: float, hum: float) -> float:
-    """
-    Çiğ Noktası: Alduchov & Eskridge (1996) Magnus yaklaşımı (WMO Standardı)
-    """
+    """Çiğ Noktası: Alduchov & Eskridge (1996) Magnus yaklaşımı (WMO Standardı)"""
     if hum <= 0:
         return temp
     a = 17.625
@@ -55,10 +63,7 @@ def calc_dew_point(temp: float, hum: float) -> float:
 
 
 def calc_vapor_pressure(temp: float, hum: float) -> Tuple[float, float, float]:
-    """
-    Buhar Basıncı: Buck (1981) formülü
-    Dönüş: (vp_act in hPa, vp_sat in hPa, vpd in kPa)
-    """
+    """Buhar Basıncı: Buck (1981) formülü -> (vp_act in hPa, vp_sat in hPa, vpd in kPa)"""
     vp_sat = 6.1121 * math.exp((17.502 * temp) / (240.97 + temp))
     vp_act = vp_sat * (max(0.0, min(100.0, float(hum))) / 100.0)
     vpd = (vp_sat - vp_act) / 10.0
@@ -66,9 +71,7 @@ def calc_vapor_pressure(temp: float, hum: float) -> Tuple[float, float, float]:
 
 
 def calc_apparent_temp(temp: float, hum: float) -> float:
-    """
-    Hissedilen Sıcaklık: Steadman (1984) iç ortam modeli + NOAA Rothfusz Heat Index
-    """
+    """Hissedilen Sıcaklık: Steadman (1984) iç ortam modeli + NOAA Rothfusz Heat Index"""
     e = (hum / 100.0) * 6.105 * math.exp((17.27 * temp) / (237.7 + temp))
 
     if temp >= 26.7 and hum >= 40:
@@ -108,155 +111,213 @@ class DatabaseManager:
                     voltage REAL,
                     dew_point REAL,
                     vapor_pressure REAL,
-                    vpd REAL
+                    vpd REAL,
+                    rssi INTEGER
                 )
             """)
-            # Migration check for existing databases
             cursor = self.conn.execute("PRAGMA table_info(measurements)")
             columns = [row[1] for row in cursor.fetchall()]
-            if "apparent_temp" not in columns:
-                try:
-                    self.conn.execute("ALTER TABLE measurements ADD COLUMN apparent_temp REAL")
-                except Exception:
-                    pass
-            if "vapor_pressure" not in columns:
-                try:
-                    self.conn.execute("ALTER TABLE measurements ADD COLUMN vapor_pressure REAL")
-                except Exception:
-                    pass
+            for col in ["apparent_temp", "vapor_pressure", "rssi"]:
+                if col not in columns:
+                    try:
+                        self.conn.execute(f"ALTER TABLE measurements ADD COLUMN {col} REAL")
+                    except Exception:
+                        pass
 
-    def insert(self, record_type: str, temp: float, hum: int, bat: Optional[int], volt: Optional[float], ts: Optional[datetime.datetime] = None):
+    def insert(self, record_type: str, temp: float, hum: int, bat: Optional[int], volt: Optional[float], rssi: Optional[int] = None, ts: Optional[datetime.datetime] = None):
         if ts is None:
             ts = datetime.datetime.now()
         dew = calc_dew_point(temp, hum)
         at = calc_apparent_temp(temp, hum)
-        vp_act, vp_sat, vpd = calc_vapor_pressure(temp, hum)
+        vp_act, _, vpd = calc_vapor_pressure(temp, hum)
         ts_str = ts.strftime("%Y-%m-%d %H:%M:%S")
 
         with self.conn:
             self.conn.execute("""
-                INSERT INTO measurements (timestamp, record_type, temperature, apparent_temp, humidity, battery, voltage, dew_point, vapor_pressure, vpd)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (ts_str, record_type, temp, at, hum, bat, volt, dew, vp_act, vpd))
+                INSERT INTO measurements (timestamp, record_type, temperature, apparent_temp, humidity, battery, voltage, dew_point, vapor_pressure, vpd, rssi)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (ts_str, record_type, temp, at, hum, bat, volt, dew, vp_act, vpd, rssi))
 
         # Append to CSV
         file_exists = os.path.exists(CSV_FILE)
         with open(CSV_FILE, "a", encoding="utf-8") as f:
             if not file_exists:
-                f.write("Tarih_Saat;Tur;Sicaklik_C;Hissedilen_Sicaklik_C;Nem_Yuzde;Cig_Noktasi_C;Buhar_Basinci_hPa;VPD_kPa;Pil_Yuzde;Voltaj_V\n")
-            f.write(f"{ts_str};{record_type};{temp:.2f};{at:.1f};{hum};{dew:.1f};{vp_act:.1f};{vpd:.2f};{bat or ''};{volt or ''}\n")
+                f.write("Tarih_Saat;Tur;Sicaklik_C;Hissedilen_Sicaklik_C;Nem_Yuzde;Cig_Noktasi_C;Buhar_Basinci_hPa;VPD_kPa;Pil_Yuzde;Voltaj_V;RSSI_dBm\n")
+            f.write(f"{ts_str};{record_type};{temp:.2f};{at:.1f};{hum};{dew:.1f};{vp_act:.1f};{vpd:.2f};{bat or ''};{volt or ''};{rssi or ''}\n")
 
 
 async def scan_devices():
-    print("🔍 Çevredeki Xiaomi Bluetooth cihazları taranıyor (5 saniye)...")
-    devices = await BleakScanner.discover(timeout=5.0)
-    xiaomi_devices = []
+    print("🔍 Çevredeki tüm Bluetooth BLE cihazları taranıyor (ATC / Xiaomi / Modlu dahil)...")
+    discovered = await BleakScanner.discover(timeout=6.0, return_adv=True)
+    all_devices = []
 
-    for d in devices:
-        name = d.name or ""
-        if "LYWSD03MMC" in name or "ATC" in name or "MHO" in name or name.startswith("Xiaomi"):
-            xiaomi_devices.append(d)
+    for d, adv in discovered.values():
+        name = d.name or adv.local_name or ""
+        name_lower = name.lower()
+        uuids = [u.lower() for u in adv.service_uuids]
+        is_xiaomi = ("lywsd" in name_lower or "atc" in name_lower or "mho" in name_lower or "thermo" in name_lower
+                     or any("181a" in u or "ebe0" in u or "fe95" in u or "1f10" in u for u in uuids))
 
-    if not xiaomi_devices:
-        print("⚠️ Yakında Xiaomi LYWSD03MMC bulunamadı. Tüm BLE cihazları listeleniyor:")
-        for d in devices:
-            if d.name:
-                print(f"  • {d.address} -> {d.name} (Sinyal: {d.rssi} dBm)")
+        all_devices.append((d, adv, is_xiaomi))
+
+    matched = [item for item in all_devices if item[2]]
+
+    print("\n" + "=" * 60)
+    if matched:
+        print(f"✅ {len(matched)} Xiaomi / ATC Termometresi Bulundu:")
+        for d, adv, _ in matched:
+            name = d.name or adv.local_name or "İsimsiz Cihaz"
+            print(f"  ⭐ {d.address} — {name} (Sinyal RSSI: {adv.rssi} dBm)")
     else:
-        print(f"✅ {len(xiaomi_devices)} Xiaomi sensörü bulundu:")
-        for d in xiaomi_devices:
-            print(f"  ⭐ {d.address} — {d.name} (Sinyal: {d.rssi} dBm)")
-    return xiaomi_devices
+        print("⚠️ İsmi eşleşen cihaz bulunamadı. Çevredeki tüm BLE cihazları:")
+        for d, adv, _ in all_devices[:15]:
+            name = d.name or adv.local_name or "Bilinmeyen"
+            print(f"  • {d.address} — {name} (Sinyal RSSI: {adv.rssi} dBm)")
+    print("=" * 60 + "\n")
+    return [item[0] for item in matched] or [item[0] for item in all_devices]
 
 
-async def run_live(mac_address: str, db: DatabaseManager):
+def parse_atc_advertisement(data: bytes) -> Optional[Tuple[float, int, float, int]]:
+    """ATC1441 veya PVVX BLE sinyal yayın paketini çözümler"""
+    if len(data) >= 15:
+        # PVVX Format (Little-Endian)
+        # Byte 6-7: temp (int16 / 100), Byte 8-9: hum (int16 / 100), Byte 10-11: volt (mV), Byte 12: bat %
+        temp = struct.unpack_from("<h", data, 6)[0] / 100.0
+        hum = round(struct.unpack_from("<h", data, 8)[0] / 100.0)
+        volt = struct.unpack_from("<H", data, 10)[0] / 1000.0
+        bat = data[12]
+        return round(temp, 2), hum, round(volt, 2), bat
+    elif len(data) >= 13:
+        # ATC1441 Format (Big-Endian)
+        # Byte 6-7: temp (int16 / 10), Byte 8: hum (uint8), Byte 9: bat (uint8), Byte 10-11: volt (mV)
+        temp = struct.unpack_from(">h", data, 6)[0] / 10.0
+        hum = data[8]
+        bat = data[9]
+        volt = struct.unpack_from(">H", data, 10)[0] / 1000.0
+        return round(temp, 2), hum, round(volt, 2), bat
+    return None
+
+
+async def run_passive_listener(mac_address: Optional[str], db: DatabaseManager):
+    """Cihaza hiç bağlanmadan havadaki BLE sinyallerini (Advertisements) canlı dinler ve kaydeder"""
+    print("📡 Pasif BLE Sinyal Yakalayıcı Başlatıldı (Eşleme / Bağlantı gerektirmez)...")
+    print("Çıkmak için Ctrl+C tuşlarına basın.\n")
+
+    def detection_callback(device: BLEDevice, advertisement_data: AdvertisementData):
+        if mac_address and device.address.lower() != mac_address.lower():
+            return
+
+        name = device.name or advertisement_data.local_name or ""
+        service_data = advertisement_data.service_data
+
+        # 0x181A Service Data kontrolü
+        for uuid, raw_bytes in service_data.items():
+            if "181a" in uuid.lower():
+                parsed = parse_atc_advertisement(raw_bytes)
+                if parsed:
+                    temp, hum, volt, bat = parsed
+                    at = calc_apparent_temp(temp, hum)
+                    dew = calc_dew_point(temp, hum)
+                    vp_act, _, vpd = calc_vapor_pressure(temp, hum)
+                    now_str = datetime.datetime.now().strftime("%H:%M:%S")
+
+                    print(f"[{now_str}] 📶 [{advertisement_data.rssi} dBm] {device.address} ({name}) -> "
+                          f"🌡️ {temp}°C | ☀️ His: {at}°C | 💧 %{hum} | 🌧️ Çiğ: {dew}°C | 💨 {vp_act} hPa | 🔋 %{bat} ({volt}V)")
+
+                    db.insert("ble_adv", temp, hum, bat, volt, rssi=advertisement_data.rssi)
+
+    scanner = BleakScanner(detection_callback=detection_callback)
+    await scanner.start()
+    try:
+        while True:
+            await asyncio.sleep(1)
+    finally:
+        await scanner.stop()
+
+
+async def run_live_gatt(mac_address: str, db: DatabaseManager):
+    """GATT bağlantısı kurarak hem Xiaomi Stock hem de ATC Modlu cihazları canlı dinler"""
     print(f"📡 {mac_address} adresine bağlanılıyor...")
     async with BleakClient(mac_address) as client:
-        print("✅ Bağlantı kuruldu! Canlı veriler dinleniyor (Çıkmak için Ctrl+C)...")
+        print("✅ Bağlantı kuruldu! Donanım ve servis profili algılanıyor...")
 
-        def notification_handler(sender: BleakGATTCharacteristic, data: bytearray):
-            if len(data) >= 5:
-                temp_raw = struct.unpack_from("<h", data, 0)[0]
-                temp = round(temp_raw / 100.0, 2)
-                hum = data[2]
-                volt_raw = struct.unpack_from("<h", data, 3)[0]
-                volt = round(volt_raw / 1000.0, 2)
-                bat = min(100, max(0, int(round((volt - 2.1) / 1.0 * 100))))
+        # Servisleri listele
+        char_uuids = [c.uuid.lower() for c in client.services.characteristics.values()]
+        is_stock = CHAR_STOCK_LIVE.lower() in char_uuids
+        is_atc = CHAR_TEMP_HIGH_RES.lower() in char_uuids or CHAR_HUMIDITY.lower() in char_uuids or CHAR_ATC_CUSTOM.lower() in char_uuids
 
-                dew = calc_dew_point(temp, hum)
-                at = calc_apparent_temp(temp, hum)
-                vp_act, _, vpd = calc_vapor_pressure(temp, hum)
+        cached_temp = None
+        cached_hum = None
+        cached_bat = 100
+        cached_volt = 3.0
 
-                now_str = datetime.datetime.now().strftime("%H:%M:%S")
-                print(f"[{now_str}] 🌡️ Sıcaklık: {temp}°C | ☀️ Hissedilen: {at}°C | 💧 Nem: %{hum} | 🌧️ Çiğ N.: {dew}°C | 💨 Buhar B.: {vp_act} hPa (VPD: {vpd} kPa) | 🔋 Pil: %{bat} ({volt}V)")
-                db.insert("live", temp, hum, bat, volt)
+        if is_stock:
+            print("⭐ Profil: Orijinal Xiaomi LYWSD03MMC Firmware")
 
-        await client.start_notify(CHAR_LIVE_DATA, notification_handler)
+            def stock_handler(sender: BleakGATTCharacteristic, data: bytearray):
+                if len(data) >= 5:
+                    temp_raw = struct.unpack_from("<h", data, 0)[0]
+                    temp = round(temp_raw / 100.0, 2)
+                    hum = data[2]
+                    volt_raw = struct.unpack_from("<h", data, 3)[0]
+                    volt = round(volt_raw / 1000.0, 2)
+                    bat = min(100, max(0, int(round((volt - 2.1) / 1.0 * 100))))
+
+                    dew = calc_dew_point(temp, hum)
+                    at = calc_apparent_temp(temp, hum)
+                    vp_act, _, vpd = calc_vapor_pressure(temp, hum)
+
+                    now_str = datetime.datetime.now().strftime("%H:%M:%S")
+                    print(f"[{now_str}] 🌡️ {temp}°C | ☀️ His: {at}°C | 💧 %{hum} | 🌧️ Çiğ: {dew}°C | 💨 {vp_act} hPa | 🔋 %{bat} ({volt}V)")
+                    db.insert("live_stock", temp, hum, bat, volt)
+
+            await client.start_notify(CHAR_STOCK_LIVE, stock_handler)
+
+        elif is_atc:
+            print("⭐ Profil: ATC / PVVX Modlu Firmware (0x181A & 0x1F10)")
+
+            def emit_atc():
+                nonlocal cached_temp, cached_hum, cached_bat, cached_volt
+                if cached_temp is not None and cached_hum is not None:
+                    dew = calc_dew_point(cached_temp, cached_hum)
+                    at = calc_apparent_temp(cached_temp, cached_hum)
+                    vp_act, _, vpd = calc_vapor_pressure(cached_temp, cached_hum)
+                    now_str = datetime.datetime.now().strftime("%H:%M:%S")
+                    print(f"[{now_str}] 🌡️ {cached_temp}°C | ☀️ His: {at}°C | 💧 %{cached_hum} | 🌧️ Çiğ: {dew}°C | 💨 {vp_act} hPa | 🔋 %{cached_bat} ({cached_volt}V)")
+                    db.insert("live_atc", cached_temp, cached_hum, cached_bat, cached_volt)
+
+            def temp_handler(sender: BleakGATTCharacteristic, data: bytearray):
+                nonlocal cached_temp
+                if len(data) >= 2:
+                    cached_temp = round(struct.unpack_from("<h", data, 0)[0] / 100.0, 2)
+                    emit_atc()
+
+            def hum_handler(sender: BleakGATTCharacteristic, data: bytearray):
+                nonlocal cached_hum
+                if len(data) >= 2:
+                    cached_hum = round(struct.unpack_from("<H", data, 0)[0] / 100.0)
+                elif len(data) == 1:
+                    cached_hum = data[0]
+                emit_atc()
+
+            if CHAR_TEMP_HIGH_RES.lower() in char_uuids:
+                await client.start_notify(CHAR_TEMP_HIGH_RES, temp_handler)
+            if CHAR_HUMIDITY.lower() in char_uuids:
+                await client.start_notify(CHAR_HUMIDITY, hum_handler)
+
+        else:
+            print("⚠️ Özel karakteristiğe ulaşılamadı, sinyaller pasif dinleyici üzerinden takip ediliyor.")
 
         while True:
             await asyncio.sleep(1)
 
 
-async def run_history(mac_address: str, db: DatabaseManager):
-    print(f"📦 {mac_address} adresine bağlanılıyor (Dahili Hafıza İndirme)...")
-    async with BleakClient(mac_address) as client:
-        print("✅ Bağlandı. Cihaz saati güncelleniyor...")
-        now_sec = int(datetime.datetime.now().timestamp())
-        try:
-            await client.write_gatt_char(CHAR_TIMESTAMP, struct.pack("<I", now_sec))
-            print("🕒 Saat senkronize edildi.")
-        except Exception as e:
-            print(f"⚠️ Saat yazma uyarısı: {e}")
-
-        # Read Last hour record
-        try:
-            last_hour = await client.read_gatt_char(CHAR_LAST_HOUR_DATA)
-            if len(last_hour) >= 14:
-                idx, ts, t_max_raw, h_max, t_min_raw, h_min = struct.unpack_from("<IIhBhB", last_hour)
-                t_avg = round(((t_max_raw / 10.0) + (t_min_raw / 10.0)) / 2, 1)
-                h_avg = round((h_max + h_min) / 2)
-                dt = datetime.datetime.fromtimestamp(ts) if ts > 1600000000 else datetime.datetime.now()
-                at = calc_apparent_temp(t_avg, h_avg)
-                dew = calc_dew_point(t_avg, h_avg)
-                vp_act, _, vpd = calc_vapor_pressure(t_avg, h_avg)
-                print(f"📌 Son 1 Saat Özeti: {dt} -> Ort: {t_avg}°C (Hissedilen: {at}°C), Nem: %{h_avg}, Çiğ N.: {dew}°C, Buhar B.: {vp_act} hPa")
-                db.insert("history_hour", t_avg, h_avg, None, None, dt)
-        except Exception as e:
-            print(f"⚠️ Son saat kaydı okuma hatası: {e}")
-
-        # Stream history records
-        records_count = 0
-
-        def history_callback(sender: BleakGATTCharacteristic, data: bytearray):
-            nonlocal records_count
-            if len(data) >= 14:
-                idx, ts, t_max_raw, h_max, t_min_raw, h_min = struct.unpack_from("<IIhBhB", data)
-                t_avg = round(((t_max_raw / 10.0) + (t_min_raw / 10.0)) / 2, 1)
-                h_avg = round((h_max + h_min) / 2)
-                dt = datetime.datetime.fromtimestamp(ts) if ts > 1600000000 else datetime.datetime.now()
-                db.insert("history_hour", t_avg, h_avg, None, None, dt)
-                records_count += 1
-                at = calc_apparent_temp(t_avg, h_avg)
-                dew = calc_dew_point(t_avg, h_avg)
-                print(f"  📥 [{records_count}] Tarih: {dt.strftime('%d.%m.%Y %H:%M')} | Sıcaklık: {t_avg}°C | Hissedilen: {at}°C | Nem: %{h_avg} | Çiğ N.: {dew}°C")
-
-        print("🔄 Dahili geçmiş kayıtları okunuyor...")
-        try:
-            await client.start_notify(CHAR_HISTORY_STREAM, history_callback)
-            await asyncio.sleep(5.0)  # Wait for chunks
-            await client.stop_notify(CHAR_HISTORY_STREAM)
-        except Exception as e:
-            print(f"ℹ️ Akış tamamlandı veya durduruldu: {e}")
-
-        print(f"\n🎉 Toplam {records_count} geçmiş kayıt başarıyla veritabanına ({DB_FILE}) ve CSV'ye ({CSV_FILE}) aktarıldı.")
-
-
 def main():
-    parser = argparse.ArgumentParser(description="Xiaomi LYWSD03MMC Akıllı Sıcaklık, Nem & Atmosferik Takipçi")
-    parser.add_argument("--scan", action="store_true", help="Çevredeki Xiaomi sensörlerini tara")
-    parser.add_argument("--mac", type=str, help="Cihazın Bluetooth MAC adresi")
-    parser.add_argument("--live", action="store_true", help="Sürekli canlı ölçüm al ve kaydet")
-    parser.add_argument("--history", action="store_true", help="Cihazın dahili flaş hafızasındaki geçmiş verileri indir")
+    parser = argparse.ArgumentParser(description="Xiaomi LYWSD03MMC & ATC Modlu BLE Termometre Takipçisi")
+    parser.add_argument("--scan", action="store_true", help="Çevredeki tüm Bluetooth BLE cihazlarını tara")
+    parser.add_argument("--listen", action="store_true", help="Bağlantı kurmadan BLE sinyallerini (Advertisements) canlı dinle ve kaydet")
+    parser.add_argument("--live", action="store_true", help="GATT bağlantısı kurarak sürekli telemetri al")
+    parser.add_argument("--mac", type=str, help="Cihazın Bluetooth MAC adresi (örn: A4:C1:38:XX:XX:XX)")
     args = parser.parse_args()
 
     db = DatabaseManager()
@@ -265,9 +326,13 @@ def main():
         asyncio.run(scan_devices())
         return
 
+    if args.listen:
+        asyncio.run(run_passive_listener(args.mac, db))
+        return
+
     mac = args.mac
     if not mac:
-        print("MAC adresi belirtilmedi, yakındaki sensör aranıyor...")
+        print("MAC adresi belirtilmedi, çevredeki Xiaomi / ATC sensörleri taranıyor...")
         devices = asyncio.run(scan_devices())
         if devices:
             mac = devices[0].address
@@ -276,17 +341,10 @@ def main():
             print("Lütfen bir cihaz seçip --mac <ADRES> parametresiyle çalıştırın.")
             sys.exit(1)
 
-    if args.history:
-        asyncio.run(run_history(mac, db))
-    elif args.live:
-        try:
-            asyncio.run(run_live(mac, db))
-        except KeyboardInterrupt:
-            print("\nCanlı dinleme sonlandırıldı.")
-    else:
-        # Default: show history then live
-        print("İpucu: Canlı dinleme için '--live', geçmiş indirme için '--history' parametresini kullanabilirsiniz.")
-        asyncio.run(run_live(mac, db))
+    try:
+        asyncio.run(run_live_gatt(mac, db))
+    except KeyboardInterrupt:
+        print("\nCanlı dinleme sonlandırıldı.")
 
 
 if __name__ == "__main__":

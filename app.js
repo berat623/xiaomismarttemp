@@ -1,28 +1,42 @@
 /**
  * Xiaomi SmartTemp Pro — Poppins Typography & Dual Theme (Light / Dark)
- * Device: Xiaomi Mijia LYWSD03MMC
- * Derived Parameters: Dew Point, Apparent Temperature & Vapor Pressure / VPD
- * Mobile-First Responsive Design (Phone & Desktop Unified)
+ * Device: Xiaomi Mijia LYWSD03MMC (Stock & ATC / PVVX Modded Firmware Support)
+ * Full BLE Advertisement Signal Sniffer (RSSI, Packet Counter, Broadcast Decoding)
+ * Multi-Profile GATT Connection & Atmospheric Metrics (Dew Point, Apparent Temp, VPD)
  */
 
 // ==========================================
-// 1. CONSTANTS & UUID DEFINITIONS
+// 1. CONSTANTS & ALL GATT SERVICE UUIDs
 // ==========================================
-const XIAOMI_CONFIG = {
-  // Service UUIDs
-  SERVICE_UUID: 'ebe0ccb0-7a0a-4b0c-8a1a-6ff2997da3a6',
-  ENV_SENSING_UUID: '0000181a-0000-1000-8000-00805f9b34fb', // Custom FW fallback
-  BATTERY_SERVICE_UUID: '0000180f-0000-1000-8000-00805f9b34fb',
-
-  // Characteristic UUIDs (Stock Xiaomi LYWSD03MMC GATT Profile)
+const BLE_PROFILES = {
+  // 1. Xiaomi Stock Firmware Service
+  XIAOMI_SERVICE: 'ebe0ccb0-7a0a-4b0c-8a1a-6ff2997da3a6',
   CHAR_LIVE_DATA: 'ebe0ccc1-7a0a-4b0c-8a1a-6ff2997da3a6',       // 5 bytes: [temp (int16), hum (uint8), volt (int16)]
   CHAR_BATTERY: 'ebe0ccc4-7a0a-4b0c-8a1a-6ff2997da3a6',         // 1 byte %
   CHAR_UNIT: 'ebe0ccbe-7a0a-4b0c-8a1a-6ff2997da3a6',            // 0x00=C, 0x01=F
   CHAR_TIMESTAMP: 'ebe0ccb7-7a0a-4b0c-8a1a-6ff2997da3a6',       // 4 bytes uint32 epoch sec
-  CHAR_FIRST_REC_IDX: 'ebe0ccba-7a0a-4b0c-8a1a-6ff2997da3a6',   // 4 bytes uint32
   CHAR_LAST_CALC_IDX: 'ebe0ccb9-7a0a-4b0c-8a1a-6ff2997da3a6',   // 8 bytes: [last_calc_idx, last_rec_idx]
   CHAR_HISTORY_STREAM: 'ebe0ccbc-7a0a-4b0c-8a1a-6ff2997da3a6',  // 14 bytes: [idx, ts, tMax, hMax, tMin, hMin]
-  CHAR_LAST_HOUR_DATA: 'ebe0ccbb-7a0a-4b0c-8a1a-6ff2997da3a6'   // 14 bytes: latest 1-hour record
+  CHAR_LAST_HOUR_DATA: 'ebe0ccbb-7a0a-4b0c-8a1a-6ff2997da3a6',  // 14 bytes: latest 1-hour record
+
+  // 2. Standard Environmental Sensing Service (ATC / PVVX Custom Firmware)
+  ENV_SENSING_SERVICE: '0000181a-0000-1000-8000-00805f9b34fb',
+  CHAR_TEMP_HIGH_RES: '00002a6e-0000-1000-8000-00805f9b34fb',  // int16, 0.01 °C
+  CHAR_TEMP_STD: '00002a1f-0000-1000-8000-00805f9b34fb',       // int16, 0.1 °C
+  CHAR_HUMIDITY: '00002a6f-0000-1000-8000-00805f9b34fb',       // uint16, 0.01 % or uint8
+
+  // 3. Battery Service (Standard)
+  BATTERY_SERVICE: '0000180f-0000-1000-8000-00805f9b34fb',
+  CHAR_BATTERY_LEVEL: '00002a19-0000-1000-8000-00805f9b34fb',   // uint8 %
+
+  // 4. ATC / PVVX Custom Control & Telemetry Service
+  ATC_CUSTOM_SERVICE: '00001f10-0000-1000-8000-00805f9b34fb',
+  CHAR_ATC_CUSTOM: '00001f1f-0000-1000-8000-00805f9b34fb',
+
+  // 5. Xiaomi MiBeacon & BTHome UUIDs for Advertisements
+  UUID_MIBEACON: '0000fe95-0000-1000-8000-00805f9b34fb',
+  UUID_BTHOME_V2: '0000fcd2-0000-1000-8000-00805f9b34fb',
+  UUID_BTHOME_V1: '0000181c-0000-1000-8000-00805f9b34fb'
 };
 
 // ==========================================
@@ -32,7 +46,6 @@ class AtmosphericMetrics {
   /**
    * Çiğ Noktası (Dew Point - Td)
    * Formül: Alduchov & Eskridge (1996) Magnus yaklaşımı (WMO Standardı)
-   * a = 17.625, b = 243.04 °C
    */
   static calculateDewPoint(temperature, humidity) {
     if (humidity <= 0) return temperature;
@@ -46,9 +59,6 @@ class AtmosphericMetrics {
   /**
    * Buhar Basıncı (Vapor Pressure & VPD)
    * Formül: Buck (1981) denklemi
-   * vpSat: Doygunluk buhar basıncı (hPa)
-   * vpAct: Gerçek su buharı kısmi basıncı (hPa)
-   * vpd: Buhar basıncı açığı (kPa)
    */
   static calculateVaporPressure(temperature, humidity) {
     const vpSat = 6.1121 * Math.exp((17.502 * temperature) / (240.97 + temperature));
@@ -66,13 +76,11 @@ class AtmosphericMetrics {
    * Formül: Steadman (1984) iç ortam modeli + Yüksek sıcaklıklarda NOAA Rothfusz Heat Index
    */
   static calculateApparentTemp(temperature, humidity) {
-    // 1. Su buharı basıncı hesabı (hPa)
     const e = (humidity / 100.0) * 6.105 * Math.exp((17.27 * temperature) / (237.7 + temperature));
 
-    // 2. Yüksek sıcaklık ve nemde NOAA Rothfusz Isı İndeksi (Heat Index)
     if (temperature >= 26.7 && humidity >= 40) {
       const tf = (temperature * 1.8) + 32.0;
-      let hi = -42.379 +
+      const hi = -42.379 +
         (2.04901523 * tf) +
         (10.14333127 * humidity) -
         (0.22475541 * tf * humidity) -
@@ -86,14 +94,10 @@ class AtmosphericMetrics {
       return Number(tc.toFixed(1));
     }
 
-    // 3. Standart iç ortam Steadman formülü (rüzgar hızı v ≈ 0-0.2 m/s)
     const at = temperature + (0.33 * e) - 4.0;
     return Number(at.toFixed(1));
   }
 
-  /**
-   * Tüm türetilmiş parametreleri tek seferde hesaplar ve nesneye iliştirir
-   */
   static enrich(record) {
     const t = record.temperature;
     const h = record.humidity;
@@ -158,7 +162,6 @@ class TelemetryStorage {
       const req = store.getAll();
       req.onsuccess = () => {
         const raw = req.result || [];
-        // Geçmiş kayıtların türetilmiş parametreleri eksikse tamamla
         this.records = raw.map(r => AtmosphericMetrics.enrich(r));
         this.records.sort((a, b) => a.timestamp - b.timestamp);
         resolve(this.records);
@@ -218,7 +221,8 @@ class TelemetryStorage {
       'Doygunluk_Basinci_hPa',
       'VPD_kPa',
       'Pil_Yuzde',
-      'Voltaj_V'
+      'Voltaj_V',
+      'Sinyal_RSSI'
     ];
     const rows = this.records.map((r, i) => {
       const d = new Date(r.timestamp);
@@ -226,7 +230,7 @@ class TelemetryStorage {
         i + 1,
         d.toLocaleDateString('tr-TR'),
         d.toLocaleTimeString('tr-TR'),
-        r.type === 'history_hour' ? 'Cihaz Geçmişi' : 'Canlı Ölçüm',
+        r.type === 'history_hour' ? 'Cihaz Geçmişi' : (r.source === 'ble_adv' ? 'BLE Sinyal Yayını' : 'GATT Canlı'),
         r.temperature.toFixed(2),
         r.apparentTemp != null ? r.apparentTemp.toFixed(1) : '',
         r.humidity,
@@ -235,7 +239,8 @@ class TelemetryStorage {
         r.vpSat != null ? r.vpSat.toFixed(1) : '',
         r.vpd != null ? r.vpd.toFixed(2) : '',
         r.battery != null ? r.battery : '',
-        r.voltage != null ? r.voltage.toFixed(2) : ''
+        r.voltage != null ? r.voltage.toFixed(2) : '',
+        r.rssi != null ? `${r.rssi} dBm` : ''
       ].join(';');
     });
     return [headers.join(';'), ...rows].join('\r\n');
@@ -247,20 +252,32 @@ class TelemetryStorage {
 }
 
 // ==========================================
-// 4. BLUETOOTH MANAGER (Web Bluetooth API)
+// 4. MULTI-PROTOCOL BLE & SIGNAL MANAGER
 // ==========================================
-class XiaomiBleManager {
-  constructor(onDataCallback, onStatusCallback, onHistoryProgressCallback) {
+class UniversalBleManager {
+  constructor(onDataCallback, onStatusCallback, onHistoryProgressCallback, onSignalCallback) {
     this.onData = onDataCallback;
     this.onStatus = onStatusCallback;
     this.onHistoryProgress = onHistoryProgressCallback;
+    this.onSignal = onSignalCallback;
 
     this.device = null;
     this.server = null;
-    this.primaryService = null;
-    this.liveChar = null;
     this.isConnected = false;
     this.isFetchingHistory = false;
+    this.isWatchingAdvertisements = false;
+    this.deviceProfile = 'atc'; // 'atc' | 'stock_xiaomi' | 'generic'
+    this.lastRssi = null;
+    this.packetCount = 0;
+
+    // Cache of partial readings from distinct characteristics
+    this.cachedTemp = null;
+    this.cachedHum = null;
+    this.cachedBat = 100;
+    this.cachedVolt = 3.0;
+
+    // Throttle for live incoming data
+    this.lastEmitTime = 0;
   }
 
   async connect() {
@@ -268,108 +285,428 @@ class XiaomiBleManager {
       throw new Error('Tarayıcınız Web Bluetooth API desteği sağlamıyor. Lütfen Google Chrome veya Microsoft Edge kullanın.');
     }
 
-    this.onStatus('scanning', 'Cihaz aranıyor...');
+    this.onStatus('scanning', 'Bluetooth cihazları taranıyor...');
+
+    // Tam liste: Hem orijinal Xiaomi hem ATC / PVVX / BTHome servisleri
+    const optionalServices = [
+      BLE_PROFILES.XIAOMI_SERVICE,
+      BLE_PROFILES.ENV_SENSING_SERVICE,
+      0x181a,
+      BLE_PROFILES.BATTERY_SERVICE,
+      0x180f,
+      BLE_PROFILES.ATC_CUSTOM_SERVICE,
+      0x1f10,
+      '00001f11-0000-1000-8000-00805f9b34fb',
+      0x1f11,
+      '0000180a-0000-1000-8000-00805f9b34fb',
+      0x180a,
+      BLE_PROFILES.UUID_MIBEACON,
+      0xfe95,
+      BLE_PROFILES.UUID_BTHOME_V2,
+      0xfcd2,
+      BLE_PROFILES.UUID_BTHOME_V1,
+      0x181c,
+      '0000181e-0000-1000-8000-00805f9b34fb',
+      0x181e,
+      '22210000-554a-4546-5542-46534450464d',
+      '0000fff9-0000-1000-8000-00805f9b34fb',
+      0xfff9,
+      '0000fdcd-0000-1000-8000-00805f9b34fb',
+      0xfdcd,
+      '0000ffe0-0000-1000-8000-00805f9b34fb',
+      0xffe0
+    ];
 
     try {
+      // acceptAllDevices: true kullanarak tarayıcı eşleme penceresinde
+      // ATC_..., LYWSD03MMC ve modlu tüm BLE cihazlarının 100% görünmesini sağlıyoruz!
       this.device = await navigator.bluetooth.requestDevice({
-        filters: [
-          { namePrefix: 'LYWSD03MMC' },
-          { namePrefix: 'ATC' },
-          { namePrefix: 'MHO' },
-          { services: [XIAOMI_CONFIG.SERVICE_UUID] }
-        ],
-        optionalServices: [
-          XIAOMI_CONFIG.SERVICE_UUID,
-          XIAOMI_CONFIG.ENV_SENSING_UUID,
-          XIAOMI_CONFIG.BATTERY_SERVICE_UUID
-        ]
+        acceptAllDevices: true,
+        optionalServices: optionalServices
       });
-
-      this.device.addEventListener('gattserverdisconnected', () => this.handleDisconnect());
-
-      this.onStatus('connecting', `${this.device.name || 'Xiaomi Cihazı'} bağlanıyor...`);
-      this.server = await this.device.gatt.connect();
-
-      this.primaryService = await this.server.getPrimaryService(XIAOMI_CONFIG.SERVICE_UUID);
-      await this.startLiveNotifications();
-
-      this.isConnected = true;
-      this.onStatus('connected', `${this.device.name || 'LYWSD03MMC'} Bağlandı`);
-      return true;
     } catch (err) {
       this.isConnected = false;
-      this.onStatus('disconnected', 'Bağlantı iptal edildi veya başarısız.');
+      if (err.name === 'NotFoundError') {
+        this.onStatus('disconnected', 'Cihaz seçimi iptal edildi.');
+        return false;
+      }
+      this.onStatus('disconnected', 'Bluetooth cihaz listesi açılamadı.');
       throw err;
+    }
+
+    this.device.addEventListener('gattserverdisconnected', () => this.handleDisconnect());
+
+    // 1. ADVERTISMENT WATCHER (BLE Sinyalleri & Paket Yakalayıcı)
+    this.startAdvertisementWatcher();
+
+    // 2. GATT BAĞLANTISI
+    const devName = this.device.name || 'ATC Cihazı';
+    this.onStatus('connecting', `${devName} bağlanıyor...`);
+
+    try {
+      this.server = await this.device.gatt.connect();
+    } catch (connErr) {
+      console.warn('GATT bağlantısı kurulamadı, ancak BLE sinyal yayınları izleniyor:', connErr);
+      if (this.isWatchingAdvertisements) {
+        this.isConnected = true;
+        this.onStatus('connected', `${devName} (BLE Sinyal Yayını Aktif)`);
+        return true;
+      }
+      throw connErr;
+    }
+
+    // 3. ÇOKLU PROFİL OTOMATİK ALGILAMA (Stock Xiaomi vs. ATC Custom)
+    await this.setupGattProfiles();
+
+    this.isConnected = true;
+    const fwBadge = this.deviceProfile === 'atc' ? 'ATC Modlu FW' : 'Xiaomi Orijinal FW';
+    this.onStatus('connected', `${devName} (${fwBadge})`);
+    return true;
+  }
+
+  // BLE Reklam / Sinyal Yayınlarını Canlı Yakalama (watchAdvertisements)
+  startAdvertisementWatcher() {
+    if (!this.device || !this.device.watchAdvertisements) {
+      console.log('Tarayıcınızda device.watchAdvertisements desteği henüz etkinleştirilmemiş.');
+      return;
+    }
+
+    try {
+      this.device.addEventListener('advertisementreceived', (event) => {
+        this.handleAdvertisementPacket(event);
+      });
+      this.device.watchAdvertisements().then(() => {
+        this.isWatchingAdvertisements = true;
+        console.log('📡 BLE Yayın / Reklam Sinyali dinleyicisi başarıyla başlatıldı.');
+      }).catch(e => {
+        console.warn('watchAdvertisements hatası:', e);
+      });
+    } catch (e) {
+      console.warn('Sinyal dinleyicisi başlatılamadı:', e);
     }
   }
 
-  async startLiveNotifications() {
-    if (!this.primaryService) return;
+  // Gelen BLE Sinyal Yayın Paketini Çözümleme (ATC1441, PVVX, BTHome, MiBeacon)
+  handleAdvertisementPacket(event) {
+    this.packetCount++;
+    this.lastRssi = event.rssi;
 
-    try {
-      this.liveChar = await this.primaryService.getCharacteristic(XIAOMI_CONFIG.CHAR_LIVE_DATA);
-      await this.liveChar.startNotifications();
-      this.liveChar.addEventListener('characteristicvaluechanged', (e) => this.handleLivePacket(e));
+    if (this.onSignal) {
+      this.onSignal({
+        rssi: event.rssi,
+        packetCount: this.packetCount,
+        deviceName: event.device ? event.device.name : (this.device ? this.device.name : 'ATC Cihazı'),
+        profile: this.deviceProfile
+      });
+    }
 
-      // Initial direct read
-      const val = await this.liveChar.readValue();
-      this.parseAndEmitLivePacket(val);
-    } catch (err) {
-      console.warn('Özel bildirim karakteristiği alınamadı, standart çevre servisi deneniyor...', err);
-      try {
-        const envService = await this.server.getPrimaryService(XIAOMI_CONFIG.ENV_SENSING_UUID);
-        const tempChar = await envService.getCharacteristic('00002a6e-0000-1000-8000-00805f9b34fb');
-        const humChar = await envService.getCharacteristic('00002a6f-0000-1000-8000-00805f9b34fb');
+    if (!event.serviceData) return;
 
-        const tempVal = await tempChar.readValue();
-        const humVal = await humChar.readValue();
-        const temp = tempVal.getInt16(0, true) / 100.0;
-        const hum = humVal.getUint16(0, true) / 100.0;
+    for (const [key, dataView] of event.serviceData.entries()) {
+      const lowerKey = key.toLowerCase();
+      const b = dataView;
+      const len = b.byteLength;
 
-        this.onData({
-          temperature: Number(temp.toFixed(2)),
-          humidity: Math.round(hum),
-          voltage: 3.0,
-          battery: 90,
-          timestamp: Date.now(),
-          type: 'live'
-        });
-      } catch (e2) {
-        throw new Error('Sensör karakteristiklerine erişilemedi: ' + err.message);
+      // 1. Environmental Sensing Service (0x181A) — ATC / PVVX Custom Firmware
+      if (lowerKey.includes('181a')) {
+        this.deviceProfile = 'atc';
+        if (len >= 15) {
+          // PVVX Custom Format (Little Endian, 0.01 hassasiyet)
+          // 6-7: temp (int16), 8-9: humi (int16), 10-11: vbat (uint16 mV), 12: bat (uint8 %)
+          const temp = b.getInt16(6, true) / 100.0;
+          const hum = b.getInt16(8, true) / 100.0;
+          const vbat = b.getUint16(10, true) / 1000.0;
+          const bat = b.getUint8(12);
+
+          this.emitTelemetry(temp, Math.round(hum), vbat, bat, 'ble_adv', 'atc');
+          return;
+        } else if (len >= 13) {
+          // ATC1441 Format (Big Endian, 0.1 hassasiyet)
+          // 6-7: temp (int16 Big Endian), 8: humi (uint8), 9: bat (uint8), 10-11: vbat (uint16 Big Endian mV)
+          const temp = b.getInt16(6, false) / 10.0;
+          const hum = b.getUint8(8);
+          const bat = b.getUint8(9);
+          const vbat = b.getUint16(10, false) / 1000.0;
+
+          this.emitTelemetry(temp, hum, vbat, bat, 'ble_adv', 'atc');
+          return;
+        }
+      }
+
+      // 2. BTHome v2 (0xFCD2) Format
+      if (lowerKey.includes('fcd2') && len > 1) {
+        this.deviceProfile = 'atc';
+        let ptr = 1;
+        let t = null, h = null, v = 3.0, bPct = 100;
+        while (ptr < len) {
+          const id = b.getUint8(ptr);
+          if (id === 0x02 && ptr + 2 < len) {
+            t = b.getInt16(ptr + 1, true) * 0.01;
+            ptr += 3;
+          } else if (id === 0x03 && ptr + 2 < len) {
+            h = b.getUint16(ptr + 1, true) * 0.01;
+            ptr += 3;
+          } else if (id === 0x01 && ptr + 1 < len) {
+            bPct = b.getUint8(ptr + 1);
+            ptr += 2;
+          } else if (id === 0x0c && ptr + 2 < len) {
+            v = b.getUint16(ptr + 1, true) / 1000.0;
+            ptr += 3;
+          } else {
+            ptr++;
+          }
+        }
+        if (t !== null && h !== null) {
+          this.emitTelemetry(t, Math.round(h), v, bPct, 'ble_adv', 'atc');
+          return;
+        }
+      }
+
+      // 3. Xiaomi MiBeacon (0xFE95) Format
+      if (lowerKey.includes('fe95') && len >= 14) {
+        this.deviceProfile = 'stock_xiaomi';
+        for (let p = 11; p < len - 3; p++) {
+          const objId = b.getUint16(p, true);
+          const objLen = b.getUint8(p + 2);
+          if (objId === 0x100d && objLen === 4 && p + 7 <= len) {
+            const temp = b.getInt16(p + 3, true) / 10.0;
+            const hum = b.getInt16(p + 5, true) / 10.0;
+            this.emitTelemetry(temp, Math.round(hum), 3.0, 95, 'ble_adv', 'stock_xiaomi');
+            return;
+          }
+        }
       }
     }
   }
 
-  handleLivePacket(event) {
-    const value = event.target.value;
-    this.parseAndEmitLivePacket(value);
+  // GATT Servislerini Keşfet ve Abone Ol
+  async setupGattProfiles() {
+    let bound = false;
+
+    // 1. Önce ATC / Standart Environmental Sensing (0x181A) Servisini Dene
+    try {
+      const envService = await this.server.getPrimaryService(BLE_PROFILES.ENV_SENSING_SERVICE)
+        .catch(() => this.server.getPrimaryService(0x181a));
+
+      if (envService) {
+        this.deviceProfile = 'atc';
+        await this.bindAtcEnvService(envService);
+        bound = true;
+        console.log('✅ ATC Environmental Sensing (0x181A) servisine başarıyla abone olundu.');
+      }
+    } catch (e) {
+      console.log('0x181A servisi yok, diğer servisler deneniyor...');
+    }
+
+    // 2. ATC Custom Control & Telemetry Servisini (0x1F10) Dene
+    try {
+      const atcService = await this.server.getPrimaryService(BLE_PROFILES.ATC_CUSTOM_SERVICE)
+        .catch(() => this.server.getPrimaryService(0x1f10));
+
+      if (atcService) {
+        this.deviceProfile = 'atc';
+        const atcChar = await atcService.getCharacteristic(BLE_PROFILES.CHAR_ATC_CUSTOM)
+          .catch(() => atcService.getCharacteristic(0x1f1f));
+
+        if (atcChar) {
+          atcChar.addEventListener('characteristicvaluechanged', (e) => {
+            this.parseAtc1f1fPacket(e.target.value);
+          });
+          await atcChar.startNotifications().catch(() => {});
+          // 0x33 komutunu göndererek telemetri akışını tetikle
+          await atcChar.writeValueWithoutResponse(new Uint8Array([0x33])).catch(() => {});
+          bound = true;
+          console.log('✅ ATC Custom (0x1F10 / 0x1F1F) telemetri akışı başlatıldı.');
+        }
+      }
+    } catch (e) {
+      console.log('0x1F10 servisi yok.');
+    }
+
+    // 3. Pil Servisini (0x180F) Dene
+    try {
+      const batService = await this.server.getPrimaryService(BLE_PROFILES.BATTERY_SERVICE)
+        .catch(() => this.server.getPrimaryService(0x180f));
+
+      if (batService) {
+        const batChar = await batService.getCharacteristic(BLE_PROFILES.CHAR_BATTERY_LEVEL)
+          .catch(() => batService.getCharacteristic(0x2a19));
+
+        if (batChar) {
+          const val = await batChar.readValue().catch(() => null);
+          if (val && val.byteLength >= 1) {
+            this.cachedBat = val.getUint8(0);
+          }
+          batChar.addEventListener('characteristicvaluechanged', (e) => {
+            this.cachedBat = e.target.value.getUint8(0);
+            this.emitCachedTelemetry();
+          });
+          await batChar.startNotifications().catch(() => {});
+        }
+      }
+    } catch (e) {
+      console.log('0x180F pil servisi yok veya atlandı.');
+    }
+
+    // 4. Orijinal Xiaomi Servisini Dene (ebe0ccb0-...)
+    try {
+      const xiaomiService = await this.server.getPrimaryService(BLE_PROFILES.XIAOMI_SERVICE);
+      if (xiaomiService) {
+        this.deviceProfile = 'stock_xiaomi';
+        this.primaryService = xiaomiService;
+        await this.bindStockXiaomiService(xiaomiService);
+        bound = true;
+        console.log('✅ Orijinal Xiaomi GATT servisine bağlanıldı.');
+      }
+    } catch (e) {
+      console.log('Orijinal Xiaomi servisi yok (Cihaz ATC modlu firmware kullanıyor).');
+    }
+
+    if (!bound) {
+      console.warn('GATT servislerine doğrudan abone olunamadı, ancak BLE sinyal yayınları (Advertisements) canlı dinleniyor.');
+    }
   }
 
-  parseAndEmitLivePacket(value) {
+  // ATC Environmental Sensing (0x181A) Karakteristiklerini Dinle
+  async bindAtcEnvService(envService) {
+    // 1. Sıcaklık Karakteristiği (0x2A6E = 0.01°C, 0x2A1F = 0.1°C)
+    try {
+      const tempChar = await envService.getCharacteristic(BLE_PROFILES.CHAR_TEMP_HIGH_RES)
+        .catch(() => envService.getCharacteristic(BLE_PROFILES.CHAR_TEMP_STD))
+        .catch(() => envService.getCharacteristic(0x2a6e))
+        .catch(() => envService.getCharacteristic(0x2a1f));
+
+      if (tempChar) {
+        const val = await tempChar.readValue().catch(() => null);
+        if (val && val.byteLength >= 2) {
+          this.cachedTemp = val.getInt16(0, true) / 100.0;
+        }
+        tempChar.addEventListener('characteristicvaluechanged', (e) => {
+          const v = e.target.value;
+          this.cachedTemp = v.byteLength >= 2 ? v.getInt16(0, true) / 100.0 : v.getInt16(0, true) / 10.0;
+          this.emitCachedTelemetry();
+        });
+        await tempChar.startNotifications().catch(() => {});
+      }
+    } catch (err) {
+      console.warn('ATC Sıcaklık karakteristiği açılamadı:', err);
+    }
+
+    // 2. Nem Karakteristiği (0x2A6F)
+    try {
+      const humChar = await envService.getCharacteristic(BLE_PROFILES.CHAR_HUMIDITY)
+        .catch(() => envService.getCharacteristic(0x2a6f));
+
+      if (humChar) {
+        const val = await humChar.readValue().catch(() => null);
+        if (val && val.byteLength >= 2) {
+          this.cachedHum = Math.round(val.getUint16(0, true) / 100.0);
+        } else if (val && val.byteLength === 1) {
+          this.cachedHum = val.getUint8(0);
+        }
+        humChar.addEventListener('characteristicvaluechanged', (e) => {
+          const v = e.target.value;
+          this.cachedHum = v.byteLength >= 2 ? Math.round(v.getUint16(0, true) / 100.0) : v.getUint8(0);
+          this.emitCachedTelemetry();
+        });
+        await humChar.startNotifications().catch(() => {});
+      }
+    } catch (err) {
+      console.warn('ATC Nem karakteristiği açılamadı:', err);
+    }
+
+    this.emitCachedTelemetry();
+  }
+
+  // Orijinal Xiaomi Servisini Dinle (ebe0ccc1)
+  async bindStockXiaomiService(xiaomiService) {
+    try {
+      const liveChar = await xiaomiService.getCharacteristic(BLE_PROFILES.CHAR_LIVE_DATA);
+      liveChar.addEventListener('characteristicvaluechanged', (e) => {
+        const val = e.target.value;
+        if (!val || val.byteLength < 5) return;
+        const temp = val.getInt16(0, true) / 100.0;
+        const hum = val.getUint8(2);
+        const volt = val.getInt16(3, true) / 1000.0;
+        let bat = Math.round(((volt - 2.1) / 1.0) * 100);
+        bat = Math.max(0, Math.min(100, bat));
+
+        this.emitTelemetry(temp, hum, volt, bat, 'gatt_xiaomi', 'stock_xiaomi');
+      });
+      await liveChar.startNotifications();
+      const initialVal = await liveChar.readValue().catch(() => null);
+      if (initialVal && initialVal.byteLength >= 5) {
+        const temp = initialVal.getInt16(0, true) / 100.0;
+        const hum = initialVal.getUint8(2);
+        const volt = initialVal.getInt16(3, true) / 1000.0;
+        let bat = Math.round(((volt - 2.1) / 1.0) * 100);
+        bat = Math.max(0, Math.min(100, bat));
+        this.emitTelemetry(temp, hum, volt, bat, 'gatt_xiaomi', 'stock_xiaomi');
+      }
+    } catch (err) {
+      console.warn('Orijinal Xiaomi canlı bildirimleri açılamadı:', err);
+    }
+  }
+
+  // ATC Custom 0x1F1F Paket Çözümleme
+  parseAtc1f1fPacket(value) {
     if (!value || value.byteLength < 5) return;
+    const b = value;
+    let offset = 0;
+    if (b.getUint8(0) === 0x33 || b.getUint8(0) === 0x55) {
+      offset = 1;
+    }
+    if (b.byteLength >= offset + 4) {
+      const temp = b.getInt16(offset, true) / 100.0;
+      const hum = Math.round(b.getUint16(offset + 2, true) / 100.0);
+      let vbat = 3.0;
+      let bat = 100;
+      if (b.byteLength >= offset + 6) {
+        vbat = b.getUint16(offset + 4, true) / 1000.0;
+      }
+      if (b.byteLength >= offset + 7) {
+        bat = b.getUint8(offset + 6);
+      }
+      this.emitTelemetry(temp, hum, vbat, bat, 'gatt_atc_custom', 'atc');
+    }
+  }
 
-    const tempRaw = value.getInt16(0, true);
-    const temperature = tempRaw / 100.0;
-    const humidity = value.getUint8(2);
+  emitCachedTelemetry() {
+    if (this.cachedTemp !== null && this.cachedHum !== null) {
+      this.emitTelemetry(
+        this.cachedTemp,
+        this.cachedHum,
+        this.cachedVolt,
+        this.cachedBat,
+        'gatt_atc_env',
+        'atc'
+      );
+    }
+  }
 
-    const voltageRaw = value.getInt16(3, true);
-    const voltage = voltageRaw / 1000.0;
-
-    let battery = Math.round(((voltage - 2.1) / 1.0) * 100);
-    battery = Math.max(0, Math.min(100, battery));
+  emitTelemetry(temp, hum, volt, bat, source, profile) {
+    // 500ms throttling to avoid rapid DOM repaints
+    const now = Date.now();
+    if (now - this.lastEmitTime < 400 && source === 'ble_adv') {
+      return;
+    }
+    this.lastEmitTime = now;
 
     this.onData({
-      temperature: Number(temperature.toFixed(2)),
-      humidity: humidity,
-      voltage: Number(voltage.toFixed(2)),
-      battery: battery,
-      timestamp: Date.now(),
+      temperature: Number(temp.toFixed(2)),
+      humidity: Math.round(hum),
+      voltage: Number(volt.toFixed(2)),
+      battery: Math.max(0, Math.min(100, bat)),
+      rssi: this.lastRssi,
+      source: source,
+      profile: profile || this.deviceProfile,
+      timestamp: now,
       type: 'live'
     });
   }
 
   async fetchDeviceHistory() {
-    if (!this.isConnected || !this.primaryService) {
+    if (!this.isConnected) {
       throw new Error('Geçmiş kayıtları çekmek için önce cihaza bağlı olmalısınız.');
     }
 
@@ -378,90 +715,61 @@ class XiaomiBleManager {
     }
 
     this.isFetchingHistory = true;
-    this.onHistoryProgress({ active: true, percent: 5, message: 'Cihaz saati senkronize ediliyor...' });
+    this.onHistoryProgress({ active: true, percent: 10, message: 'Cihaz hafıza modu denetleniyor...' });
 
     try {
-      // 1. Sync Timestamp
-      const nowSec = Math.floor(Date.now() / 1000);
-      try {
-        const timeChar = await this.primaryService.getCharacteristic(XIAOMI_CONFIG.CHAR_TIMESTAMP);
-        const timeBuf = new ArrayBuffer(4);
-        new DataView(timeBuf).setUint32(0, nowSec, true);
-        await timeChar.writeValue(timeBuf);
-      } catch (e) {
-        console.warn('Saat senkronizasyonu atlandı:', e);
-      }
+      // 1. Stock Xiaomi cihazında ebe0ccbc stream'i kontrol et
+      if (this.primaryService) {
+        try {
+          const historyChar = await this.primaryService.getCharacteristic(BLE_PROFILES.CHAR_HISTORY_STREAM);
+          if (historyChar) {
+            this.onHistoryProgress({ active: true, percent: 30, message: 'Dahili flaş hafıza kayıtları akıtılıyor...' });
+            await historyChar.startNotifications();
 
-      // 2. Read pointers
-      this.onHistoryProgress({ active: true, percent: 15, message: 'Kayıt indeksleri okunuyor...' });
-      let lastCalcIdx = 0;
-      let lastRecIdx = 0;
-      try {
-        const idxChar = await this.primaryService.getCharacteristic(XIAOMI_CONFIG.CHAR_LAST_CALC_IDX);
-        const idxVal = await idxChar.readValue();
-        if (idxVal.byteLength >= 8) {
-          lastCalcIdx = idxVal.getUint32(0, true);
-          lastRecIdx = idxVal.getUint32(4, true);
+            const fetchedRecords = [];
+            await new Promise((resolve) => {
+              let timeout = null;
+              const handler = (event) => {
+                const chunk = event.target.value;
+                const item = this.parseHistoryChunk(chunk);
+                if (item) {
+                  fetchedRecords.push(item);
+                  const count = fetchedRecords.length;
+                  const pct = Math.min(95, 30 + (count * 3));
+                  this.onHistoryProgress({
+                    active: true,
+                    percent: pct,
+                    message: `${count} geçmiş kayıt alındı...`
+                  });
+                }
+                clearTimeout(timeout);
+                timeout = setTimeout(() => {
+                  historyChar.removeEventListener('characteristicvaluechanged', handler);
+                  resolve();
+                }, 3000);
+              };
+
+              historyChar.addEventListener('characteristicvaluechanged', handler);
+              timeout = setTimeout(() => {
+                historyChar.removeEventListener('characteristicvaluechanged', handler);
+                resolve();
+              }, 6000);
+            });
+
+            await historyChar.stopNotifications().catch(() => {});
+            this.onHistoryProgress({ active: false, percent: 100, message: 'Tamamlandı' });
+            this.isFetchingHistory = false;
+            return fetchedRecords;
+          }
+        } catch (e) {
+          console.log('Orijinal Xiaomi geçmiş akışı açılamadı:', e);
         }
-      } catch (e) {
-        console.warn('İndeks karakteristiği okunamadı:', e);
       }
 
-      // 3. Read Latest 1-Hour Record
-      const fetchedRecords = [];
-      try {
-        const lastHourChar = await this.primaryService.getCharacteristic(XIAOMI_CONFIG.CHAR_LAST_HOUR_DATA);
-        const lastVal = await lastHourChar.readValue();
-        const parsed = this.parseHistoryChunk(lastVal);
-        if (parsed) fetchedRecords.push(parsed);
-      } catch (e) {
-        console.warn('Son saat kaydı okunamadı:', e);
-      }
-
-      // 4. Stream full history via notifications
-      this.onHistoryProgress({ active: true, percent: 35, message: 'Geçmiş kayıt akışı dinleniyor...' });
-      try {
-        const historyChar = await this.primaryService.getCharacteristic(XIAOMI_CONFIG.CHAR_HISTORY_STREAM);
-        await historyChar.startNotifications();
-
-        await new Promise((resolve) => {
-          let timeout = null;
-          const handler = (event) => {
-            const chunk = event.target.value;
-            const item = this.parseHistoryChunk(chunk);
-            if (item) {
-              fetchedRecords.push(item);
-              const count = fetchedRecords.length;
-              const target = Math.max(1, lastRecIdx || 24);
-              const pct = Math.min(95, 35 + Math.round((count / target) * 60));
-              this.onHistoryProgress({
-                active: true,
-                percent: pct,
-                message: `${count} geçmiş kayıt alındı...`
-              });
-            }
-            clearTimeout(timeout);
-            timeout = setTimeout(() => {
-              historyChar.removeEventListener('characteristicvaluechanged', handler);
-              resolve();
-            }, 3000);
-          };
-
-          historyChar.addEventListener('characteristicvaluechanged', handler);
-          timeout = setTimeout(() => {
-            historyChar.removeEventListener('characteristicvaluechanged', handler);
-            resolve();
-          }, 6000);
-        });
-
-        await historyChar.stopNotifications().catch(() => {});
-      } catch (err) {
-        console.warn('Geçmiş bildirim akışı alınamadı:', err);
-      }
-
-      this.onHistoryProgress({ active: false, percent: 100, message: 'Tamamlandı' });
+      // 2. ATC / Modlu Firmware: Canlı akış verileri zaten kalıcı IndexedDB'ye kaydedilmiştir
+      this.onHistoryProgress({ active: false, percent: 100, message: 'ATC Canlı Yayın Arşivi Güncel' });
       this.isFetchingHistory = false;
-      return fetchedRecords;
+      return [];
     } catch (err) {
       this.isFetchingHistory = false;
       this.onHistoryProgress({ active: false, percent: 0, message: 'Hata' });
@@ -502,9 +810,11 @@ class XiaomiBleManager {
   }
 
   async disconnect() {
-    if (this.device && this.device.gatt.connected) {
+    if (this.device && this.device.gatt && this.device.gatt.connected) {
       this.device.gatt.disconnect();
     }
+    this.isConnected = false;
+    this.onStatus('disconnected', 'Bağlantı kesildi.');
   }
 
   handleDisconnect() {
@@ -519,10 +829,11 @@ class XiaomiBleManager {
 class AppController {
   constructor() {
     this.storage = new TelemetryStorage();
-    this.ble = new XiaomiBleManager(
+    this.ble = new UniversalBleManager(
       (data) => this.handleNewData(data),
       (state, text) => this.handleBleStatus(state, text),
-      (prog) => this.handleHistoryProgress(prog)
+      (prog) => this.handleHistoryProgress(prog),
+      (signal) => this.handleSignalUpdate(signal)
     );
 
     // State
@@ -558,6 +869,15 @@ class AppController {
       connectionDotMobile: document.getElementById('connectionDotMobile'),
       connectionStatusText: document.getElementById('connectionStatusText'),
       lastUpdatedAgo: document.getElementById('lastUpdatedAgo'),
+
+      // Live Signal (RSSI) Elements
+      signalPill: document.getElementById('signalPill'),
+      signalRssiText: document.getElementById('signalRssiText'),
+      signalPillMobile: document.getElementById('signalPillMobile'),
+      signalRssiTextMobile: document.getElementById('signalRssiTextMobile'),
+      valRssi: document.getElementById('valRssi'),
+      valFirmwareBadge: document.getElementById('valFirmwareBadge'),
+      bleLiveStatusTag: document.getElementById('bleLiveStatusTag'),
 
       // Card 1: Sıcaklık
       valTemp: document.getElementById('valTemp'),
@@ -635,7 +955,6 @@ class AppController {
       this.updateChart();
     }
 
-    // Responsive orientation & resize handling
     window.addEventListener('resize', () => {
       if (this.chart) {
         this.chart.options.scales.x.ticks.maxTicksLimit = window.innerWidth < 640 ? 4 : 7;
@@ -644,7 +963,6 @@ class AppController {
     });
   }
 
-  // Live Streaming Digital Clock (Saat : Dakika : Saniye)
   initLiveClock() {
     const timeEl = document.getElementById('liveClockTime');
     const dateEl = document.getElementById('liveClockDate');
@@ -703,8 +1021,12 @@ class AppController {
       await this.ble.disconnect();
     } else {
       try {
-        await this.ble.connect();
-        this.showToast('Xiaomi sensörü başarıyla bağlandı!', 'success');
+        this.showToast('Çevredeki tüm BLE cihazları listeleniyor. ATC_... cihazınızı seçin.', 'info');
+        const success = await this.ble.connect();
+        if (success) {
+          const fw = this.ble.deviceProfile === 'atc' ? 'ATC Modlu Firmware' : 'Xiaomi Orijinal';
+          this.showToast(`Bağlandı: ${this.ble.device ? this.ble.device.name : 'Cihaz'} (${fw})`, 'success');
+        }
       } catch (err) {
         if (err.name !== 'NotFoundError') {
           this.showToast('Bağlantı hatası: ' + err.message, 'error');
@@ -718,7 +1040,7 @@ class AppController {
       if (this.dom.btnFetchHistory) this.dom.btnFetchHistory.disabled = true;
       if (this.dom.btnFetchHistoryMobile) this.dom.btnFetchHistoryMobile.disabled = true;
 
-      this.showToast('Cihaz hafızasındaki geçmiş kayıtlar indiriliyor...', 'info');
+      this.showToast('Geçmiş kayıtlar sorgulanıyor...', 'info');
       const historyRecords = await this.ble.fetchDeviceHistory();
       if (historyRecords && historyRecords.length > 0) {
         await this.storage.addBatch(historyRecords);
@@ -726,7 +1048,7 @@ class AppController {
         this.updateChart();
         this.showToast(`${historyRecords.length} geçmiş kayıt başarıyla arşive eklendi!`, 'success');
       } else {
-        this.showToast('Yeni geçmiş kaydı bulunamadı veya saatlik log henüz oluşmadı.', 'info');
+        this.showToast('Kayıtlar güncel. Anlık ve yayınlanan tüm ölçümler arşivde kaydediliyor.', 'info');
       }
     } catch (err) {
       this.showToast('Geçmiş alınırken hata: ' + err.message, 'error');
@@ -737,10 +1059,8 @@ class AppController {
   }
 
   setupEventListeners() {
-    // Theme Switcher
     this.dom.btnThemeToggle.addEventListener('click', () => this.toggleTheme());
 
-    // Connect (Both Desktop and Mobile buttons)
     if (this.dom.btnConnect) {
       this.dom.btnConnect.addEventListener('click', () => this.triggerConnect());
     }
@@ -748,7 +1068,6 @@ class AppController {
       this.dom.btnConnectMobile.addEventListener('click', () => this.triggerConnect());
     }
 
-    // Fetch History (Both Desktop and Mobile buttons)
     if (this.dom.btnFetchHistory) {
       this.dom.btnFetchHistory.addEventListener('click', () => this.triggerFetchHistory());
     }
@@ -756,7 +1075,6 @@ class AppController {
       this.dom.btnFetchHistoryMobile.addEventListener('click', () => this.triggerFetchHistory());
     }
 
-    // Unit Toggle (°C / °F)
     this.dom.btnToggleUnit.addEventListener('click', () => {
       this.currentUnit = this.currentUnit === 'C' ? 'F' : 'C';
       this.dom.lblTempUnit.textContent = `°${this.currentUnit}`;
@@ -770,7 +1088,6 @@ class AppController {
       this.updateChart();
     });
 
-    // Chart Range Buttons
     document.querySelectorAll('.filter-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
@@ -781,7 +1098,6 @@ class AppController {
       });
     });
 
-    // Chart Parameter Mode Buttons
     document.querySelectorAll('.mode-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
@@ -792,22 +1108,20 @@ class AppController {
       });
     });
 
-    // CSV & JSON Export
     this.dom.btnExportCsv.addEventListener('click', () => {
       const csv = this.storage.exportCSV();
       if (!csv) return this.showToast('Dışa aktarılacak veri bulunmuyor.', 'info');
-      this.downloadFile('xiaomi_atmosferik_veriler.csv', csv, 'text/csv;charset=utf-8;');
+      this.downloadFile('xiaomi_atc_atmosferik_veriler.csv', csv, 'text/csv;charset=utf-8;');
       this.showToast('CSV dosyası başarıyla indirildi.', 'success');
     });
 
     this.dom.btnExportJson.addEventListener('click', () => {
       const json = this.storage.exportJSON();
       if (!json || json === '[]') return this.showToast('Dışa aktarılacak veri bulunmuyor.', 'info');
-      this.downloadFile('xiaomi_atmosferik_telemetri.json', json, 'application/json');
+      this.downloadFile('xiaomi_atc_telemetri.json', json, 'application/json');
       this.showToast('JSON dosyası başarıyla indirildi.', 'success');
     });
 
-    // Clear Data
     this.dom.btnClearData.addEventListener('click', async () => {
       if (confirm('Tüm kayıtlı sıcaklık, nem ve türetilmiş parametre verilerini silmek istediğinize emin misiniz?')) {
         await this.storage.clearAll();
@@ -817,7 +1131,6 @@ class AppController {
       }
     });
 
-    // Table Pagination
     this.dom.btnPrevPage.addEventListener('click', () => {
       if (this.currentPage > 1) {
         this.currentPage--;
@@ -833,7 +1146,6 @@ class AppController {
       }
     });
 
-    // Help Modal
     const toggleHelp = (show) => {
       if (show) {
         this.dom.helpModal.classList.remove('hidden');
@@ -850,8 +1162,7 @@ class AppController {
 
   handleBleStatus(status, text) {
     if (this.dom.connectionStatusText) this.dom.connectionStatusText.textContent = text;
-    
-    // Update dots
+
     const updateDot = (el) => {
       if (!el) return;
       el.className = 'w-2.5 h-2.5 rounded-full inline-block flex-shrink-0';
@@ -866,7 +1177,6 @@ class AppController {
     updateDot(this.dom.connectionDot);
     updateDot(this.dom.connectionDotMobile);
 
-    // Update buttons
     const updateBtn = (btn, isMobile = false) => {
       if (!btn) return;
       if (status === 'connected') {
@@ -885,7 +1195,41 @@ class AppController {
     if (this.dom.btnFetchHistoryMobile) this.dom.btnFetchHistoryMobile.disabled = !isConnected;
     if (this.dom.lastUpdatedAgo) this.dom.lastUpdatedAgo.classList.toggle('hidden', !isConnected);
 
+    if (this.dom.bleLiveStatusTag) {
+      if (isConnected) {
+        const fwName = this.ble.deviceProfile === 'atc' ? 'ATC Modlu FW Yayını' : 'Xiaomi Orijinal Yayın';
+        this.dom.bleLiveStatusTag.textContent = fwName;
+        this.dom.bleLiveStatusTag.className = 'font-mono text-[10px] uppercase px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-500/30';
+      } else {
+        this.dom.bleLiveStatusTag.textContent = 'Sinyal Dinleme Hazır';
+        this.dom.bleLiveStatusTag.className = 'font-mono text-[10px] uppercase px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold border border-slate-200 dark:border-slate-700';
+      }
+    }
+
     lucide.createIcons();
+  }
+
+  handleSignalUpdate({ rssi, packetCount, deviceName, profile }) {
+    if (rssi != null) {
+      const rssiStr = `${rssi} dBm`;
+      if (this.dom.signalRssiText) this.dom.signalRssiText.textContent = rssiStr;
+      if (this.dom.signalRssiTextMobile) this.dom.signalRssiTextMobile.textContent = rssiStr;
+      if (this.dom.valRssi) this.dom.valRssi.textContent = rssiStr;
+
+      if (this.dom.signalPill) this.dom.signalPill.classList.remove('hidden');
+      if (this.dom.signalPillMobile) this.dom.signalPillMobile.classList.remove('hidden');
+      if (this.dom.signalPillMobile) this.dom.signalPillMobile.classList.add('flex');
+    }
+
+    if (this.dom.valFirmwareBadge) {
+      if (profile === 'atc') {
+        this.dom.valFirmwareBadge.textContent = 'ATC Modlu FW';
+        this.dom.valFirmwareBadge.className = 'text-[10px] font-mono px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 font-bold';
+      } else if (profile === 'stock_xiaomi') {
+        this.dom.valFirmwareBadge.textContent = 'Xiaomi Orijinal';
+        this.dom.valFirmwareBadge.className = 'text-[10px] font-mono px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 font-bold';
+      }
+    }
   }
 
   handleHistoryProgress({ active, percent, message }) {
@@ -910,7 +1254,6 @@ class AppController {
     this.updateChart();
   }
 
-  // 6 Ayrı Kartın Render Edilmesi (Sıcaklık, Nem, Hissedilen, Çiğ Noktası, Buhar Basıncı, Pil)
   renderTelemetryCards(data) {
     // 1. Sıcaklık Kartı
     let displayTemp = data.temperature;
@@ -965,7 +1308,6 @@ class AppController {
       this.dom.valDewPointCard.textContent = displayDew.toFixed(1);
       this.dom.lblDewPointUnit.textContent = `°${this.currentUnit}`;
 
-      // Yoğuşma ve Nem Riski Durumu
       const spread = data.temperature - data.dewPoint;
       if (spread <= 2.5) {
         this.dom.dewPointRiskBadge.textContent = 'Yoğuşma Riski!';
@@ -1007,6 +1349,17 @@ class AppController {
     if (data.voltage != null) {
       this.dom.valVoltage.textContent = `${data.voltage.toFixed(2)} V`;
     }
+    if (data.rssi != null && this.dom.valRssi) {
+      this.dom.valRssi.textContent = `${data.rssi} dBm`;
+    }
+
+    if (this.dom.valFirmwareBadge) {
+      const isAtc = (data.profile === 'atc' || (data.source && data.source.includes('atc')));
+      this.dom.valFirmwareBadge.textContent = isAtc ? 'ATC Modlu FW' : 'Xiaomi Orijinal';
+      this.dom.valFirmwareBadge.className = isAtc
+        ? 'text-[10px] font-mono px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 font-bold'
+        : 'text-[10px] font-mono px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 font-bold';
+    }
 
     if (this.dom.lastUpdatedAgo) {
       this.dom.lastUpdatedAgo.textContent = `• ${new Date().toLocaleTimeString('tr-TR')}`;
@@ -1020,23 +1373,18 @@ class AppController {
     if (list.length > 0) {
       const conv = (t) => this.currentUnit === 'F' ? (t * 9 / 5 + 32).toFixed(1) : t.toFixed(1);
 
-      // 1. Sıcaklık Min / Max
       const temps = list.map(r => r.temperature);
       this.dom.tempMinMax.textContent = `${conv(Math.min(...temps))} / ${conv(Math.max(...temps))}`;
 
-      // 2. Nem Min / Max
       const hums = list.map(r => r.humidity);
       this.dom.humMinMax.textContent = `%${Math.min(...hums)} / %${Math.max(...hums)}`;
 
-      // 3. Hissedilen Sıcaklık Min / Max
       const apps = list.map(r => r.apparentTemp != null ? r.apparentTemp : r.temperature);
       this.dom.apparentMinMax.textContent = `${conv(Math.min(...apps))} / ${conv(Math.max(...apps))}`;
 
-      // 4. Çiğ Noktası Min / Max
       const dews = list.map(r => r.dewPoint != null ? r.dewPoint : AtmosphericMetrics.calculateDewPoint(r.temperature, r.humidity));
       this.dom.dewPointMinMax.textContent = `${conv(Math.min(...dews))} / ${conv(Math.max(...dews))}`;
 
-      // Trend Analizi
       if (list.length >= 3) {
         const last3 = list.slice(-3);
         const diff = last3[2].temperature - last3[0].temperature;
@@ -1098,7 +1446,9 @@ class AppController {
         const timeStr = `${d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })} ${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
         const typeBadge = item.type === 'history_hour'
           ? '<span class="px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20 text-[10px] font-sans font-medium">Hafıza</span>'
-          : '<span class="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-sans font-medium">Canlı</span>';
+          : (item.source === 'ble_adv'
+            ? '<span class="px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border border-cyan-500/20 text-[10px] font-sans font-medium">BLE Sinyal</span>'
+            : '<span class="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-sans font-medium">GATT Canlı</span>');
 
         let t = item.temperature;
         let at = item.apparentTemp != null ? item.apparentTemp : t;
@@ -1169,8 +1519,10 @@ class AppController {
         const d = new Date(item.timestamp);
         const timeStr = `${d.toLocaleDateString('tr-TR')} ${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
         const typeBadge = item.type === 'history_hour'
-          ? '<span class="px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20 text-[10px] font-sans">Hafıza (1s)</span>'
-          : '<span class="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-sans">Canlı</span>';
+          ? '<span class="px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20 text-[10px] font-sans">Hafıza</span>'
+          : (item.source === 'ble_adv'
+            ? '<span class="px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border border-cyan-500/20 text-[10px] font-sans">BLE Sinyal</span>'
+            : '<span class="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-sans">GATT Canlı</span>');
 
         let t = item.temperature;
         let at = item.apparentTemp != null ? item.apparentTemp : t;
@@ -1209,7 +1561,6 @@ class AppController {
     }
   }
 
-  // Chart.js Zaman Serisi Grafiği (5 Parametre Eğrisi)
   initChart() {
     const ctx = document.getElementById('telemetryChart').getContext('2d');
     const isDark = this.currentTheme === 'dark';
@@ -1224,7 +1575,6 @@ class AppController {
       data: {
         labels: [],
         datasets: [
-          // 0: Sıcaklık
           {
             label: 'Sıcaklık',
             data: [],
@@ -1237,7 +1587,6 @@ class AppController {
             pointHoverRadius: 5,
             yAxisID: 'yTemp'
           },
-          // 1: Hissedilen Sıcaklık
           {
             label: 'Hissedilen Sıcaklık',
             data: [],
@@ -1250,7 +1599,6 @@ class AppController {
             pointHoverRadius: 5,
             yAxisID: 'yTemp'
           },
-          // 2: Çiğ Noktası
           {
             label: 'Çiğ Noktası',
             data: [],
@@ -1263,7 +1611,6 @@ class AppController {
             pointHoverRadius: 5,
             yAxisID: 'yTemp'
           },
-          // 3: Bağıl Nem
           {
             label: 'Bağıl Nem (%)',
             data: [],
@@ -1275,7 +1622,6 @@ class AppController {
             pointHoverRadius: 5,
             yAxisID: 'yHum'
           },
-          // 4: Buhar Basıncı
           {
             label: 'Buhar Basıncı (hPa)',
             data: [],
@@ -1426,34 +1772,28 @@ class AppController {
         : `${d.toLocaleDateString('tr-TR', { day: 'numeric', month: isMobile ? 'numeric' : 'short' })} ${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
     });
 
-    // 0: Sıcaklık
     const tempData = records.map(r => {
       return this.currentUnit === 'F' ? (r.temperature * 9 / 5) + 32 : r.temperature;
     });
 
-    // 1: Hissedilen Sıcaklık
     const apparentData = records.map(r => {
       const at = r.apparentTemp != null ? r.apparentTemp : AtmosphericMetrics.calculateApparentTemp(r.temperature, r.humidity);
       return this.currentUnit === 'F' ? (at * 9 / 5) + 32 : at;
     });
 
-    // 2: Çiğ Noktası
     const dewData = records.map(r => {
       const dp = r.dewPoint != null ? r.dewPoint : AtmosphericMetrics.calculateDewPoint(r.temperature, r.humidity);
       return this.currentUnit === 'F' ? (dp * 9 / 5) + 32 : dp;
     });
 
-    // 3: Nem
     const humData = records.map(r => r.humidity);
 
-    // 4: Buhar Basıncı
     const pressData = records.map(r => {
       return r.vaporPressure != null ? r.vaporPressure : AtmosphericMetrics.calculateVaporPressure(r.temperature, r.humidity).vpAct;
     });
 
     this.chart.data.labels = labels;
 
-    // Update labels and dataset arrays
     this.chart.data.datasets[0].label = `Sıcaklık (°${this.currentUnit})`;
     this.chart.data.datasets[0].data = tempData;
 
@@ -1469,8 +1809,6 @@ class AppController {
     this.chart.data.datasets[4].label = `Buhar Basıncı (hPa)`;
     this.chart.data.datasets[4].data = pressData;
 
-    // Filter Mode Visibility
-    // Datasets: 0=Sıcaklık, 1=Hissedilen, 2=Çiğ Noktası, 3=Nem, 4=Buhar Basıncı
     const ds = this.chart.data.datasets;
     const scales = this.chart.options.scales;
 
@@ -1529,7 +1867,6 @@ class AppController {
       scales.yHum.display = false;
       scales.yPress.display = true;
     } else {
-      // 'all' mode: Show all curves
       ds[0].hidden = false;
       ds[1].hidden = false;
       ds[2].hidden = false;
@@ -1537,7 +1874,7 @@ class AppController {
       ds[4].hidden = false;
       scales.yTemp.display = true;
       scales.yHum.display = true;
-      scales.yPress.display = false; // keep yHum for right side to avoid cluttering in all-view
+      scales.yPress.display = false;
     }
 
     scales.yTemp.title.text = `Sıcaklık (°${this.currentUnit})`;
