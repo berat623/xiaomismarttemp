@@ -271,6 +271,8 @@ class UniversalBleManager {
     this.lastRssi = null;
     this.packetCount = 0;
     this.autoReconnectTimer = null;
+    this.atcChar = null; // 0x1F1F kontrol ve konfigürasyon karakteristiği
+    this.onDevPacket = null; // Geliştirici paket dinleyicisi
 
     // Cache of partial readings from distinct characteristics
     this.cachedTemp = null;
@@ -552,14 +554,15 @@ class UniversalBleManager {
           .catch(() => atcService.getCharacteristic(0x1f1f));
 
         if (atcChar) {
+          this.atcChar = atcChar;
           atcChar.addEventListener('characteristicvaluechanged', (e) => {
-            this.parseAtc1f1fPacket(e.target.value);
+            this.handleAtcNotification(e.target.value);
           });
           await atcChar.startNotifications().catch(() => {});
           // 0x33 komutunu göndererek telemetri akışını tetikle
-          await atcChar.writeValueWithoutResponse(new Uint8Array([0x33])).catch(() => {});
+          await this.sendAtcCommand(new Uint8Array([0x33])).catch(() => {});
           bound = true;
-          console.log('✅ ATC Custom (0x1F10 / 0x1F1F) telemetri akışı başlatıldı.');
+          console.log('✅ ATC Custom (0x1F10 / 0x1F1F) telemetri ve geliştirici kontrol hattı aktif.');
         }
       }
     } catch (e) {
@@ -691,12 +694,61 @@ class UniversalBleManager {
     }
   }
 
-  // ATC Custom 0x1F1F Paket Çözümleme
+  // ATC / PVVX GATT Komutu Gönderme (0x1F1F)
+  async sendAtcCommand(data) {
+    if (!this.atcChar) {
+      throw new Error('Cihaz bağlı değil veya 0x1F1F kontrol karakteristiği bulunamadı.');
+    }
+    let uint8;
+    if (typeof data === 'string') {
+      const clean = data.replace(/[^0-9a-fA-F]/g, '');
+      const bytes = [];
+      for (let i = 0; i < clean.length; i += 2) {
+        bytes.push(parseInt(clean.substr(i, 2), 16));
+      }
+      uint8 = new Uint8Array(bytes);
+    } else if (data instanceof Uint8Array) {
+      uint8 = data;
+    } else if (Array.isArray(data)) {
+      uint8 = new Uint8Array(data);
+    } else {
+      throw new Error('Geçersiz veri biçimi');
+    }
+
+    try {
+      if (this.atcChar.properties && this.atcChar.properties.writeWithoutResponse) {
+        await this.atcChar.writeValueWithoutResponse(uint8);
+      } else {
+        await this.atcChar.writeValue(uint8);
+      }
+    } catch (e) {
+      await this.atcChar.writeValue(uint8);
+    }
+    return uint8;
+  }
+
+  // ATC / PVVX Bildirim Yönlendirici (0x1F1F)
+  handleAtcNotification(value) {
+    if (!value || value.byteLength < 1) return;
+    const cmdId = value.getUint8(0);
+
+    // Canlı telemetri akışı (0x33 veya standart telemetri baytları)
+    if (cmdId === 0x33 || (value.byteLength >= 5 && cmdId !== 0x55 && cmdId !== 0x20 && cmdId !== 0x25 && cmdId !== 0x44 && cmdId !== 0x01 && cmdId !== 0x10 && cmdId !== 0x24 && cmdId !== 0x22)) {
+      this.parseAtc1f1fPacket(value);
+    }
+
+    // Geliştirici konsolu ve seçenekleri için gelen paket
+    if (this.onDevPacket) {
+      this.onDevPacket(cmdId, value);
+    }
+  }
+
+  // ATC Custom 0x1F1F Canlı Telemetri Paket Çözümleme
   parseAtc1f1fPacket(value) {
     if (!value || value.byteLength < 5) return;
     const b = value;
     let offset = 0;
-    if (b.getUint8(0) === 0x33 || b.getUint8(0) === 0x55) {
+    if (b.getUint8(0) === 0x33) {
       offset = 1;
     }
     if (b.byteLength >= offset + 4) {
@@ -856,11 +908,13 @@ class UniversalBleManager {
     if (this.device && this.device.gatt && this.device.gatt.connected) {
       this.device.gatt.disconnect();
     }
+    this.atcChar = null;
     this.isConnected = false;
     this.onStatus('disconnected', 'Bağlantı kesildi.');
   }
 
   handleDisconnect() {
+    this.atcChar = null;
     this.isConnected = false;
     const devName = this.device ? (this.device.name || 'ATC_597941') : 'ATC_597941';
     this.onStatus('disconnected', `${devName} koptu. Otomatik yeniden bağlanılıyor...`);
@@ -1001,7 +1055,16 @@ class AppController {
 
       // Offline Badges
       offlineBadge: document.getElementById('offlineBadge'),
-      offlineBadgeMobile: document.getElementById('offlineBadgeMobile')
+      offlineBadgeMobile: document.getElementById('offlineBadgeMobile'),
+
+      // Developer Options Modal & Controls
+      btnOpenDevOptions: document.getElementById('btnOpenDevOptions'),
+      btnOpenDevOptionsMobile: document.getElementById('btnOpenDevOptionsMobile'),
+      devOptionsModal: document.getElementById('devOptionsModal'),
+      btnCloseDevModal: document.getElementById('btnCloseDevModal'),
+      btnCloseDevModalBottom: document.getElementById('btnCloseDevModalBottom'),
+      devBleStatusBadge: document.getElementById('devBleStatusBadge'),
+      devCmdTerminal: document.getElementById('devCmdTerminal')
     };
 
     this.init();
@@ -1014,6 +1077,7 @@ class AppController {
     this.applyTheme(this.currentTheme);
     lucide.createIcons();
     this.setupEventListeners();
+    this.initDeveloperOptions();
     this.initChart();
 
     await this.storage.initPromise;
@@ -1243,6 +1307,24 @@ class AppController {
 
   handleBleStatus(status, text) {
     if (this.dom.connectionStatusText) this.dom.connectionStatusText.textContent = text;
+
+    // Geliştirici Seçenekleri Modal Durum Rozeti
+    if (this.dom.devBleStatusBadge) {
+      if (status === 'connected') {
+        this.dom.devBleStatusBadge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800';
+        this.dom.devBleStatusBadge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span><span>GATT Aktif (0x1F1F)</span>';
+        this.logDevTerminal('GATT bağlantısı kuruldu. Geliştirici kontrol hattı (0x1F1F) aktif.', 'info');
+        setTimeout(() => {
+          this.devReadConfigFromDevice();
+        }, 600);
+      } else if (status === 'connecting' || status === 'scanning') {
+        this.dom.devBleStatusBadge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-200 dark:border-amber-800';
+        this.dom.devBleStatusBadge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span><span>Bağlanılıyor...</span>';
+      } else {
+        this.dom.devBleStatusBadge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300';
+        this.dom.devBleStatusBadge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span><span>Cihaz Bekleniyor</span>';
+      }
+    }
 
     const updateDot = (el) => {
       if (!el) return;
@@ -2208,6 +2290,935 @@ class AppController {
       toast.style.transition = 'all 0.3s ease';
       setTimeout(() => toast.remove(), 300);
     }, 3500);
+  }
+  // ==========================================
+  // GELİŞTİRİCİ SEÇENEKLERİ (DEVELOPER OPTIONS)
+  // ATC / PVVX TELINK FIRMWARE GATT CONTROLLER
+  // ==========================================
+
+  initDeveloperOptions() {
+    // 1. Modal Açma / Kapatma Olayları
+    if (this.dom.btnOpenDevOptions) {
+      this.dom.btnOpenDevOptions.addEventListener('click', () => this.openDevModal());
+    }
+    if (this.dom.btnOpenDevOptionsMobile) {
+      this.dom.btnOpenDevOptionsMobile.addEventListener('click', () => this.openDevModal());
+    }
+    if (this.dom.btnCloseDevModal) {
+      this.dom.btnCloseDevModal.addEventListener('click', () => this.closeDevModal());
+    }
+    if (this.dom.btnCloseDevModalBottom) {
+      this.dom.btnCloseDevModalBottom.addEventListener('click', () => this.closeDevModal());
+    }
+
+    if (this.dom.devOptionsModal) {
+      this.dom.devOptionsModal.addEventListener('click', (e) => {
+        if (e.target === this.dom.devOptionsModal) {
+          this.closeDevModal();
+        }
+      });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !this.dom.devOptionsModal.classList.contains('hidden')) {
+          this.closeDevModal();
+        }
+      });
+    }
+
+    // 2. BLE ATC Yanıt Dinleyicisi
+    this.ble.onDevPacket = (dataView) => {
+      this.handleIncomingDevPacket(dataView);
+    };
+
+    // 3. Hafızadan Kayıtlı Ayarları Yükle
+    this.loadDevSettingsFromStorage();
+
+    // 4. Otomatik Devreye Alma (Auto-Apply) Olaylarını Bağla
+    this.setupDevAutoApply();
+
+    // 5. İşlem Butonlarını ve Hızlı Komutları Bağla
+    this.setupDevActionButtons();
+
+    // 6. Dinamik Hesaplama Etiketlerini Güncelle
+    this.updateMeasureIntervalLabel();
+  }
+
+  openDevModal() {
+    if (!this.dom.devOptionsModal) return;
+    this.dom.devOptionsModal.classList.remove('hidden');
+    this.dom.devOptionsModal.classList.add('flex');
+    document.body.style.overflow = 'hidden';
+    lucide.createIcons();
+    this.updateMeasureIntervalLabel();
+
+    // Bağlı ise cihazdan güncel ayarları oku
+    if (this.ble.isConnected) {
+      this.devReadConfigFromDevice();
+    }
+  }
+
+  closeDevModal() {
+    if (!this.dom.devOptionsModal) return;
+    this.dom.devOptionsModal.classList.add('hidden');
+    this.dom.devOptionsModal.classList.remove('flex');
+    document.body.style.overflow = '';
+  }
+
+  logDevTerminal(message, type = 'info') {
+    if (!this.dom.devCmdTerminal) return;
+    const line = document.createElement('div');
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + '.' + String(now.getMilliseconds()).padStart(3, '0');
+
+    let colorCls = 'text-slate-400';
+    let prefix = 'ℹ️';
+    if (type === 'tx') {
+      colorCls = 'text-cyan-400 font-bold';
+      prefix = '📤 [TX]';
+    } else if (type === 'rx') {
+      colorCls = 'text-emerald-400 font-bold';
+      prefix = '📥 [RX]';
+    } else if (type === 'warn') {
+      colorCls = 'text-amber-400';
+      prefix = '⚠️';
+    } else if (type === 'error') {
+      colorCls = 'text-rose-400 font-bold';
+      prefix = '❌';
+    }
+
+    line.className = `py-0.5 break-all ${colorCls}`;
+    line.textContent = `[${timeStr}] ${prefix} ${message}`;
+    this.dom.devCmdTerminal.appendChild(line);
+
+    this.dom.devCmdTerminal.scrollTop = this.dom.devCmdTerminal.scrollHeight;
+
+    while (this.dom.devCmdTerminal.children.length > 150) {
+      this.dom.devCmdTerminal.removeChild(this.dom.devCmdTerminal.children[1]);
+    }
+  }
+
+  async sendDevPacket(packet, title = 'Komut') {
+    const hex = Array.from(packet).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+    this.logDevTerminal(`${title}: ${hex}`, 'tx');
+
+    this.saveDevSettingsToStorage();
+
+    if (!this.ble.isConnected) {
+      this.logDevTerminal(`Cihaz bağlı değil. Ayar hafızaya kaydedildi, bağlantı sağlandığında sensöre aktarılacak.`, 'warn');
+      this.showToast(`💾 ${title} kaydedildi. Cihaza bağlanınca uygulanacak.`, 'info');
+      return false;
+    }
+
+    try {
+      await this.ble.sendAtcCommand(packet);
+      this.showToast(`⚡ ${title} sensörde devreye alındı!`, 'success');
+      return true;
+    } catch (err) {
+      this.logDevTerminal(`Gönderme hatası: ${err.message}`, 'error');
+      this.showToast(`Hata: ${err.message}`, 'error');
+      return false;
+    }
+  }
+
+  packCustomConfig() {
+    const advType = parseInt(document.getElementById('dev_cfg_adv_type')?.value || '1', 10);
+    const comfort = document.getElementById('dev_cfg_comfort')?.checked ? 1 : 0;
+    const clock = document.getElementById('dev_cfg_clock')?.checked ? 1 : 0;
+    const tempUnit = parseInt(document.getElementById('dev_cfg_temp_unit')?.value || '0', 10);
+    const showBatt = document.getElementById('dev_cfg_show_batt')?.checked ? 1 : 0;
+    const txMeas = document.getElementById('dev_cfg_tx_meas')?.checked ? 1 : 0;
+    const lpMeas = document.getElementById('dev_cfg_lp_meas')?.checked ? 1 : 0;
+
+    const flg = (advType & 0x03) |
+                (comfort ? 0x04 : 0) |
+                (clock ? 0x08 : 0) |
+                (tempUnit ? 0x10 : 0) |
+                (showBatt ? 0x20 : 0) |
+                (txMeas ? 0x40 : 0) |
+                (lpMeas ? 0x80 : 0);
+
+    const smiley = parseInt(document.getElementById('dev_ext_smiley')?.value || '0', 10);
+    const advCrypto = document.getElementById('dev_cfg_adv_crypto')?.checked ? 1 : 0;
+    const advFlags = document.getElementById('dev_cfg_adv_flags')?.checked ? 1 : 0;
+    const bt5Flags = document.getElementById('dev_cfg_bt5_flags')?.checked ? 1 : 0;
+    const longrange = document.getElementById('dev_cfg_longrange')?.checked ? 1 : 0;
+    const screenOff = document.getElementById('dev_cfg_scr_off')?.checked ? 1 : 0;
+
+    const flg2 = (smiley & 0x07) |
+                 (advCrypto ? 0x08 : 0) |
+                 (advFlags ? 0x10 : 0) |
+                 (bt5Flags ? 0x20 : 0) |
+                 (longrange ? 0x40 : 0) |
+                 (screenOff ? 0x80 : 0);
+
+    const tempOffset = 0;
+    const humiOffset = 0;
+
+    const advIntervalMs = parseFloat(document.getElementById('dev_cfg_adv_interval')?.value || '1000.0');
+    const advIntRaw = Math.max(16, Math.min(65535, Math.round(advIntervalMs / 0.625)));
+
+    const measureInterval = parseInt(document.getElementById('dev_cfg_measure_interval')?.value || '2', 10);
+    const rfTxPower = parseInt(document.getElementById('dev_cfg_rf_tx_power')?.value || '63', 10);
+
+    const connLatMs = parseInt(document.getElementById('dev_cfg_connect_latency')?.value || '1000', 10);
+    const connLatRaw = Math.max(1, Math.min(65535, Math.round(connLatMs / 1.25)));
+
+    const lcdRefreshSec = parseFloat(document.getElementById('dev_cfg_lcd_refresh')?.value || '2.45');
+    const lcdRefreshRaw = Math.max(10, Math.min(255, Math.round(lcdRefreshSec / 0.05)));
+
+    const averaging = parseInt(document.getElementById('dev_cfg_averaging')?.value || '1', 10);
+    const advDelay = parseInt(document.getElementById('dev_cfg_adv_delay')?.value || '10', 10);
+    const eventAdvCnt = parseInt(document.getElementById('dev_cfg_event_adv_cnt')?.value || '6', 10);
+
+    return new Uint8Array([
+      0x55,
+      flg,
+      flg2,
+      tempOffset & 0xff,
+      humiOffset & 0xff,
+      advIntRaw & 0xff,
+      (advIntRaw >> 8) & 0xff,
+      measureInterval & 0xff,
+      rfTxPower & 0xff,
+      connLatRaw & 0xff,
+      (connLatRaw >> 8) & 0xff,
+      lcdRefreshRaw & 0xff,
+      averaging & 0xff,
+      advDelay & 0xff,
+      eventAdvCnt & 0xff
+    ]);
+  }
+
+  packComfortConfig() {
+    const loT = Math.round((parseFloat(document.getElementById('dev_cmf_temp_lo')?.value || '21.0')) * 100);
+    const hiT = Math.round((parseFloat(document.getElementById('dev_cmf_temp_hi')?.value || '26.0')) * 100);
+    const loH = Math.round((parseFloat(document.getElementById('dev_cmf_hum_lo')?.value || '30.0')) * 100);
+    const hiH = Math.round((parseFloat(document.getElementById('dev_cmf_hum_hi')?.value || '60.0')) * 100);
+
+    const packet = new Uint8Array(9);
+    const dv = new DataView(packet.buffer);
+    dv.setUint8(0, 0x20);
+    dv.setInt16(1, loT, true);
+    dv.setInt16(3, hiT, true);
+    dv.setInt16(5, loH, true);
+    dv.setInt16(7, hiH, true);
+    return packet;
+  }
+
+  packSensorConfig() {
+    const tk = parseFloat(document.getElementById('dev_sens_temp_k')?.value || '1.0');
+    const tz = Math.round((parseFloat(document.getElementById('dev_sens_temp_z')?.value || '0.0')) * 100);
+    const hk = parseFloat(document.getElementById('dev_sens_hum_k')?.value || '1.0');
+    const hz = Math.round((parseFloat(document.getElementById('dev_sens_hum_z')?.value || '0.0')) * 100);
+
+    const packet = new Uint8Array(13);
+    const dv = new DataView(packet.buffer);
+    dv.setUint8(0, 0x25);
+    dv.setFloat32(1, tk, true);
+    dv.setFloat32(5, hk, true);
+    dv.setInt16(9, tz, true);
+    dv.setInt16(11, hz, true);
+    return packet;
+  }
+
+  packTimeDeltaConfig() {
+    const delta = parseInt(document.getElementById('dev_sens_time_delta')?.value || '0', 10);
+    const packet = new Uint8Array(3);
+    const dv = new DataView(packet.buffer);
+    dv.setUint8(0, 0x24);
+    dv.setInt16(1, delta, true);
+    return packet;
+  }
+
+  packTimeStampConfig() {
+    const interval = parseInt(document.getElementById('dev_ts_interval')?.value || '0', 10);
+    const macStr = (document.getElementById('dev_ts_mac')?.value || '').replace(/[^0-9A-Fa-f]/g, '');
+    const macBytes = [];
+    for (let i = 0; i < 12; i += 2) {
+      macBytes.push(parseInt(macStr.substr(i, 2), 16) || 0);
+    }
+    const packet = new Uint8Array(9);
+    const dv = new DataView(packet.buffer);
+    dv.setUint8(0, 0x26);
+    dv.setUint16(1, interval, true);
+    for (let i = 0; i < 6; i++) {
+      dv.setUint8(3 + i, macBytes[5 - i] || 0);
+    }
+    return packet;
+  }
+
+  packTrgConfig() {
+    const tHyst = Math.round((parseFloat(document.getElementById('dev_trg_temp_hyst')?.value || '-0.55')) * 100);
+    const tThr = Math.round((parseFloat(document.getElementById('dev_trg_temp_thresh')?.value || '21.0')) * 100);
+    const hHyst = Math.round((parseFloat(document.getElementById('dev_trg_hum_hyst')?.value || '0.0')) * 100);
+    const hThr = Math.round((parseFloat(document.getElementById('dev_trg_hum_thresh')?.value || '50.0')) * 100);
+    const rsMode = parseInt(document.getElementById('dev_rs_mode')?.value || '0', 10);
+    const rsInvert = document.getElementById('dev_rs_invert')?.checked ? 1 : 0;
+    const rsInterval = parseInt(document.getElementById('dev_rs_interval')?.value || '3600', 10);
+
+    const packet = new Uint8Array(12);
+    const dv = new DataView(packet.buffer);
+    dv.setUint8(0, 0x44);
+    dv.setInt16(1, tHyst, true);
+    dv.setInt16(3, tThr, true);
+    dv.setInt16(5, hHyst, true);
+    dv.setInt16(7, hThr, true);
+    dv.setUint16(9, rsInterval, true);
+    dv.setUint8(11, (rsMode & 0x01) | (rsInvert ? 0x02 : 0));
+    return packet;
+  }
+
+  packScreenShow() {
+    const bigNumStr = (document.getElementById('dev_ext_bignumb')?.value || '123.4').trim();
+    const smalNumStr = (document.getElementById('dev_ext_smalnumb')?.value || '99').trim();
+    const bigNum = Math.round((parseFloat(bigNumStr) || 0) * 10);
+    const smalNum = Math.round(parseFloat(smalNumStr) || 0);
+    const durSec = parseInt(document.getElementById('dev_ext_duration')?.value || '600', 10);
+
+    const smb = parseInt(document.getElementById('dev_ext_tmpsmb')?.value || '6', 10);
+    const smi = parseInt(document.getElementById('dev_ext_smiley')?.value || '7', 10);
+    const pct = document.getElementById('dev_ext_percent')?.checked ? 1 : 0;
+    const bat = document.getElementById('dev_ext_battery')?.checked ? 1 : 0;
+
+    const cfg = (bat ? 0x01 : 0) |
+                (pct ? 0x02 : 0) |
+                ((smb & 0x07) << 2) |
+                ((smi & 0x07) << 5);
+
+    const packet = new Uint8Array(8);
+    const dv = new DataView(packet.buffer);
+    dv.setUint8(0, 0x22);
+    dv.setInt16(1, bigNum, true);
+    dv.setInt16(3, smalNum, true);
+    dv.setUint16(5, durSec, true);
+    dv.setUint8(7, cfg);
+    return packet;
+  }
+
+  packUtcTime(epoch = Math.floor(Date.now() / 1000)) {
+    const packet = new Uint8Array(5);
+    const dv = new DataView(packet.buffer);
+    dv.setUint8(0, 0x23);
+    dv.setUint32(1, epoch, true);
+    return packet;
+  }
+
+  packDeviceName(nameStr) {
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(nameStr);
+    const packet = new Uint8Array(1 + bytes.length);
+    packet[0] = 0x01;
+    packet.set(bytes, 1);
+    return packet;
+  }
+
+  packPinCode(pinStr) {
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(pinStr);
+    const packet = new Uint8Array(1 + bytes.length);
+    packet[0] = 0x12;
+    packet.set(bytes, 1);
+    return packet;
+  }
+
+  packDeviceMac(macStr) {
+    const clean = macStr.replace(/[^0-9A-Fa-f]/g, '');
+    const bytes = [];
+    for (let i = 0; i < clean.length; i += 2) {
+      bytes.push(parseInt(clean.substr(i, 2), 16) || 0);
+    }
+    const packet = new Uint8Array(7);
+    packet[0] = 0x10;
+    for (let i = 0; i < 6; i++) {
+      packet[1 + i] = bytes[5 - i] || 0;
+    }
+    return packet;
+  }
+
+  packBindKey(hexKey) {
+    const clean = hexKey.replace(/[^0-9A-Fa-f]/g, '');
+    const bytes = [];
+    for (let i = 0; i < clean.length; i += 2) {
+      bytes.push(parseInt(clean.substr(i, 2), 16) || 0);
+    }
+    const packet = new Uint8Array(1 + bytes.length);
+    packet[0] = 0x11;
+    packet.set(bytes, 1);
+    return packet;
+  }
+
+  updateMeasureIntervalLabel() {
+    const advEl = document.getElementById('dev_cfg_adv_interval');
+    const measEl = document.getElementById('dev_cfg_measure_interval');
+    const lbl = document.getElementById('devCfgMeasureSecLabel');
+    if (!advEl || !measEl || !lbl) return;
+
+    const advMs = parseFloat(advEl.value) || 1000.0;
+    const meas = parseInt(measEl.value, 10) || 2;
+    const sec = ((advMs * meas) / 1000).toFixed(1);
+    lbl.textContent = `x(yayın aralığı) = ${sec} sn`;
+  }
+
+  setupDevAutoApply() {
+    let debounceTimer = null;
+    const debounceApply = (fn, delay = 350) => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(fn, delay);
+    };
+
+    // 1. Genel Cihaz & Ekran Yapılandırması (0x55)
+    const cfgInputs = [
+      'dev_cfg_scr_off', 'dev_cfg_comfort', 'dev_cfg_show_batt', 'dev_cfg_clock',
+      'dev_cfg_lp_meas', 'dev_cfg_tx_meas', 'dev_cfg_bt5_flags', 'dev_cfg_longrange',
+      'dev_cfg_adv_type', 'dev_cfg_adv_flags', 'dev_cfg_adv_crypto', 'dev_cfg_temp_unit',
+      'dev_cfg_adv_interval', 'dev_cfg_measure_interval', 'dev_cfg_connect_latency', 'dev_cfg_rf_tx_power',
+      'dev_cfg_lcd_refresh', 'dev_cfg_averaging', 'dev_cfg_adv_delay', 'dev_cfg_event_adv_cnt'
+    ];
+
+    cfgInputs.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const isSelectOrCheck = el.type === 'checkbox' || el.tagName === 'SELECT';
+      const eventName = isSelectOrCheck ? 'change' : 'input';
+
+      el.addEventListener(eventName, () => {
+        this.updateMeasureIntervalLabel();
+        if (isSelectOrCheck) {
+          this.sendDevPacket(this.packCustomConfig(), 'Cihaz Yapılandırması');
+        } else {
+          debounceApply(() => {
+            this.sendDevPacket(this.packCustomConfig(), 'Cihaz Yapılandırması');
+          });
+        }
+      });
+    });
+
+    // 2. Konfor Bölgesi Parametreleri (0x20)
+    const cmfInputs = ['dev_cmf_temp_lo', 'dev_cmf_temp_hi', 'dev_cmf_hum_lo', 'dev_cmf_hum_hi'];
+    cmfInputs.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('input', () => {
+        debounceApply(() => {
+          this.sendDevPacket(this.packComfortConfig(), 'Konfor Parametreleri');
+        });
+      });
+    });
+
+    // 3. Sensör Hassasiyet Kalibrasyonu (0x25)
+    const sensInputs = ['dev_sens_temp_k', 'dev_sens_temp_z', 'dev_sens_hum_k', 'dev_sens_hum_z'];
+    sensInputs.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('input', () => {
+        debounceApply(() => {
+          this.sendDevPacket(this.packSensorConfig(), 'Sensör Kalibrasyonu');
+        });
+      });
+    });
+
+    // 4. Saat Kristal Sapması (0x24)
+    const deltaEl = document.getElementById('dev_sens_time_delta');
+    if (deltaEl) {
+      deltaEl.addEventListener('input', () => {
+        debounceApply(() => {
+          this.sendDevPacket(this.packTimeDeltaConfig(), 'Saat Kristal Sapması');
+        });
+      });
+    }
+
+    // 5. Zaman Damgası & Tarama (0x26)
+    const tsInputs = ['dev_ts_interval', 'dev_ts_mac'];
+    tsInputs.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('input', () => {
+        debounceApply(() => {
+          this.sendDevPacket(this.packTimeStampConfig(), 'Zaman Damgası Ayarları');
+        });
+      });
+    });
+
+    // 6. Donanım Tetikleyicileri TRG (0x44)
+    const trgInputs = [
+      'dev_trg_temp_hyst', 'dev_trg_temp_thresh', 'dev_trg_hum_hyst', 'dev_trg_hum_thresh',
+      'dev_rs_mode', 'dev_rs_invert', 'dev_rs_interval'
+    ];
+    trgInputs.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const isSelectOrCheck = el.type === 'checkbox' || el.tagName === 'SELECT';
+      const eventName = isSelectOrCheck ? 'change' : 'input';
+
+      el.addEventListener(eventName, () => {
+        if (isSelectOrCheck) {
+          this.sendDevPacket(this.packTrgConfig(), 'TRG & Reed Switch');
+        } else {
+          debounceApply(() => {
+            this.sendDevPacket(this.packTrgConfig(), 'TRG & Reed Switch');
+          });
+        }
+      });
+    });
+
+    // 7. Ekran Değerleri (0x22)
+    const extInputs = [
+      'dev_ext_bignumb', 'dev_ext_tmpsmb', 'dev_ext_smiley', 'dev_ext_smalnumb',
+      'dev_ext_duration', 'dev_ext_percent', 'dev_ext_battery'
+    ];
+    extInputs.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const isSelectOrCheck = el.type === 'checkbox' || el.tagName === 'SELECT';
+      const eventName = isSelectOrCheck ? 'change' : 'input';
+
+      el.addEventListener(eventName, () => {
+        if (isSelectOrCheck) {
+          this.sendDevPacket(this.packScreenShow(), 'LCD Ekran Değerleri');
+        } else {
+          debounceApply(() => {
+            this.sendDevPacket(this.packScreenShow(), 'LCD Ekran Değerleri');
+          });
+        }
+      });
+    });
+  }
+
+  setupDevActionButtons() {
+    document.getElementById('btnDevGetConfig')?.addEventListener('click', () => {
+      this.sendDevPacket(new Uint8Array([0x55]), 'Ayarları Oku (0x55)');
+    });
+
+    document.getElementById('btnDevSendConfig')?.addEventListener('click', () => {
+      this.sendDevPacket(this.packCustomConfig(), 'Ayarları Gönder (0x55)');
+    });
+
+    document.getElementById('btnDevSetTime')?.addEventListener('click', () => {
+      this.sendDevPacket(this.packUtcTime(), 'Saati Eşitle (Set Time)');
+    });
+
+    document.getElementById('btnDevSetDefault')?.addEventListener('click', () => {
+      if (confirm('Sensörü fabrika varsayılan yapılandırmasına sıfırlamak istediğinize emin misiniz?')) {
+        this.sendDevPacket(new Uint8Array([0x56]), 'Varsayılan Yapılandırma (0x56)');
+      }
+    });
+
+    document.getElementById('btnDevDeleteRecords')?.addEventListener('click', () => {
+      if (confirm('Sensörün dahili flash belleğindeki tüm kayıtlar silinecektir. Devam edilsin mi?')) {
+        this.sendDevPacket(new Uint8Array([0x35]), 'Bellek Kayıtlarını Sil (0x35)');
+      }
+    });
+
+    document.getElementById('btnDevExtShow')?.addEventListener('click', () => {
+      this.sendDevPacket(this.packScreenShow(), 'LCD Ekrana Yansıt (0x22)');
+    });
+
+    document.getElementById('btnDevExtGetOld')?.addEventListener('click', () => {
+      this.sendDevPacket(new Uint8Array([0x22, 0, 0, 0, 0, 0, 0, 0]), 'Eski Ekran Verilerini Getir');
+    });
+
+    document.getElementById('btnDevStartTx')?.addEventListener('click', () => {
+      this.sendDevPacket(new Uint8Array([0x33, 0x01]), 'Telemetri Başlat (Start Tx)');
+    });
+
+    document.getElementById('btnDevStopTx')?.addEventListener('click', () => {
+      this.sendDevPacket(new Uint8Array([0x33, 0x00]), 'Telemetri Durdur (Stop Tx)');
+    });
+
+    document.getElementById('btnDevGetSens')?.addEventListener('click', () => {
+      this.sendDevPacket(new Uint8Array([0x25]), 'Kalibrasyonu Oku (0x25)');
+    });
+
+    document.getElementById('btnDevSetSens')?.addEventListener('click', () => {
+      this.sendDevPacket(this.packSensorConfig(), 'Kalibrasyonu Gönder (0x25)');
+    });
+
+    document.getElementById('btnDevResetSens')?.addEventListener('click', () => {
+      const p = new Uint8Array(13);
+      const dv = new DataView(p.buffer);
+      dv.setUint8(0, 0x25);
+      dv.setFloat32(1, 1.0, true);
+      dv.setFloat32(5, 1.0, true);
+      dv.setInt16(9, 0, true);
+      dv.setInt16(11, 0, true);
+      const tkEl = document.getElementById('dev_sens_temp_k');
+      const tzEl = document.getElementById('dev_sens_temp_z');
+      const hkEl = document.getElementById('dev_sens_hum_k');
+      const hzEl = document.getElementById('dev_sens_hum_z');
+      if (tkEl) tkEl.value = '1.00';
+      if (tzEl) tzEl.value = '0.00';
+      if (hkEl) hkEl.value = '1.00';
+      if (hzEl) hzEl.value = '0.00';
+      this.sendDevPacket(p, 'Fabrika Kalibrasyonu (Tk=1, Tz=0, Hk=1, Hz=0)');
+    });
+
+    document.getElementById('btnDevGetTimeDelta')?.addEventListener('click', () => {
+      this.sendDevPacket(new Uint8Array([0x24]), 'Saat Sapmasını Oku (0x24)');
+    });
+
+    document.getElementById('btnDevSetTimeDelta')?.addEventListener('click', () => {
+      this.sendDevPacket(this.packTimeDeltaConfig(), 'Saat Sapmasını Ata (0x24)');
+    });
+
+    document.getElementById('btnDevCalcTimeDelta')?.addEventListener('click', () => {
+      this.sendDevPacket(this.packUtcTime(), 'Saat Senkronizasyonu & Sapma Testi');
+    });
+
+    document.getElementById('btnDevGetComfort')?.addEventListener('click', () => {
+      this.sendDevPacket(new Uint8Array([0x20]), 'Konfor Parametrelerini Oku (0x20)');
+    });
+
+    document.getElementById('btnDevSetComfort')?.addEventListener('click', () => {
+      this.sendDevPacket(this.packComfortConfig(), 'Konfor Parametrelerini Kaydet (0x20)');
+    });
+
+    document.getElementById('btnDevGetTimeStamp')?.addEventListener('click', () => {
+      this.sendDevPacket(new Uint8Array([0x26]), 'Zaman Damgası Ayarlarını Oku (0x26)');
+    });
+
+    document.getElementById('btnDevSetTimeStamp')?.addEventListener('click', () => {
+      this.sendDevPacket(this.packTimeStampConfig(), 'Zaman Damgası Ayarlarını Kaydet (0x26)');
+    });
+
+    document.getElementById('btnDevGetTrg')?.addEventListener('click', () => {
+      this.sendDevPacket(new Uint8Array([0x44]), 'TRG Ayarlarını Oku (0x44)');
+    });
+
+    document.getElementById('btnDevSetTrg')?.addEventListener('click', () => {
+      this.sendDevPacket(this.packTrgConfig(), 'TRG Ayarlarını Kaydet (0x44)');
+    });
+
+    document.getElementById('btnDevPinHigh')?.addEventListener('click', () => {
+      this.sendDevPacket(new Uint8Array([0x45, 0x01]), 'Reset Pini Yüksek (Pin=1)');
+    });
+
+    document.getElementById('btnDevPinLow')?.addEventListener('click', () => {
+      this.sendDevPacket(new Uint8Array([0x45, 0x00]), 'Reset Pini Düşük (Pin=0)');
+    });
+
+    document.getElementById('btnDevGetName')?.addEventListener('click', () => {
+      this.sendDevPacket(new Uint8Array([0x01]), 'Cihaz Adını Oku (0x01)');
+    });
+
+    document.getElementById('btnDevSetName')?.addEventListener('click', () => {
+      const name = (document.getElementById('dev_device_name')?.value || '').trim();
+      if (!name) return this.showToast('Cihaz adı boş olamaz.', 'error');
+      this.sendDevPacket(this.packDeviceName(name), `Cihaz Adı Ata: ${name}`);
+    });
+
+    document.getElementById('btnDevResetName')?.addEventListener('click', () => {
+      const defName = 'ATC_597941';
+      const el = document.getElementById('dev_device_name');
+      if (el) el.value = defName;
+      this.sendDevPacket(this.packDeviceName(defName), `Cihaz Adını Sıfırla: ${defName}`);
+    });
+
+    document.getElementById('btnDevSetPin')?.addEventListener('click', () => {
+      const pin = (document.getElementById('dev_pin_code')?.value || '000000').trim();
+      this.sendDevPacket(this.packPinCode(pin), `PIN Kodu Ata: ${pin}`);
+    });
+
+    document.getElementById('btnDevGetMac')?.addEventListener('click', () => {
+      this.sendDevPacket(new Uint8Array([0x10]), 'MAC Adresini Oku (0x10)');
+    });
+
+    document.getElementById('btnDevSetMac')?.addEventListener('click', () => {
+      const mac = (document.getElementById('dev_device_mac')?.value || '').trim();
+      if (!mac) return this.showToast('Lütfen geçerli bir MAC adresi girin.', 'error');
+      this.sendDevPacket(this.packDeviceMac(mac), `MAC Adresi Ata: ${mac}`);
+    });
+
+    document.getElementById('btnDevCleanMac')?.addEventListener('click', () => {
+      if (confirm('Özel MAC adresi temizlensin mi?')) {
+        this.sendDevPacket(new Uint8Array([0x10, 0, 0, 0, 0, 0, 0]), 'Özel MAC Adresini Temizle');
+      }
+    });
+
+    document.getElementById('btnDevGetBindKey')?.addEventListener('click', () => {
+      this.sendDevPacket(new Uint8Array([0x11]), 'BindKey Oku (0x11)');
+    });
+
+    document.getElementById('btnDevSetBindKey')?.addEventListener('click', () => {
+      const key = (document.getElementById('dev_bind_key')?.value || '').trim();
+      if (!key) return this.showToast('Lütfen geçerli bir hex BindKey girin.', 'error');
+      this.sendDevPacket(this.packBindKey(key), 'BindKey Kaydet (0x11)');
+    });
+
+    document.getElementById('btnDevSendCustomCmd')?.addEventListener('click', () => {
+      const txt = (document.getElementById('dev_cmd_txt')?.value || '').trim();
+      if (!txt) return this.showToast('Lütfen gönderilecek onaltılık (hex) komut dizisi girin.', 'info');
+
+      try {
+        const hexParts = txt.replace(/0x/gi, '').split(/[\s,:-]+/).filter(x => x.length > 0);
+        const bytes = new Uint8Array(hexParts.map(h => parseInt(h, 16)));
+        this.sendDevPacket(bytes, 'Özel Komut');
+      } catch (err) {
+        this.showToast('Geçersiz onaltılık (hex) formatı!', 'error');
+      }
+    });
+
+    document.querySelectorAll('.dev-quick-cmd').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const cmd = btn.dataset.cmd;
+        if (!cmd) return;
+        const input = document.getElementById('dev_cmd_txt');
+        if (input) input.value = cmd;
+        try {
+          const byteVal = parseInt(cmd, 16);
+          this.sendDevPacket(new Uint8Array([byteVal]), `Hızlı Komut 0x${cmd}`);
+        } catch (e) {}
+      });
+    });
+  }
+
+  async devReadConfigFromDevice() {
+    if (!this.ble.isConnected) return;
+    this.logDevTerminal('Sensörden güncel parametreler talep ediliyor...', 'info');
+    await this.ble.sendAtcCommand(new Uint8Array([0x55])).catch(() => {});
+  }
+
+  handleIncomingDevPacket(b) {
+    if (!b || b.byteLength === 0) return;
+    const len = b.byteLength;
+    const cmd = b.getUint8(0);
+
+    const hexArr = [];
+    for (let i = 0; i < len; i++) {
+      hexArr.push(b.getUint8(i).toString(16).padStart(2, '0').toUpperCase());
+    }
+    const hexStr = hexArr.join(' ');
+    this.logDevTerminal(`0x${cmd.toString(16).padStart(2, '0').toUpperCase()}: ${hexStr}`, 'rx');
+
+    // 1. Yapılandırma Paketi (0x55)
+    if (cmd === 0x55 && len >= 12) {
+      const flg = b.getUint8(1);
+      const flg2 = b.getUint8(2);
+
+      const advType = flg & 0x03;
+      const comfort = !!(flg & 0x04);
+      const clock = !!(flg & 0x08);
+      const tempUnit = (flg & 0x10) ? 1 : 0;
+      const showBatt = !!(flg & 0x20);
+      const txMeas = !!(flg & 0x40);
+      const lpMeas = !!(flg & 0x80);
+
+      const smiley = flg2 & 0x07;
+      const advCrypto = !!(flg2 & 0x08);
+      const advFlags = !!(flg2 & 0x10);
+      const bt5Flags = !!(flg2 & 0x20);
+      const longrange = !!(flg2 & 0x40);
+      const screenOff = !!(flg2 & 0x80);
+
+      const advIntRaw = b.getUint16(5, true);
+      const advIntMs = (advIntRaw * 0.625).toFixed(1);
+      const measureInterval = b.getUint8(7);
+      const rfTxPower = b.getUint8(8);
+      const connLatRaw = b.getUint16(9, true);
+      const connLatMs = Math.round(connLatRaw * 1.25);
+      const lcdRefreshRaw = b.getUint8(11);
+      const lcdRefreshSec = (lcdRefreshRaw * 0.05).toFixed(2);
+      const averaging = len >= 13 ? b.getUint8(12) : 1;
+      const advDelay = len >= 14 ? b.getUint8(13) : 10;
+      const eventAdvCnt = len >= 15 ? b.getUint8(14) : 6;
+
+      const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+      const setChecked = (id, chk) => { const el = document.getElementById(id); if (el) el.checked = chk; };
+
+      setVal('dev_cfg_adv_type', advType);
+      setChecked('dev_cfg_comfort', comfort);
+      setChecked('dev_cfg_clock', clock);
+      setVal('dev_cfg_temp_unit', tempUnit);
+      setChecked('dev_cfg_show_batt', showBatt);
+      setChecked('dev_cfg_tx_meas', txMeas);
+      setChecked('dev_cfg_lp_meas', lpMeas);
+
+      setVal('dev_ext_smiley', smiley);
+      setChecked('dev_cfg_adv_crypto', advCrypto);
+      setChecked('dev_cfg_adv_flags', advFlags);
+      setChecked('dev_cfg_bt5_flags', bt5Flags);
+      setChecked('dev_cfg_longrange', longrange);
+      setChecked('dev_cfg_scr_off', screenOff);
+
+      setVal('dev_cfg_adv_interval', advIntMs);
+      setVal('dev_cfg_measure_interval', measureInterval);
+      setVal('dev_cfg_connect_latency', connLatMs);
+      setVal('dev_cfg_rf_tx_power', rfTxPower);
+      setVal('dev_cfg_lcd_refresh', lcdRefreshSec);
+      setVal('dev_cfg_averaging', averaging);
+      setVal('dev_cfg_adv_delay', advDelay);
+      setVal('dev_cfg_event_adv_cnt', eventAdvCnt);
+
+      this.updateMeasureIntervalLabel();
+      this.saveDevSettingsToStorage();
+      this.showToast('Sensör donanım yapılandırması (0x55) başarıyla okundu.', 'info');
+      return;
+    }
+
+    // 2. Konfor Parametreleri (0x20)
+    if (cmd === 0x20 && len >= 9) {
+      const loT = (b.getInt16(1, true) / 100).toFixed(2);
+      const hiT = (b.getInt16(3, true) / 100).toFixed(2);
+      const loH = (b.getInt16(5, true) / 100).toFixed(2);
+      const hiH = (b.getInt16(7, true) / 100).toFixed(2);
+
+      const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+      setVal('dev_cmf_temp_lo', loT);
+      setVal('dev_cmf_temp_hi', hiT);
+      setVal('dev_cmf_hum_lo', loH);
+      setVal('dev_cmf_hum_hi', hiH);
+
+      this.saveDevSettingsToStorage();
+      this.showToast('Konfor bölgesi ayarları (0x20) okundu.', 'info');
+      return;
+    }
+
+    // 3. Kalibrasyon Paketi (0x25)
+    if (cmd === 0x25 && len >= 13) {
+      const tk = b.getFloat32(1, true).toFixed(3);
+      const hk = b.getFloat32(5, true).toFixed(3);
+      const tz = (b.getInt16(9, true) / 100).toFixed(2);
+      const hz = (b.getInt16(11, true) / 100).toFixed(2);
+
+      const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+      setVal('dev_sens_temp_k', tk);
+      setVal('dev_sens_temp_z', tz);
+      setVal('dev_sens_hum_k', hk);
+      setVal('dev_sens_hum_z', hz);
+
+      this.saveDevSettingsToStorage();
+      this.showToast('Sensör hassasiyet kalibrasyonu (0x25) okundu.', 'info');
+      return;
+    }
+
+    // 4. Saat Sapması (0x24)
+    if (cmd === 0x24 && len >= 3) {
+      const delta = b.getInt16(1, true);
+      const el = document.getElementById('dev_sens_time_delta');
+      if (el) el.value = delta;
+      this.saveDevSettingsToStorage();
+      this.showToast(`Saat kristal sapması okundu: ${delta}`, 'info');
+      return;
+    }
+
+    // 5. TRG & Reed Switch (0x44)
+    if (cmd === 0x44 && len >= 11) {
+      const tHyst = (b.getInt16(1, true) / 100).toFixed(2);
+      const tThr = (b.getInt16(3, true) / 100).toFixed(2);
+      const hHyst = (b.getInt16(5, true) / 100).toFixed(2);
+      const hThr = (b.getInt16(7, true) / 100).toFixed(2);
+      const rsInt = b.getUint16(9, true);
+      const rsCfg = len >= 12 ? b.getUint8(11) : 0;
+
+      const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+      setVal('dev_trg_temp_hyst', tHyst);
+      setVal('dev_trg_temp_thresh', tThr);
+      setVal('dev_trg_hum_hyst', hHyst);
+      setVal('dev_trg_hum_thresh', hThr);
+      setVal('dev_rs_interval', rsInt);
+      setVal('dev_rs_mode', rsCfg & 0x01);
+      const invertEl = document.getElementById('dev_rs_invert');
+      if (invertEl) invertEl.checked = !!(rsCfg & 0x02);
+
+      this.saveDevSettingsToStorage();
+      this.showToast('TRG eşik değerleri (0x44) okundu.', 'info');
+      return;
+    }
+
+    // 6. Cihaz Adı (0x01)
+    if (cmd === 0x01 && len > 1) {
+      const bytes = new Uint8Array(b.buffer, b.byteOffset + 1, len - 1);
+      const name = new TextDecoder().decode(bytes);
+      const el = document.getElementById('dev_device_name');
+      if (el) el.value = name;
+      this.saveDevSettingsToStorage();
+      this.showToast(`Cihaz adı okundu: ${name}`, 'info');
+      return;
+    }
+
+    // 7. MAC Adresi (0x10)
+    if (cmd === 0x10 && len >= 7) {
+      const macArr = [];
+      for (let i = 6; i >= 1; i--) {
+        macArr.push(b.getUint8(i).toString(16).padStart(2, '0').toUpperCase());
+      }
+      const macStr = macArr.join(':');
+      const el = document.getElementById('dev_device_mac');
+      if (el) el.value = macStr;
+      this.saveDevSettingsToStorage();
+      this.showToast(`Cihaz MAC adresi: ${macStr}`, 'info');
+      return;
+    }
+
+    // 8. BindKey (0x11)
+    if (cmd === 0x11 && len >= 17) {
+      const keyArr = [];
+      for (let i = 1; i < 17; i++) {
+        keyArr.push(b.getUint8(i).toString(16).padStart(2, '0').toUpperCase());
+      }
+      const keyStr = keyArr.join('');
+      const el = document.getElementById('dev_bind_key');
+      if (el) el.value = keyStr;
+      this.saveDevSettingsToStorage();
+      this.showToast('BindKey başarıyla okundu.', 'info');
+      return;
+    }
+
+    // 9. UTC Saati (0x23)
+    if (cmd === 0x23 && len >= 5) {
+      const epoch = b.getUint32(1, true);
+      const date = new Date(epoch * 1000);
+      this.showToast(`Sensör UTC Saati: ${date.toLocaleString('tr-TR')}`, 'info');
+      return;
+    }
+  }
+
+  saveDevSettingsToStorage() {
+    const keys = [
+      'dev_cfg_scr_off', 'dev_cfg_comfort', 'dev_cfg_show_batt', 'dev_cfg_clock',
+      'dev_cfg_lp_meas', 'dev_cfg_tx_meas', 'dev_cfg_bt5_flags', 'dev_cfg_longrange',
+      'dev_cfg_adv_type', 'dev_cfg_adv_flags', 'dev_cfg_adv_crypto', 'dev_cfg_temp_unit',
+      'dev_cfg_adv_interval', 'dev_cfg_measure_interval', 'dev_cfg_connect_latency', 'dev_cfg_rf_tx_power',
+      'dev_cfg_lcd_refresh', 'dev_cfg_averaging', 'dev_cfg_adv_delay', 'dev_cfg_event_adv_cnt',
+      'dev_cmf_temp_lo', 'dev_cmf_temp_hi', 'dev_cmf_hum_lo', 'dev_cmf_hum_hi',
+      'dev_sens_temp_k', 'dev_sens_temp_z', 'dev_sens_hum_k', 'dev_sens_hum_z', 'dev_sens_time_delta',
+      'dev_ts_interval', 'dev_ts_mac',
+      'dev_trg_temp_hyst', 'dev_trg_temp_thresh', 'dev_trg_hum_hyst', 'dev_trg_hum_thresh',
+      'dev_rs_mode', 'dev_rs_invert', 'dev_rs_interval',
+      'dev_device_name', 'dev_pin_code', 'dev_device_mac', 'dev_bind_key',
+      'dev_ext_bignumb', 'dev_ext_tmpsmb', 'dev_ext_smiley', 'dev_ext_smalnumb',
+      'dev_ext_duration', 'dev_ext_percent', 'dev_ext_battery'
+    ];
+
+    const data = {};
+    keys.forEach(k => {
+      const el = document.getElementById(k);
+      if (!el) return;
+      if (el.type === 'checkbox') {
+        data[k] = el.checked;
+      } else {
+        data[k] = el.value;
+      }
+    });
+
+    try {
+      localStorage.setItem('xiaomi_atc_dev_settings', JSON.stringify(data));
+    } catch (e) {}
+  }
+
+  loadDevSettingsFromStorage() {
+    try {
+      const raw = localStorage.getItem('xiaomi_atc_dev_settings');
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      for (const [k, v] of Object.entries(data)) {
+        const el = document.getElementById(k);
+        if (!el) continue;
+        if (el.type === 'checkbox') {
+          el.checked = !!v;
+        } else {
+          el.value = v;
+        }
+      }
+    } catch (e) {}
   }
 }
 
