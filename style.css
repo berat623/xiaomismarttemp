@@ -1,5 +1,35 @@
 /* Xiaomi SmartTemp Pro — Google Material 3 (M3) Blue & Parkinsans Typography */
 
+/* Local Offline Fonts: Parkinsans (Zero Internet Dependency) */
+@font-face {
+  font-family: 'Parkinsans';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('fonts/parkinsans-500.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Parkinsans';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('fonts/parkinsans-600.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Parkinsans';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('fonts/parkinsans-700.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Parkinsans';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url('fonts/parkinsans-800.ttf') format('truetype');
+}
+
 /* Universal Font Enforcement (Parkinsans Only, Minimum 500 Weight) */
 *, *::before, *::after {
   -webkit-tap-highlight-color: transparent;

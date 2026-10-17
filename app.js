@@ -997,13 +997,19 @@ class AppController {
       btnExportCsv: document.getElementById('btnExportCsv'),
       btnExportJson: document.getElementById('btnExportJson'),
       btnClearData: document.getElementById('btnClearData'),
-      toastContainer: document.getElementById('toastContainer')
+      toastContainer: document.getElementById('toastContainer'),
+
+      // Offline Badges
+      offlineBadge: document.getElementById('offlineBadge'),
+      offlineBadgeMobile: document.getElementById('offlineBadgeMobile')
     };
 
     this.init();
   }
 
   async init() {
+    this.initServiceWorker();
+    this.initNetworkStatus();
     this.initLiveClock();
     this.applyTheme(this.currentTheme);
     lucide.createIcons();
@@ -1028,6 +1034,56 @@ class AppController {
         this.chart.resize();
       }
     });
+  }
+
+  initServiceWorker() {
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then((reg) => {
+            console.log('[PWA] Service Worker aktif:', reg.scope);
+          })
+          .catch((err) => {
+            console.warn('[PWA] Service Worker kaydı başarısız:', err);
+          });
+      });
+    }
+  }
+
+  initNetworkStatus() {
+    const updateStatus = () => {
+      const isOnline = navigator.onLine;
+      if (this.dom.offlineBadge) {
+        if (!isOnline) {
+          this.dom.offlineBadge.classList.remove('hidden');
+          this.dom.offlineBadge.classList.add('flex');
+        } else {
+          this.dom.offlineBadge.classList.add('hidden');
+          this.dom.offlineBadge.classList.remove('flex');
+        }
+      }
+      if (this.dom.offlineBadgeMobile) {
+        if (!isOnline) {
+          this.dom.offlineBadgeMobile.classList.remove('hidden');
+          this.dom.offlineBadgeMobile.classList.add('flex');
+        } else {
+          this.dom.offlineBadgeMobile.classList.add('hidden');
+          this.dom.offlineBadgeMobile.classList.remove('flex');
+        }
+      }
+    };
+
+    window.addEventListener('online', () => {
+      updateStatus();
+      this.showToast('İnternet bağlantısı sağlandı.', 'info');
+    });
+
+    window.addEventListener('offline', () => {
+      updateStatus();
+      this.showToast('Çevrimdışı moddasınız. Bluetooth ölçümleri kesintisiz çalışıyor.', 'info');
+    });
+
+    updateStatus();
   }
 
   initLiveClock() {

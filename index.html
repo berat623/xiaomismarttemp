@@ -9,19 +9,16 @@
 
   <!-- PWA & Mobile Web App Meta Tags -->
   <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/svg+xml" href="icon.svg" />
+  <link rel="apple-touch-icon" href="icon.svg" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="SmartTemp" />
   <meta name="format-detection" content="telephone=no" />
 
-  <!-- Google Fonts: Parkinsans (Weights: 500, 600, 700, 800) -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Parkinsans:wght@500;600;700;800&display=swap" rel="stylesheet">
-
-  <!-- Tailwind CSS CDN with Google Material 3 Blue Tokens -->
-  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Tailwind CSS (Offline-First Local Vendor) -->
+  <script src="vendor/tailwind.js"></script>
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -58,13 +55,13 @@
     }
   </script>
 
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Lucide Icons (Offline-First Local Vendor) -->
+  <script src="vendor/lucide.min.js"></script>
 
-  <!-- Chart.js CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Chart.js (Offline-First Local Vendor) -->
+  <script src="vendor/chart.umd.min.js"></script>
 
-  <!-- Custom CSS -->
+  <!-- Custom CSS (Contains Local Offline Parkinsans Fonts) -->
   <link rel="stylesheet" href="style.css" />
 </head>
 <body class="bg-[#f8fafd] dark:bg-[#0c131c] text-[#1b1f24] dark:text-[#e2e8f0] min-h-screen flex flex-col font-sans selection:bg-[#0b57d0] selection:text-white transition-colors duration-300 pb-10 sm:pb-0">
@@ -100,6 +97,12 @@
       <!-- Right Side Controls (Material 3 Style) -->
       <div class="flex items-center gap-2 sm:gap-3 flex-shrink-0">
         
+        <!-- Offline Mode Pill (Appears when internet is disconnected) -->
+        <div id="offlineBadge" class="hidden items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 dark:bg-amber-400/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-semibold" title="İnternet bağlantısı yok - Çevrimdışı Çalışıyor (Bluetooth Aktif)">
+          <i data-lucide="wifi-off" class="w-3.5 h-3.5"></i>
+          <span>Çevrimdışı</span>
+        </div>
+
         <!-- Connection Status Pill (Desktop only) -->
         <div class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#edf2f9] dark:bg-[#1e2938] border border-[#d8e2ee] dark:border-[#2e3b4e] text-xs">
           <span id="connectionDot" class="w-2 h-2 rounded-full bg-slate-400 dark:bg-slate-500 flex-shrink-0"></span>
@@ -141,6 +144,11 @@
         <i data-lucide="bluetooth" class="w-4 h-4"></i>
         <span>Cihaza Bağlan</span>
       </button>
+
+      <!-- Mobile Offline Indicator -->
+      <div id="offlineBadgeMobile" class="hidden px-2.5 py-2 rounded-full bg-amber-500/10 dark:bg-amber-400/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 items-center justify-center" title="Çevrimdışı Mod">
+        <i data-lucide="wifi-off" class="w-3.5 h-3.5"></i>
+      </div>
 
       <!-- Live Signal on Mobile with 4-Bar Signal Meter -->
       <div id="signalPillMobile" class="hidden px-3 py-2 rounded-full bg-[#edf2f9] dark:bg-[#1e2938] border border-[#d8e2ee] dark:border-[#2e3b4e] items-center gap-1.5 font-mono text-[11px] font-bold text-[#0b57d0] dark:text-[#a8c7fa]" title="Bluetooth Sinyal Gücü">
