@@ -1,6 +1,7 @@
 /**
  * Xiaomi SmartTemp Pro — Poppins Typography & Dual Theme (Light / Dark)
  * Device: Xiaomi Mijia LYWSD03MMC
+ * Derived Parameters: Dew Point, Apparent Temperature & Vapor Pressure / VPD
  * Mobile-First Responsive Design (Phone & Desktop Unified)
  */
 
@@ -25,7 +26,95 @@ const XIAOMI_CONFIG = {
 };
 
 // ==========================================
-// 2. STORAGE MANAGER (IndexedDB + Memory)
+// 2. SCIENTIFIC ATMOSPHERIC METRICS CALCULATOR
+// ==========================================
+class AtmosphericMetrics {
+  /**
+   * Çiğ Noktası (Dew Point - Td)
+   * Formül: Alduchov & Eskridge (1996) Magnus yaklaşımı (WMO Standardı)
+   * a = 17.625, b = 243.04 °C
+   */
+  static calculateDewPoint(temperature, humidity) {
+    if (humidity <= 0) return temperature;
+    const a = 17.625;
+    const b = 243.04;
+    const alpha = ((a * temperature) / (b + temperature)) + Math.log(humidity / 100.0);
+    const dewPoint = (b * alpha) / (a - alpha);
+    return Number(dewPoint.toFixed(1));
+  }
+
+  /**
+   * Buhar Basıncı (Vapor Pressure & VPD)
+   * Formül: Buck (1981) denklemi
+   * vpSat: Doygunluk buhar basıncı (hPa)
+   * vpAct: Gerçek su buharı kısmi basıncı (hPa)
+   * vpd: Buhar basıncı açığı (kPa)
+   */
+  static calculateVaporPressure(temperature, humidity) {
+    const vpSat = 6.1121 * Math.exp((17.502 * temperature) / (240.97 + temperature));
+    const vpAct = vpSat * (Math.max(0, Math.min(100, humidity)) / 100.0);
+    const vpd = (vpSat - vpAct) / 10.0; // kPa cinsine çevrim
+    return {
+      vpSat: Number(vpSat.toFixed(1)),
+      vpAct: Number(vpAct.toFixed(1)),
+      vpd: Number(vpd.toFixed(2))
+    };
+  }
+
+  /**
+   * Hissedilen Sıcaklık (Apparent Temperature - AT)
+   * Formül: Steadman (1984) iç ortam modeli + Yüksek sıcaklıklarda NOAA Rothfusz Heat Index
+   */
+  static calculateApparentTemp(temperature, humidity) {
+    // 1. Su buharı basıncı hesabı (hPa)
+    const e = (humidity / 100.0) * 6.105 * Math.exp((17.27 * temperature) / (237.7 + temperature));
+
+    // 2. Yüksek sıcaklık ve nemde NOAA Rothfusz Isı İndeksi (Heat Index)
+    if (temperature >= 26.7 && humidity >= 40) {
+      const tf = (temperature * 1.8) + 32.0;
+      let hi = -42.379 +
+        (2.04901523 * tf) +
+        (10.14333127 * humidity) -
+        (0.22475541 * tf * humidity) -
+        (0.00683783 * tf * tf) -
+        (0.05481717 * humidity * humidity) +
+        (0.00122874 * tf * tf * humidity) +
+        (0.00085282 * tf * humidity * humidity) -
+        (0.00000199 * tf * tf * humidity * humidity);
+
+      const tc = (hi - 32.0) / 1.8;
+      return Number(tc.toFixed(1));
+    }
+
+    // 3. Standart iç ortam Steadman formülü (rüzgar hızı v ≈ 0-0.2 m/s)
+    const at = temperature + (0.33 * e) - 4.0;
+    return Number(at.toFixed(1));
+  }
+
+  /**
+   * Tüm türetilmiş parametreleri tek seferde hesaplar ve nesneye iliştirir
+   */
+  static enrich(record) {
+    const t = record.temperature;
+    const h = record.humidity;
+
+    const dewPoint = this.calculateDewPoint(t, h);
+    const vp = this.calculateVaporPressure(t, h);
+    const apparentTemp = this.calculateApparentTemp(t, h);
+
+    return {
+      ...record,
+      dewPoint,
+      apparentTemp,
+      vaporPressure: vp.vpAct,
+      vpSat: vp.vpSat,
+      vpd: vp.vpd
+    };
+  }
+}
+
+// ==========================================
+// 3. STORAGE MANAGER (IndexedDB + Memory)
 // ==========================================
 class TelemetryStorage {
   constructor() {
@@ -68,7 +157,9 @@ class TelemetryStorage {
       const store = tx.objectStore(this.storeName);
       const req = store.getAll();
       req.onsuccess = () => {
-        this.records = req.result || [];
+        const raw = req.result || [];
+        // Geçmiş kayıtların türetilmiş parametreleri eksikse tamamla
+        this.records = raw.map(r => AtmosphericMetrics.enrich(r));
         this.records.sort((a, b) => a.timestamp - b.timestamp);
         resolve(this.records);
       };
@@ -77,24 +168,27 @@ class TelemetryStorage {
   }
 
   async addRecord(record) {
-    this.records.push(record);
+    const enriched = AtmosphericMetrics.enrich(record);
+    this.records.push(enriched);
     this.records.sort((a, b) => a.timestamp - b.timestamp);
 
     if (this.db) {
       const tx = this.db.transaction(this.storeName, 'readwrite');
-      tx.objectStore(this.storeName).add(record);
+      tx.objectStore(this.storeName).add(enriched);
     }
+    return enriched;
   }
 
   async addBatch(recordsList) {
     if (!recordsList || recordsList.length === 0) return;
     for (const r of recordsList) {
-      const exists = this.records.some(ex => Math.abs(ex.timestamp - r.timestamp) < 5000 && ex.type === r.type);
+      const enriched = AtmosphericMetrics.enrich(r);
+      const exists = this.records.some(ex => Math.abs(ex.timestamp - enriched.timestamp) < 5000 && ex.type === enriched.type);
       if (!exists) {
-        this.records.push(r);
+        this.records.push(enriched);
         if (this.db) {
           const tx = this.db.transaction(this.storeName, 'readwrite');
-          tx.objectStore(this.storeName).add(r);
+          tx.objectStore(this.storeName).add(enriched);
         }
       }
     }
@@ -111,7 +205,21 @@ class TelemetryStorage {
 
   exportCSV() {
     if (this.records.length === 0) return null;
-    const headers = ['ID', 'Tarih', 'Saat', 'Tür', 'Sıcaklık (°C)', 'Nem (%)', 'Pil (%)', 'Voltaj (V)', 'Çiğ Noktası (°C)', 'VPD (kPa)'];
+    const headers = [
+      'ID',
+      'Tarih',
+      'Saat',
+      'Tur',
+      'Sicaklik_C',
+      'Hissedilen_Sicaklik_C',
+      'Nem_Yuzde',
+      'Cig_Noktasi_C',
+      'Buhar_Basinci_hPa',
+      'Doygunluk_Basinci_hPa',
+      'VPD_kPa',
+      'Pil_Yuzde',
+      'Voltaj_V'
+    ];
     const rows = this.records.map((r, i) => {
       const d = new Date(r.timestamp);
       return [
@@ -120,11 +228,14 @@ class TelemetryStorage {
         d.toLocaleTimeString('tr-TR'),
         r.type === 'history_hour' ? 'Cihaz Geçmişi' : 'Canlı Ölçüm',
         r.temperature.toFixed(2),
+        r.apparentTemp != null ? r.apparentTemp.toFixed(1) : '',
         r.humidity,
-        r.battery != null ? r.battery : '',
-        r.voltage != null ? r.voltage.toFixed(2) : '',
         r.dewPoint != null ? r.dewPoint.toFixed(1) : '',
-        r.vpd != null ? r.vpd.toFixed(2) : ''
+        r.vaporPressure != null ? r.vaporPressure.toFixed(1) : '',
+        r.vpSat != null ? r.vpSat.toFixed(1) : '',
+        r.vpd != null ? r.vpd.toFixed(2) : '',
+        r.battery != null ? r.battery : '',
+        r.voltage != null ? r.voltage.toFixed(2) : ''
       ].join(';');
     });
     return [headers.join(';'), ...rows].join('\r\n');
@@ -136,7 +247,7 @@ class TelemetryStorage {
 }
 
 // ==========================================
-// 3. BLUETOOTH MANAGER (Web Bluetooth API)
+// 4. BLUETOOTH MANAGER (Web Bluetooth API)
 // ==========================================
 class XiaomiBleManager {
   constructor(onDataCallback, onStatusCallback, onHistoryProgressCallback) {
@@ -200,7 +311,7 @@ class XiaomiBleManager {
       await this.liveChar.startNotifications();
       this.liveChar.addEventListener('characteristicvaluechanged', (e) => this.handleLivePacket(e));
 
-      // Initial read
+      // Initial direct read
       const val = await this.liveChar.readValue();
       this.parseAndEmitLivePacket(val);
     } catch (err) {
@@ -216,8 +327,8 @@ class XiaomiBleManager {
         const hum = humVal.getUint16(0, true) / 100.0;
 
         this.onData({
-          temperature: temp,
-          humidity: hum,
+          temperature: Number(temp.toFixed(2)),
+          humidity: Math.round(hum),
           voltage: 3.0,
           battery: 90,
           timestamp: Date.now(),
@@ -375,7 +486,7 @@ class XiaomiBleManager {
 
     const validTs = timestampSec > 1600000000 ? timestampSec * 1000 : Date.now() - (idxNum * 3600 * 1000);
 
-    return {
+    const baseRecord = {
       id_idx: idxNum,
       timestamp: validTs,
       temperature: avgTemp,
@@ -386,6 +497,8 @@ class XiaomiBleManager {
       humMin,
       type: 'history_hour'
     };
+
+    return AtmosphericMetrics.enrich(baseRecord);
   }
 
   async disconnect() {
@@ -397,26 +510,6 @@ class XiaomiBleManager {
   handleDisconnect() {
     this.isConnected = false;
     this.onStatus('disconnected', 'Cihaz bağlantısı koptu.');
-  }
-}
-
-// ==========================================
-// 4. PHYSICAL METRICS CALCULATOR
-// ==========================================
-class PhysicalMetrics {
-  static calculateDewPoint(temperature, humidity) {
-    const a = 17.27;
-    const b = 237.7;
-    const alpha = ((a * temperature) / (b + temperature)) + Math.log(humidity / 100.0);
-    const dewPoint = (b * alpha) / (a - alpha);
-    return Number(dewPoint.toFixed(1));
-  }
-
-  static calculateVPD(temperature, humidity) {
-    const vpSat = 0.61078 * Math.exp((17.27 * temperature) / (temperature + 237.3));
-    const vpAir = vpSat * (humidity / 100.0);
-    const vpd = vpSat - vpAir;
-    return Number(vpd.toFixed(2));
   }
 }
 
@@ -437,7 +530,7 @@ class AppController {
     this.currentTheme = localStorage.getItem('smarttemp_theme') || 'light';
     this.latestTelemetry = null;
     this.chartRange = '1h';
-    this.chartMode = 'both';
+    this.chartMode = 'all';
     this.currentPage = 1;
     this.pageSize = 15;
 
@@ -466,20 +559,37 @@ class AppController {
       connectionStatusText: document.getElementById('connectionStatusText'),
       lastUpdatedAgo: document.getElementById('lastUpdatedAgo'),
 
-      // Metrics
+      // Card 1: Sıcaklık
       valTemp: document.getElementById('valTemp'),
       lblTempUnit: document.getElementById('lblTempUnit'),
       btnToggleUnit: document.getElementById('btnToggleUnit'),
       tempMinMax: document.getElementById('tempMinMax'),
       tempTrendBadge: document.getElementById('tempTrendBadge'),
-      valDewPoint: document.getElementById('valDewPoint'),
 
+      // Card 2: Bağıl Nem
       valHum: document.getElementById('valHum'),
       humProgressBar: document.getElementById('humProgressBar'),
       humMinMax: document.getElementById('humMinMax'),
       humidityStatusBadge: document.getElementById('humidityStatusBadge'),
-      valVpd: document.getElementById('valVpd'),
 
+      // Card 3: Hissedilen Sıcaklık (Türetilmiş)
+      valApparentTemp: document.getElementById('valApparentTemp'),
+      lblApparentUnit: document.getElementById('lblApparentUnit'),
+      apparentDiffBadge: document.getElementById('apparentDiffBadge'),
+      apparentMinMax: document.getElementById('apparentMinMax'),
+
+      // Card 4: Çiğ Noktası (Türetilmiş)
+      valDewPointCard: document.getElementById('valDewPointCard'),
+      lblDewPointUnit: document.getElementById('lblDewPointUnit'),
+      dewPointRiskBadge: document.getElementById('dewPointRiskBadge'),
+      dewPointMinMax: document.getElementById('dewPointMinMax'),
+
+      // Card 5: Buhar Basıncı & VPD (Türetilmiş)
+      valVaporPressure: document.getElementById('valVaporPressure'),
+      vpdBadge: document.getElementById('vpdBadge'),
+      valVpSat: document.getElementById('valVpSat'),
+
+      // Card 6: Pil & Donanım
       valBattery: document.getElementById('valBattery'),
       valVoltage: document.getElementById('valVoltage'),
       batteryProgressBar: document.getElementById('batteryProgressBar'),
@@ -534,7 +644,7 @@ class AppController {
     });
   }
 
-  // Live Digital Clock (Saat : Dakika : Saniye)
+  // Live Streaming Digital Clock (Saat : Dakika : Saniye)
   initLiveClock() {
     const timeEl = document.getElementById('liveClockTime');
     const dateEl = document.getElementById('liveClockDate');
@@ -646,15 +756,18 @@ class AppController {
       this.dom.btnFetchHistoryMobile.addEventListener('click', () => this.triggerFetchHistory());
     }
 
-    // Unit Toggle
+    // Unit Toggle (°C / °F)
     this.dom.btnToggleUnit.addEventListener('click', () => {
       this.currentUnit = this.currentUnit === 'C' ? 'F' : 'C';
       this.dom.lblTempUnit.textContent = `°${this.currentUnit}`;
+      if (this.dom.lblApparentUnit) this.dom.lblApparentUnit.textContent = `°${this.currentUnit}`;
+      if (this.dom.lblDewPointUnit) this.dom.lblDewPointUnit.textContent = `°${this.currentUnit}`;
+
       if (this.latestTelemetry) {
         this.renderTelemetryCards(this.latestTelemetry);
       }
+      this.updateStatsAndTable();
       this.updateChart();
-      this.renderTable();
     });
 
     // Chart Range Buttons
@@ -668,7 +781,7 @@ class AppController {
       });
     });
 
-    // Chart Metric Mode Buttons
+    // Chart Parameter Mode Buttons
     document.querySelectorAll('.mode-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
@@ -683,20 +796,20 @@ class AppController {
     this.dom.btnExportCsv.addEventListener('click', () => {
       const csv = this.storage.exportCSV();
       if (!csv) return this.showToast('Dışa aktarılacak veri bulunmuyor.', 'info');
-      this.downloadFile('xiaomi_sicaklik_nem_verileri.csv', csv, 'text/csv;charset=utf-8;');
+      this.downloadFile('xiaomi_atmosferik_veriler.csv', csv, 'text/csv;charset=utf-8;');
       this.showToast('CSV dosyası başarıyla indirildi.', 'success');
     });
 
     this.dom.btnExportJson.addEventListener('click', () => {
       const json = this.storage.exportJSON();
       if (!json || json === '[]') return this.showToast('Dışa aktarılacak veri bulunmuyor.', 'info');
-      this.downloadFile('xiaomi_telemetri.json', json, 'application/json');
+      this.downloadFile('xiaomi_atmosferik_telemetri.json', json, 'application/json');
       this.showToast('JSON dosyası başarıyla indirildi.', 'success');
     });
 
     // Clear Data
     this.dom.btnClearData.addEventListener('click', async () => {
-      if (confirm('Tüm kayıtlı sıcaklık ve nem verilerini silmek istediğinize emin misiniz?')) {
+      if (confirm('Tüm kayıtlı sıcaklık, nem ve türetilmiş parametre verilerini silmek istediğinize emin misiniz?')) {
         await this.storage.clearAll();
         this.updateStatsAndTable();
         this.updateChart();
@@ -788,27 +901,28 @@ class AppController {
     }
   }
 
-  handleNewData(data) {
-    data.dewPoint = PhysicalMetrics.calculateDewPoint(data.temperature, data.humidity);
-    data.vpd = PhysicalMetrics.calculateVPD(data.temperature, data.humidity);
+  async handleNewData(data) {
+    const enriched = await this.storage.addRecord(data);
+    this.latestTelemetry = enriched;
 
-    this.latestTelemetry = data;
-    this.storage.addRecord(data);
-
-    this.renderTelemetryCards(data);
+    this.renderTelemetryCards(enriched);
     this.updateStatsAndTable();
     this.updateChart();
   }
 
+  // 6 Ayrı Kartın Render Edilmesi (Sıcaklık, Nem, Hissedilen, Çiğ Noktası, Buhar Basıncı, Pil)
   renderTelemetryCards(data) {
+    // 1. Sıcaklık Kartı
     let displayTemp = data.temperature;
     if (this.currentUnit === 'F') {
       displayTemp = (data.temperature * 9 / 5) + 32;
     }
     this.dom.valTemp.textContent = displayTemp.toFixed(1);
+    this.dom.lblTempUnit.textContent = `°${this.currentUnit}`;
 
+    // 2. Bağıl Nem Kartı
     this.dom.valHum.textContent = data.humidity;
-    this.dom.humProgressBar.style.width = `${Math.min(100, data.humidity)}%`;
+    this.dom.humProgressBar.style.width = `${Math.min(100, Math.max(0, data.humidity))}%`;
 
     if (data.humidity < 30) {
       this.dom.humidityStatusBadge.textContent = 'Kuru';
@@ -821,12 +935,67 @@ class AppController {
       this.dom.humidityStatusBadge.className = 'text-xs px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 font-medium';
     }
 
-    this.dom.valDewPoint.textContent = `${data.dewPoint} °C`;
-    this.dom.valVpd.textContent = `${data.vpd} kPa`;
+    // 3. TÜRETİLMİŞ PARAMETRE: Hissedilen Sıcaklık Kartı
+    if (data.apparentTemp != null) {
+      let displayApparent = data.apparentTemp;
+      if (this.currentUnit === 'F') {
+        displayApparent = (data.apparentTemp * 9 / 5) + 32;
+      }
+      this.dom.valApparentTemp.textContent = displayApparent.toFixed(1);
+      this.dom.lblApparentUnit.textContent = `°${this.currentUnit}`;
 
+      const diff = data.apparentTemp - data.temperature;
+      const sign = diff >= 0 ? '+' : '';
+      this.dom.apparentDiffBadge.textContent = `Fark: ${sign}${diff.toFixed(1)}°C`;
+      if (Math.abs(diff) < 0.5) {
+        this.dom.apparentDiffBadge.className = 'text-xs px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 font-mono font-semibold';
+      } else if (diff > 0) {
+        this.dom.apparentDiffBadge.className = 'text-xs px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 font-mono font-semibold';
+      } else {
+        this.dom.apparentDiffBadge.className = 'text-xs px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border border-cyan-500/20 font-mono font-semibold';
+      }
+    }
+
+    // 4. TÜRETİLMİŞ PARAMETRE: Çiğ Noktası (Dew Point) Kartı
+    if (data.dewPoint != null) {
+      let displayDew = data.dewPoint;
+      if (this.currentUnit === 'F') {
+        displayDew = (data.dewPoint * 9 / 5) + 32;
+      }
+      this.dom.valDewPointCard.textContent = displayDew.toFixed(1);
+      this.dom.lblDewPointUnit.textContent = `°${this.currentUnit}`;
+
+      // Yoğuşma ve Nem Riski Durumu
+      const spread = data.temperature - data.dewPoint;
+      if (spread <= 2.5) {
+        this.dom.dewPointRiskBadge.textContent = 'Yoğuşma Riski!';
+        this.dom.dewPointRiskBadge.className = 'text-xs px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20 font-bold';
+      } else if (data.dewPoint >= 21) {
+        this.dom.dewPointRiskBadge.textContent = 'Baskıcı Nem';
+        this.dom.dewPointRiskBadge.className = 'text-xs px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 font-medium';
+      } else if (data.dewPoint >= 10 && data.dewPoint < 16) {
+        this.dom.dewPointRiskBadge.textContent = 'Konforlu';
+        this.dom.dewPointRiskBadge.className = 'text-xs px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 font-medium';
+      } else if (data.dewPoint < 10) {
+        this.dom.dewPointRiskBadge.textContent = 'Kuru Hava';
+        this.dom.dewPointRiskBadge.className = 'text-xs px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border border-cyan-500/20 font-medium';
+      } else {
+        this.dom.dewPointRiskBadge.textContent = 'Normal';
+        this.dom.dewPointRiskBadge.className = 'text-xs px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20 font-medium';
+      }
+    }
+
+    // 5. TÜRETİLMİŞ PARAMETRE: Buhar Basıncı & VPD Kartı
+    if (data.vaporPressure != null) {
+      this.dom.valVaporPressure.textContent = data.vaporPressure.toFixed(1);
+      this.dom.vpdBadge.textContent = `VPD: ${data.vpd != null ? data.vpd.toFixed(2) : '--'} kPa`;
+      this.dom.valVpSat.textContent = `${data.vpSat != null ? data.vpSat.toFixed(1) : '--'} hPa`;
+    }
+
+    // 6. Pil & Donanım Kartı
     if (data.battery != null) {
       this.dom.valBattery.textContent = data.battery;
-      this.dom.batteryProgressBar.style.width = `${Math.min(100, data.battery)}%`;
+      this.dom.batteryProgressBar.style.width = `${Math.min(100, Math.max(0, data.battery))}%`;
       if (data.battery < 20) {
         this.dom.batteryProgressBar.className = 'h-full bg-rose-500 rounded-full transition-all duration-500';
       } else if (data.battery < 50) {
@@ -849,17 +1018,25 @@ class AppController {
     this.dom.totalPointsCount.textContent = list.length;
 
     if (list.length > 0) {
-      const temps = list.map(r => r.temperature);
-      const hums = list.map(r => r.humidity);
-      const minTemp = Math.min(...temps);
-      const maxTemp = Math.max(...temps);
-      const minHum = Math.min(...hums);
-      const maxHum = Math.max(...hums);
-
       const conv = (t) => this.currentUnit === 'F' ? (t * 9 / 5 + 32).toFixed(1) : t.toFixed(1);
-      this.dom.tempMinMax.textContent = `${conv(minTemp)} / ${conv(maxTemp)} °${this.currentUnit}`;
-      this.dom.humMinMax.textContent = `%${minHum} / %${maxHum}`;
 
+      // 1. Sıcaklık Min / Max
+      const temps = list.map(r => r.temperature);
+      this.dom.tempMinMax.textContent = `${conv(Math.min(...temps))} / ${conv(Math.max(...temps))}`;
+
+      // 2. Nem Min / Max
+      const hums = list.map(r => r.humidity);
+      this.dom.humMinMax.textContent = `%${Math.min(...hums)} / %${Math.max(...hums)}`;
+
+      // 3. Hissedilen Sıcaklık Min / Max
+      const apps = list.map(r => r.apparentTemp != null ? r.apparentTemp : r.temperature);
+      this.dom.apparentMinMax.textContent = `${conv(Math.min(...apps))} / ${conv(Math.max(...apps))}`;
+
+      // 4. Çiğ Noktası Min / Max
+      const dews = list.map(r => r.dewPoint != null ? r.dewPoint : AtmosphericMetrics.calculateDewPoint(r.temperature, r.humidity));
+      this.dom.dewPointMinMax.textContent = `${conv(Math.min(...dews))} / ${conv(Math.max(...dews))}`;
+
+      // Trend Analizi
       if (list.length >= 3) {
         const last3 = list.slice(-3);
         const diff = last3[2].temperature - last3[0].temperature;
@@ -892,7 +1069,7 @@ class AppController {
       if (this.dom.historyTableBody) {
         this.dom.historyTableBody.innerHTML = `
           <tr>
-            <td colspan="6" class="py-8 text-center text-slate-400 dark:text-slate-500 font-sans">
+            <td colspan="8" class="py-8 text-center text-slate-400 dark:text-slate-500 font-sans">
               Henüz kayıt bulunmuyor. Cihazınıza bağlanarak ölçüm alabilirsiniz.
             </td>
           </tr>
@@ -914,7 +1091,7 @@ class AppController {
     const start = (this.currentPage - 1) * this.pageSize;
     const pageItems = reversed.slice(start, start + this.pageSize);
 
-    // 1. Render Mobile Feed (Cards for smartphones)
+    // 1. Akıllı Telefonlar İçin Mobil Kart Beslemesi (Mobile Feed)
     if (this.dom.mobileHistoryFeed) {
       this.dom.mobileHistoryFeed.innerHTML = pageItems.map(item => {
         const d = new Date(item.timestamp);
@@ -924,28 +1101,61 @@ class AppController {
           : '<span class="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-sans font-medium">Canlı</span>';
 
         let t = item.temperature;
-        if (this.currentUnit === 'F') t = (t * 9 / 5) + 32;
+        let at = item.apparentTemp != null ? item.apparentTemp : t;
+        let dp = item.dewPoint != null ? item.dewPoint : AtmosphericMetrics.calculateDewPoint(t, item.humidity);
+        if (this.currentUnit === 'F') {
+          t = (t * 9 / 5) + 32;
+          at = (at * 9 / 5) + 32;
+          dp = (dp * 9 / 5) + 32;
+        }
+
+        const vp = item.vaporPressure != null ? item.vaporPressure : AtmosphericMetrics.calculateVaporPressure(item.temperature, item.humidity).vpAct;
 
         return `
-          <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/90 dark:border-slate-700/60 shadow-sm space-y-2">
+          <div class="p-3.5 rounded-2xl bg-white dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700/80 shadow-sm space-y-2.5 transition-all">
             <div class="flex items-center justify-between text-xs">
               <span class="font-medium text-slate-500 dark:text-slate-400">${timeStr}</span>
               ${typeBadge}
             </div>
-            <div class="flex items-center justify-between pt-0.5">
-              <div class="flex items-baseline gap-1">
-                <span class="text-2xl font-extrabold font-mono ${item.temperature > 26 ? 'text-amber-600 dark:text-amber-400' : item.temperature < 19 ? 'text-cyan-600 dark:text-cyan-400' : 'text-emerald-600 dark:text-emerald-400'}">
-                  ${t.toFixed(1)}
-                </span>
-                <span class="text-xs font-bold text-emerald-600 dark:text-emerald-400">°${this.currentUnit}</span>
+
+            <!-- Parametre Satırı 1: Sıcaklık & Hissedilen -->
+            <div class="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100 dark:border-slate-700/50">
+              <div>
+                <span class="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-sans">Sıcaklık</span>
+                <div class="flex items-baseline gap-1">
+                  <span class="text-xl font-extrabold font-mono text-emerald-600 dark:text-emerald-400">${t.toFixed(1)}</span>
+                  <span class="text-xs font-bold text-emerald-600 dark:text-emerald-400">°${this.currentUnit}</span>
+                </div>
               </div>
-              <div class="flex items-baseline gap-1">
-                <span class="text-2xl font-extrabold font-mono text-cyan-600 dark:text-cyan-400">%${item.humidity}</span>
-                <span class="text-xs text-slate-500 dark:text-slate-400">Nem</span>
+              <div>
+                <span class="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-sans">Hissedilen</span>
+                <div class="flex items-baseline gap-1">
+                  <span class="text-xl font-extrabold font-mono text-amber-500 dark:text-amber-400">${at.toFixed(1)}</span>
+                  <span class="text-xs font-bold text-amber-500 dark:text-amber-400">°${this.currentUnit}</span>
+                </div>
               </div>
             </div>
-            <div class="flex items-center justify-between text-[11px] pt-2 border-t border-slate-200/80 dark:border-slate-700/60 text-slate-500 dark:text-slate-400">
-              <span>Çiğ Noktası: <strong class="text-slate-700 dark:text-slate-300 font-mono">${item.dewPoint != null ? `${item.dewPoint} °C` : '--'}</strong></span>
+
+            <!-- Parametre Satırı 2: Bağıl Nem & Buhar Basıncı -->
+            <div class="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100 dark:border-slate-700/50">
+              <div>
+                <span class="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-sans">Bağıl Nem</span>
+                <div class="flex items-baseline gap-1">
+                  <span class="text-xl font-extrabold font-mono text-cyan-600 dark:text-cyan-400">%${item.humidity}</span>
+                </div>
+              </div>
+              <div>
+                <span class="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-sans">Buhar Basıncı</span>
+                <div class="flex items-baseline gap-1">
+                  <span class="text-xl font-extrabold font-mono text-indigo-600 dark:text-indigo-400">${vp.toFixed(1)}</span>
+                  <span class="text-xs font-semibold text-indigo-600 dark:text-indigo-400">hPa</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Alt Detay Çubuğu: Çiğ Noktası ve Pil -->
+            <div class="flex items-center justify-between text-[11px] pt-1.5 border-t border-slate-200/80 dark:border-slate-700/60 text-slate-500 dark:text-slate-400">
+              <span>Çiğ Noktası: <strong class="text-purple-600 dark:text-purple-400 font-mono">${dp.toFixed(1)} °${this.currentUnit}</strong></span>
               <span>Pil: <strong class="text-slate-700 dark:text-slate-300 font-mono">${item.battery != null ? `%${item.battery}` : (item.voltage ? `${item.voltage}V` : '--')}</strong></span>
             </div>
           </div>
@@ -953,54 +1163,70 @@ class AppController {
       }).join('');
     }
 
-    // 2. Render Desktop Table (Spreadsheet rows for tablets/laptops)
+    // 2. Masaüstü Tablosu (Desktop Table View - 8 Sütunlu)
     if (this.dom.historyTableBody) {
       this.dom.historyTableBody.innerHTML = pageItems.map(item => {
         const d = new Date(item.timestamp);
         const timeStr = `${d.toLocaleDateString('tr-TR')} ${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
         const typeBadge = item.type === 'history_hour'
-          ? '<span class="px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20 text-[10px] font-sans">Dahili Arşiv (1s)</span>'
-          : '<span class="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-sans">Canlı Veri</span>';
+          ? '<span class="px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20 text-[10px] font-sans">Hafıza (1s)</span>'
+          : '<span class="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-sans">Canlı</span>';
 
         let t = item.temperature;
-        if (this.currentUnit === 'F') t = (t * 9 / 5) + 32;
+        let at = item.apparentTemp != null ? item.apparentTemp : t;
+        let dp = item.dewPoint != null ? item.dewPoint : AtmosphericMetrics.calculateDewPoint(t, item.humidity);
+        if (this.currentUnit === 'F') {
+          t = (t * 9 / 5) + 32;
+          at = (at * 9 / 5) + 32;
+          dp = (dp * 9 / 5) + 32;
+        }
+
+        const vp = item.vaporPressure != null ? item.vaporPressure : AtmosphericMetrics.calculateVaporPressure(item.temperature, item.humidity).vpAct;
 
         return `
           <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-            <td class="py-2.5 sm:py-3 px-4 text-slate-600 dark:text-slate-300 font-sans font-medium">${timeStr}</td>
-            <td class="py-2.5 sm:py-3 px-4">${typeBadge}</td>
-            <td class="py-2.5 sm:py-3 px-4 font-bold ${item.temperature > 26 ? 'text-amber-600 dark:text-amber-400' : item.temperature < 19 ? 'text-cyan-600 dark:text-cyan-400' : 'text-emerald-600 dark:text-emerald-400'}">
+            <td class="py-2.5 sm:py-3 px-3 text-slate-600 dark:text-slate-300 font-sans font-medium">${timeStr}</td>
+            <td class="py-2.5 sm:py-3 px-3">${typeBadge}</td>
+            <td class="py-2.5 sm:py-3 px-3 font-bold text-emerald-600 dark:text-emerald-400">
               ${t.toFixed(1)} °${this.currentUnit}
             </td>
-            <td class="py-2.5 sm:py-3 px-4 text-cyan-600 dark:text-cyan-300 font-semibold">%${item.humidity}</td>
-            <td class="py-2.5 sm:py-3 px-4 text-slate-500 dark:text-slate-400">${item.dewPoint != null ? `${item.dewPoint} °C` : '--'}</td>
-            <td class="py-2.5 sm:py-3 px-4 text-slate-500 dark:text-slate-400">${item.battery != null ? `%${item.battery}` : (item.voltage ? `${item.voltage}V` : '--')}</td>
+            <td class="py-2.5 sm:py-3 px-3 font-semibold text-amber-500 dark:text-amber-400">
+              ${at.toFixed(1)} °${this.currentUnit}
+            </td>
+            <td class="py-2.5 sm:py-3 px-3 text-cyan-600 dark:text-cyan-400 font-semibold">%${item.humidity}</td>
+            <td class="py-2.5 sm:py-3 px-3 text-purple-600 dark:text-purple-400 font-medium">
+              ${dp.toFixed(1)} °${this.currentUnit}
+            </td>
+            <td class="py-2.5 sm:py-3 px-3 text-indigo-600 dark:text-indigo-400 font-medium">
+              ${vp.toFixed(1)} hPa
+            </td>
+            <td class="py-2.5 sm:py-3 px-3 text-slate-500 dark:text-slate-400">
+              ${item.battery != null ? `%${item.battery}` : (item.voltage ? `${item.voltage}V` : '--')}
+            </td>
           </tr>
         `;
       }).join('');
     }
   }
 
+  // Chart.js Zaman Serisi Grafiği (5 Parametre Eğrisi)
   initChart() {
     const ctx = document.getElementById('telemetryChart').getContext('2d');
     const isDark = this.currentTheme === 'dark';
     const isMobile = window.innerWidth < 640;
 
     const tempGradient = ctx.createLinearGradient(0, 0, 0, 320);
-    tempGradient.addColorStop(0, isDark ? 'rgba(34, 197, 94, 0.4)' : 'rgba(34, 197, 94, 0.25)');
+    tempGradient.addColorStop(0, isDark ? 'rgba(34, 197, 94, 0.35)' : 'rgba(34, 197, 94, 0.2)');
     tempGradient.addColorStop(1, 'rgba(34, 197, 94, 0.0)');
-
-    const humGradient = ctx.createLinearGradient(0, 0, 0, 320);
-    humGradient.addColorStop(0, isDark ? 'rgba(6, 182, 212, 0.4)' : 'rgba(6, 182, 212, 0.25)');
-    humGradient.addColorStop(1, 'rgba(6, 182, 212, 0.0)');
 
     this.chart = new Chart(ctx, {
       type: 'line',
       data: {
         labels: [],
         datasets: [
+          // 0: Sıcaklık
           {
-            label: 'Sıcaklık (°C)',
+            label: 'Sıcaklık',
             data: [],
             borderColor: '#22c55e',
             backgroundColor: tempGradient,
@@ -1011,17 +1237,55 @@ class AppController {
             pointHoverRadius: 5,
             yAxisID: 'yTemp'
           },
+          // 1: Hissedilen Sıcaklık
+          {
+            label: 'Hissedilen Sıcaklık',
+            data: [],
+            borderColor: '#f59e0b',
+            borderWidth: isMobile ? 1.8 : 2.2,
+            borderDash: [4, 4],
+            fill: false,
+            tension: 0.35,
+            pointRadius: isMobile ? 1.5 : 2,
+            pointHoverRadius: 5,
+            yAxisID: 'yTemp'
+          },
+          // 2: Çiğ Noktası
+          {
+            label: 'Çiğ Noktası',
+            data: [],
+            borderColor: '#a855f7',
+            borderWidth: isMobile ? 1.8 : 2.2,
+            borderDash: [2, 2],
+            fill: false,
+            tension: 0.35,
+            pointRadius: isMobile ? 1.5 : 2,
+            pointHoverRadius: 5,
+            yAxisID: 'yTemp'
+          },
+          // 3: Bağıl Nem
           {
             label: 'Bağıl Nem (%)',
             data: [],
             borderColor: '#06b6d4',
-            backgroundColor: humGradient,
             borderWidth: isMobile ? 2 : 2.5,
-            fill: true,
+            fill: false,
             tension: 0.35,
             pointRadius: isMobile ? 1.5 : 2,
             pointHoverRadius: 5,
             yAxisID: 'yHum'
+          },
+          // 4: Buhar Basıncı
+          {
+            label: 'Buhar Basıncı (hPa)',
+            data: [],
+            borderColor: '#ec4899',
+            borderWidth: isMobile ? 1.8 : 2.2,
+            fill: false,
+            tension: 0.35,
+            pointRadius: isMobile ? 1.5 : 2,
+            pointHoverRadius: 5,
+            yAxisID: 'yPress'
           }
         ]
       },
@@ -1037,7 +1301,9 @@ class AppController {
             display: true,
             labels: {
               color: isDark ? '#94a3b8' : '#475569',
-              font: { family: 'Poppins', size: isMobile ? 11 : 12, weight: 600 }
+              font: { family: 'Poppins', size: isMobile ? 10 : 12, weight: 600 },
+              usePointStyle: true,
+              boxWidth: 8
             }
           },
           tooltip: {
@@ -1056,7 +1322,7 @@ class AppController {
           x: {
             grid: { color: isDark ? 'rgba(51, 65, 85, 0.3)' : 'rgba(203, 213, 225, 0.5)' },
             ticks: {
-              color: isDark ? '#64748b' : '#64748b',
+              color: '#64748b',
               font: { family: 'JetBrains Mono', size: isMobile ? 9 : 10 },
               maxTicksLimit: isMobile ? 4 : 7
             }
@@ -1065,6 +1331,12 @@ class AppController {
             type: 'linear',
             display: true,
             position: 'left',
+            title: {
+              display: !isMobile,
+              text: 'Sıcaklık (°C)',
+              color: '#22c55e',
+              font: { family: 'Poppins', size: 11, weight: 600 }
+            },
             grid: { color: isDark ? 'rgba(51, 65, 85, 0.25)' : 'rgba(203, 213, 225, 0.4)' },
             ticks: {
               color: '#22c55e',
@@ -1075,6 +1347,12 @@ class AppController {
             type: 'linear',
             display: true,
             position: 'right',
+            title: {
+              display: !isMobile,
+              text: 'Nem (%)',
+              color: '#06b6d4',
+              font: { family: 'Poppins', size: 11, weight: 600 }
+            },
             grid: { drawOnChartArea: false },
             ticks: {
               color: '#06b6d4',
@@ -1082,6 +1360,23 @@ class AppController {
             },
             min: 0,
             max: 100
+          },
+          yPress: {
+            type: 'linear',
+            display: false,
+            position: 'right',
+            title: {
+              display: !isMobile,
+              text: 'Buhar B. (hPa)',
+              color: '#ec4899',
+              font: { family: 'Poppins', size: 11, weight: 600 }
+            },
+            grid: { drawOnChartArea: false },
+            ticks: {
+              color: '#ec4899',
+              font: { family: 'JetBrains Mono', size: isMobile ? 9 : 10 }
+            },
+            min: 0
           }
         }
       }
@@ -1131,34 +1426,121 @@ class AppController {
         : `${d.toLocaleDateString('tr-TR', { day: 'numeric', month: isMobile ? 'numeric' : 'short' })} ${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
     });
 
+    // 0: Sıcaklık
     const tempData = records.map(r => {
       return this.currentUnit === 'F' ? (r.temperature * 9 / 5) + 32 : r.temperature;
     });
 
+    // 1: Hissedilen Sıcaklık
+    const apparentData = records.map(r => {
+      const at = r.apparentTemp != null ? r.apparentTemp : AtmosphericMetrics.calculateApparentTemp(r.temperature, r.humidity);
+      return this.currentUnit === 'F' ? (at * 9 / 5) + 32 : at;
+    });
+
+    // 2: Çiğ Noktası
+    const dewData = records.map(r => {
+      const dp = r.dewPoint != null ? r.dewPoint : AtmosphericMetrics.calculateDewPoint(r.temperature, r.humidity);
+      return this.currentUnit === 'F' ? (dp * 9 / 5) + 32 : dp;
+    });
+
+    // 3: Nem
     const humData = records.map(r => r.humidity);
 
+    // 4: Buhar Basıncı
+    const pressData = records.map(r => {
+      return r.vaporPressure != null ? r.vaporPressure : AtmosphericMetrics.calculateVaporPressure(r.temperature, r.humidity).vpAct;
+    });
+
     this.chart.data.labels = labels;
+
+    // Update labels and dataset arrays
     this.chart.data.datasets[0].label = `Sıcaklık (°${this.currentUnit})`;
     this.chart.data.datasets[0].data = tempData;
-    this.chart.data.datasets[1].data = humData;
 
-    if (this.chartMode === 'temp') {
-      this.chart.data.datasets[0].hidden = false;
-      this.chart.data.datasets[1].hidden = true;
-      this.chart.options.scales.yHum.display = false;
-      this.chart.options.scales.yTemp.display = true;
+    this.chart.data.datasets[1].label = `Hissedilen (°${this.currentUnit})`;
+    this.chart.data.datasets[1].data = apparentData;
+
+    this.chart.data.datasets[2].label = `Çiğ Noktası (°${this.currentUnit})`;
+    this.chart.data.datasets[2].data = dewData;
+
+    this.chart.data.datasets[3].label = `Bağıl Nem (%)`;
+    this.chart.data.datasets[3].data = humData;
+
+    this.chart.data.datasets[4].label = `Buhar Basıncı (hPa)`;
+    this.chart.data.datasets[4].data = pressData;
+
+    // Filter Mode Visibility
+    // Datasets: 0=Sıcaklık, 1=Hissedilen, 2=Çiğ Noktası, 3=Nem, 4=Buhar Basıncı
+    const ds = this.chart.data.datasets;
+    const scales = this.chart.options.scales;
+
+    if (this.chartMode === 'temps') {
+      ds[0].hidden = false;
+      ds[1].hidden = false;
+      ds[2].hidden = false;
+      ds[3].hidden = true;
+      ds[4].hidden = true;
+      scales.yTemp.display = true;
+      scales.yHum.display = false;
+      scales.yPress.display = false;
+    } else if (this.chartMode === 'temp') {
+      ds[0].hidden = false;
+      ds[1].hidden = true;
+      ds[2].hidden = true;
+      ds[3].hidden = true;
+      ds[4].hidden = true;
+      scales.yTemp.display = true;
+      scales.yHum.display = false;
+      scales.yPress.display = false;
+    } else if (this.chartMode === 'apparent') {
+      ds[0].hidden = true;
+      ds[1].hidden = false;
+      ds[2].hidden = true;
+      ds[3].hidden = true;
+      ds[4].hidden = true;
+      scales.yTemp.display = true;
+      scales.yHum.display = false;
+      scales.yPress.display = false;
+    } else if (this.chartMode === 'dew') {
+      ds[0].hidden = true;
+      ds[1].hidden = true;
+      ds[2].hidden = false;
+      ds[3].hidden = true;
+      ds[4].hidden = true;
+      scales.yTemp.display = true;
+      scales.yHum.display = false;
+      scales.yPress.display = false;
     } else if (this.chartMode === 'hum') {
-      this.chart.data.datasets[0].hidden = true;
-      this.chart.data.datasets[1].hidden = false;
-      this.chart.options.scales.yHum.display = true;
-      this.chart.options.scales.yTemp.display = false;
+      ds[0].hidden = true;
+      ds[1].hidden = true;
+      ds[2].hidden = true;
+      ds[3].hidden = false;
+      ds[4].hidden = true;
+      scales.yTemp.display = false;
+      scales.yHum.display = true;
+      scales.yPress.display = false;
+    } else if (this.chartMode === 'press') {
+      ds[0].hidden = true;
+      ds[1].hidden = true;
+      ds[2].hidden = true;
+      ds[3].hidden = true;
+      ds[4].hidden = false;
+      scales.yTemp.display = false;
+      scales.yHum.display = false;
+      scales.yPress.display = true;
     } else {
-      this.chart.data.datasets[0].hidden = false;
-      this.chart.data.datasets[1].hidden = false;
-      this.chart.options.scales.yHum.display = true;
-      this.chart.options.scales.yTemp.display = true;
+      // 'all' mode: Show all curves
+      ds[0].hidden = false;
+      ds[1].hidden = false;
+      ds[2].hidden = false;
+      ds[3].hidden = false;
+      ds[4].hidden = false;
+      scales.yTemp.display = true;
+      scales.yHum.display = true;
+      scales.yPress.display = false; // keep yHum for right side to avoid cluttering in all-view
     }
 
+    scales.yTemp.title.text = `Sıcaklık (°${this.currentUnit})`;
     this.chart.update('none');
   }
 
@@ -1196,7 +1578,7 @@ class AppController {
   }
 }
 
-// Instantiate on DOM load
+// DOM Yüklendiğinde Başlat
 window.addEventListener('DOMContentLoaded', () => {
   window.app = new AppController();
 });
