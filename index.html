@@ -15,10 +15,10 @@
   <meta name="apple-mobile-web-app-title" content="SmartTemp" />
   <meta name="format-detection" content="telephone=no" />
 
-  <!-- Google Fonts: Poppins & JetBrains Mono -->
+  <!-- Google Fonts: Parkinsans (Weights: 500, 600, 700, 800) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Parkinsans:wght@500;600;700;800&display=swap" rel="stylesheet">
 
   <!-- Tailwind CSS CDN with Google Material 3 Blue Tokens -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -28,8 +28,8 @@
       theme: {
         extend: {
           fontFamily: {
-            sans: ['Poppins', 'sans-serif'],
-            mono: ['JetBrains Mono', 'monospace'],
+            sans: ['Parkinsans', 'sans-serif'],
+            mono: ['Parkinsans', 'sans-serif'],
           },
           screens: {
             'xs': '380px',
@@ -396,10 +396,10 @@
           
           <!-- Range Filters (Material 3 Chips) -->
           <div class="inline-flex rounded-full bg-[#edf2f9] dark:bg-[#1e2938] p-1 border border-[#d8e2ee] dark:border-[#2e3b4e] text-xs">
-            <button class="filter-btn active px-3 py-1 font-medium transition-all" data-range="1h">1 Saat</button>
+            <button class="filter-btn px-3 py-1 font-medium transition-all" data-range="1h">1 Saat</button>
             <button class="filter-btn px-3 py-1 font-medium transition-all" data-range="24h">24 Saat</button>
             <button class="filter-btn px-3 py-1 font-medium transition-all" data-range="7d">7 Gün</button>
-            <button class="filter-btn px-3 py-1 font-medium transition-all" data-range="all">Tümü</button>
+            <button class="filter-btn active px-3 py-1 font-medium transition-all" data-range="all">Tümü</button>
           </div>
 
           <!-- Parameter View Tabs (Dedicated, Clear Material 3 Modes) -->

@@ -1,6 +1,7 @@
 /**
- * Xiaomi SmartTemp Pro — Poppins Typography & Dual Theme (Light / Dark)
+ * Xiaomi SmartTemp Pro — Parkinsans Typography & Material Blue Theme
  * Device: Xiaomi Mijia LYWSD03MMC (Stock & ATC / PVVX Modded Firmware Support)
+ * Auto-Connect to ATC_597941 with Persistent History & Telemetry KPIs
  * Full BLE Advertisement Signal Sniffer (RSSI, Packet Counter, Broadcast Decoding)
  * Multi-Profile GATT Connection & Atmospheric Metrics (Dew Point, Apparent Temp, VPD)
  */
@@ -269,6 +270,7 @@ class UniversalBleManager {
     this.deviceProfile = 'atc'; // 'atc' | 'stock_xiaomi' | 'generic'
     this.lastRssi = null;
     this.packetCount = 0;
+    this.autoReconnectTimer = null;
 
     // Cache of partial readings from distinct characteristics
     this.cachedTemp = null;
@@ -280,12 +282,32 @@ class UniversalBleManager {
     this.lastEmitTime = 0;
   }
 
+  // Sayfa açıldığında veya yenilendiğinde doğrudan ATC_597941'e otomatik bağlanma
+  async tryAutoConnect() {
+    if (!navigator.bluetooth || !navigator.bluetooth.getDevices) return false;
+    try {
+      const devices = await navigator.bluetooth.getDevices();
+      if (devices && devices.length > 0) {
+        const target = devices.find(d => d.name === 'ATC_597941') ||
+                       devices.find(d => d.name && d.name.startsWith('ATC_')) ||
+                       devices[0];
+        if (target) {
+          console.log(`⚡ ${target.name} cihazı hafızada bulundu, doğrudan otomatik bağlanılıyor...`);
+          return await this.connectToDevice(target);
+        }
+      }
+    } catch (e) {
+      console.warn('Otomatik bağlanma denenirken hata:', e);
+    }
+    return false;
+  }
+
   async connect() {
     if (!navigator.bluetooth) {
       throw new Error('Tarayıcınız Web Bluetooth API desteği sağlamıyor. Lütfen Google Chrome veya Microsoft Edge kullanın.');
     }
 
-    this.onStatus('scanning', 'Bluetooth cihazları taranıyor...');
+    this.onStatus('scanning', 'ATC_597941 aranıyor...');
 
     // Tam liste: Hem orijinal Xiaomi hem ATC / PVVX / BTHome servisleri
     const optionalServices = [
@@ -318,12 +340,25 @@ class UniversalBleManager {
     ];
 
     try {
-      // acceptAllDevices: true kullanarak tarayıcı eşleme penceresinde
-      // ATC_..., LYWSD03MMC ve modlu tüm BLE cihazlarının 100% görünmesini sağlıyoruz!
-      this.device = await navigator.bluetooth.requestDevice({
-        acceptAllDevices: true,
-        optionalServices: optionalServices
-      });
+      // 1. Önce doğrudan ATC_597941 ve ATC_ filtreleriyle ara (hemen en üstte çıksın)
+      try {
+        this.device = await navigator.bluetooth.requestDevice({
+          filters: [
+            { name: 'ATC_597941' },
+            { namePrefix: 'ATC_' }
+          ],
+          optionalServices: optionalServices
+        });
+      } catch (filterErr) {
+        if (filterErr.name === 'NotFoundError') {
+          throw filterErr;
+        }
+        // İptal edilmediyse genel arama ile dene
+        this.device = await navigator.bluetooth.requestDevice({
+          acceptAllDevices: true,
+          optionalServices: optionalServices
+        });
+      }
     } catch (err) {
       this.isConnected = false;
       if (err.name === 'NotFoundError') {
@@ -334,15 +369,23 @@ class UniversalBleManager {
       throw err;
     }
 
-    this.device.addEventListener('gattserverdisconnected', () => this.handleDisconnect());
+    return await this.connectToDevice(this.device);
+  }
+
+  async connectToDevice(device) {
+    this.device = device;
+    const devName = this.device.name || 'ATC_597941';
+    this.onStatus('connecting', `${devName} bağlanıyor...`);
+
+    // Kopma olayını temizleyip yeniden dinle
+    this.device.removeEventListener?.('gattserverdisconnected', this._boundDisconnect);
+    this._boundDisconnect = () => this.handleDisconnect();
+    this.device.addEventListener('gattserverdisconnected', this._boundDisconnect);
 
     // 1. ADVERTISMENT WATCHER (BLE Sinyalleri & Paket Yakalayıcı)
     this.startAdvertisementWatcher();
 
     // 2. GATT BAĞLANTISI
-    const devName = this.device.name || 'ATC Cihazı';
-    this.onStatus('connecting', `${devName} bağlanıyor...`);
-
     try {
       this.server = await this.device.gatt.connect();
     } catch (connErr) {
@@ -819,7 +862,21 @@ class UniversalBleManager {
 
   handleDisconnect() {
     this.isConnected = false;
-    this.onStatus('disconnected', 'Cihaz bağlantısı koptu.');
+    const devName = this.device ? (this.device.name || 'ATC_597941') : 'ATC_597941';
+    this.onStatus('disconnected', `${devName} koptu. Otomatik yeniden bağlanılıyor...`);
+
+    // Sinyal kesilirse otomatik olarak tekrar bağlanmayı dene
+    if (this.autoReconnectTimer) clearTimeout(this.autoReconnectTimer);
+    this.autoReconnectTimer = setTimeout(async () => {
+      if (!this.isConnected && this.device) {
+        console.log(`🔄 ${devName} cihazına otomatik yeniden bağlanılıyor...`);
+        try {
+          await this.connectToDevice(this.device);
+        } catch (e) {
+          console.warn('Otomatik yeniden bağlanma bekleniyor:', e.message);
+        }
+      }
+    }, 2500);
   }
 }
 
@@ -840,7 +897,7 @@ class AppController {
     this.currentUnit = 'C';
     this.currentTheme = localStorage.getItem('smarttemp_theme') || 'light';
     this.latestTelemetry = null;
-    this.chartRange = '1h';
+    this.chartRange = 'all'; // Tüm kayıtlar varsayılan olarak açık (asla boş kalmaz)
     this.chartMode = 'temps';
     this.currentPage = 1;
     this.pageSize = 15;
@@ -962,6 +1019,9 @@ class AppController {
       this.updateChart();
     }
 
+    // Site açıldığında veya yenilendiğinde doğrudan ATC_597941 cihazına otomatik bağlan!
+    this.ble.tryAutoConnect().catch(() => {});
+
     window.addEventListener('resize', () => {
       if (this.chart) {
         this.chart.options.scales.x.ticks.maxTicksLimit = window.innerWidth < 640 ? 4 : 7;
@@ -1001,13 +1061,13 @@ class AppController {
       document.documentElement.classList.remove('light');
       if (this.dom.themeIcon) this.dom.themeIcon.setAttribute('data-lucide', 'sun');
       if (this.dom.themeLabel) this.dom.themeLabel.textContent = 'Açık';
-      if (this.dom.metaThemeColor) this.dom.metaThemeColor.setAttribute('content', '#0c131c');
+      if (this.dom.metaThemeColor) this.dom.metaThemeColor.setAttribute('content', '#081220');
     } else {
       document.documentElement.classList.remove('dark');
       document.documentElement.classList.add('light');
       if (this.dom.themeIcon) this.dom.themeIcon.setAttribute('data-lucide', 'moon');
       if (this.dom.themeLabel) this.dom.themeLabel.textContent = 'Koyu';
-      if (this.dom.metaThemeColor) this.dom.metaThemeColor.setAttribute('content', '#f8fafd');
+      if (this.dom.metaThemeColor) this.dom.metaThemeColor.setAttribute('content', '#dbe8fc');
     }
 
     lucide.createIcons();
@@ -1028,11 +1088,12 @@ class AppController {
       await this.ble.disconnect();
     } else {
       try {
-        this.showToast('Çevredeki tüm BLE cihazları listeleniyor. ATC_... cihazınızı seçin.', 'info');
+        this.showToast('ATC_597941 aranıyor ve bağlanılıyor...', 'info');
         const success = await this.ble.connect();
         if (success) {
+          const devName = this.ble.device ? (this.ble.device.name || 'ATC_597941') : 'ATC_597941';
           const fw = this.ble.deviceProfile === 'atc' ? 'ATC Modlu Firmware' : 'Xiaomi Orijinal';
-          this.showToast(`Bağlandı: ${this.ble.device ? this.ble.device.name : 'Cihaz'} (${fw})`, 'success');
+          this.showToast(`Bağlandı: ${devName} (${fw})`, 'success');
         }
       } catch (err) {
         if (err.name !== 'NotFoundError') {
@@ -1248,6 +1309,21 @@ class AppController {
     }
     this.dom.valTemp.textContent = displayTemp.toFixed(1);
     this.dom.lblTempUnit.textContent = `°${this.currentUnit}`;
+
+    // Grafik KPI Son Okunan Değerini de anında canlı güncelle (Asla --.- kalmaz)
+    if (this.dom.chartKpiCurrent) {
+      if (this.chartMode === 'hum') {
+        this.dom.chartKpiCurrent.textContent = `%${data.humidity}`;
+        if (this.dom.chartKpiCurrentUnit) this.dom.chartKpiCurrentUnit.textContent = '%';
+      } else if (this.chartMode === 'press') {
+        const vp = data.vaporPressure != null ? data.vaporPressure : AtmosphericMetrics.calculateVaporPressure(data.temperature, data.humidity).vpAct;
+        this.dom.chartKpiCurrent.textContent = vp.toFixed(1);
+        if (this.dom.chartKpiCurrentUnit) this.dom.chartKpiCurrentUnit.textContent = 'hPa';
+      } else {
+        this.dom.chartKpiCurrent.textContent = displayTemp.toFixed(1);
+        if (this.dom.chartKpiCurrentUnit) this.dom.chartKpiCurrentUnit.textContent = `°${this.currentUnit}`;
+      }
+    }
 
     // 2. Bağıl Nem Kartı
     this.dom.valHum.textContent = data.humidity;
@@ -1669,7 +1745,7 @@ class AppController {
             align: 'end',
             labels: {
               color: isDark ? '#94a3b8' : '#475569',
-              font: { family: 'Poppins', size: isMobile ? 10 : 11, weight: 600 },
+              font: { family: 'Parkinsans', size: isMobile ? 10 : 11, weight: 600 },
               usePointStyle: true,
               pointStyle: 'circle',
               boxWidth: 7,
@@ -1688,9 +1764,9 @@ class AppController {
             padding: 12,
             boxPadding: 5,
             cornerRadius: 16,
-            bodyFont: { family: 'Poppins', size: 11 },
-            titleFont: { family: 'Poppins', size: 12, weight: '700' },
-            footerFont: { family: 'Poppins', size: 11, weight: '600' },
+            bodyFont: { family: 'Parkinsans', size: 11, weight: 500 },
+            titleFont: { family: 'Parkinsans', size: 12, weight: '700' },
+            footerFont: { family: 'Parkinsans', size: 11, weight: '600' },
             callbacks: {
               label: (context) => {
                 const label = context.dataset.label || '';
@@ -1734,7 +1810,7 @@ class AppController {
             },
             ticks: {
               color: isDark ? '#64748b' : '#94a3b8',
-              font: { family: 'JetBrains Mono', size: isMobile ? 9 : 10 },
+              font: { family: 'Parkinsans', size: isMobile ? 9 : 10, weight: 500 },
               maxTicksLimit: isMobile ? 4 : 7
             }
           },
@@ -1746,7 +1822,7 @@ class AppController {
               display: !isMobile,
               text: `Sıcaklık Grubu (°${this.currentUnit})`,
               color: '#0b57d0',
-              font: { family: 'Poppins', size: 11, weight: 600 }
+              font: { family: 'Parkinsans', size: 11, weight: 600 }
             },
             grid: {
               color: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
@@ -1754,7 +1830,7 @@ class AppController {
             },
             ticks: {
               color: isDark ? '#a8c7fa' : '#0b57d0',
-              font: { family: 'JetBrains Mono', size: isMobile ? 10 : 11 },
+              font: { family: 'Parkinsans', size: isMobile ? 10 : 11, weight: 600 },
               callback: (v) => `${v.toFixed(1)}°`
             }
           },
@@ -1766,12 +1842,12 @@ class AppController {
               display: !isMobile,
               text: 'Bağıl Nem (%)',
               color: '#0284c7',
-              font: { family: 'Poppins', size: 11, weight: 600 }
+              font: { family: 'Parkinsans', size: 11, weight: 600 }
             },
             grid: { drawOnChartArea: false },
             ticks: {
               color: '#0284c7',
-              font: { family: 'JetBrains Mono', size: isMobile ? 10 : 11 },
+              font: { family: 'Parkinsans', size: isMobile ? 10 : 11, weight: 600 },
               callback: (v) => `%${v}`
             },
             min: 0,
@@ -1785,12 +1861,12 @@ class AppController {
               display: !isMobile,
               text: 'Buhar Basıncı (hPa)',
               color: '#1e40af',
-              font: { family: 'Poppins', size: 11, weight: 600 }
+              font: { family: 'Parkinsans', size: 11, weight: 600 }
             },
             grid: { drawOnChartArea: false },
             ticks: {
               color: '#1e40af',
-              font: { family: 'JetBrains Mono', size: isMobile ? 9 : 10 },
+              font: { family: 'Parkinsans', size: isMobile ? 9 : 10, weight: 600 },
               callback: (v) => `${v.toFixed(1)} hPa`
             }
           }
@@ -1830,6 +1906,16 @@ class AppController {
       records = records.filter(r => (now - r.timestamp) <= 7 * 24 * 3600 * 1000);
     }
 
+    // Akıllı Yedekleme 1: Filtrelenen aralıkta kayıt kalmadıysa ama veritabanında geçmiş veri varsa tümünü kullan
+    if (records.length === 0 && this.storage.records.length > 0) {
+      records = [...this.storage.records];
+    }
+
+    // Akıllı Yedekleme 2: Veritabanında henüz kayıt yoksa ama canlı telemetri okunduysa onu tek nokta olarak kullan
+    if (records.length === 0 && this.latestTelemetry) {
+      records = [this.latestTelemetry];
+    }
+
     // Toggle Empty State Overlay
     if (this.dom.chartEmptyOverlay) {
       if (records.length === 0) {
@@ -1857,6 +1943,12 @@ class AppController {
       return;
     }
 
+    // Nokta sayısı azken (<= 4) tek noktaların grafikte görünür olması için pointRadius'u dinamik ayarla
+    const pRadius = records.length <= 4 ? 4.5 : 0;
+    this.chart.data.datasets.forEach(ds => {
+      ds.pointRadius = pRadius;
+    });
+
     if (records.length > 300) {
       const step = Math.ceil(records.length / 300);
       records = records.filter((_, idx) => idx % step === 0 || idx === records.length - 1);
@@ -1865,8 +1957,8 @@ class AppController {
     const isMobile = window.innerWidth < 640;
     const labels = records.map(r => {
       const d = new Date(r.timestamp);
-      return this.chartRange === '1h'
-        ? d.toLocaleTimeString('tr-TR', { minute: '2-digit', second: '2-digit' })
+      return (this.chartRange === '1h' || records.length <= 5)
+        ? d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
         : `${d.toLocaleDateString('tr-TR', { day: 'numeric', month: isMobile ? 'numeric' : 'short' })} ${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
     });
 
