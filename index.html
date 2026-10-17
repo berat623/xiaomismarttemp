@@ -10,7 +10,7 @@
   <!-- Google Fonts: Poppins & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -61,56 +61,53 @@
   </div>
 
   <!-- Header -->
-  <header class="relative z-10 border-b border-slate-200/90 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/70 backdrop-blur-xl sticky top-0 px-3 sm:px-6 lg:px-8 py-3 transition-colors duration-300">
+  <header class="relative z-10 border-b border-slate-200/90 dark:border-slate-800/80 bg-white/85 dark:bg-slate-900/75 backdrop-blur-xl sticky top-0 px-3.5 sm:px-6 lg:px-8 py-3 transition-colors duration-300">
     <div class="max-w-7xl mx-auto flex items-center justify-between gap-3">
       
-      <!-- Brand Logo & Title -->
-      <div class="flex items-center gap-2.5 sm:gap-3 min-w-0">
-        <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-cyan-500 flex items-center justify-center shadow-md shadow-emerald-500/20 text-white dark:text-slate-950 font-bold flex-shrink-0">
-          <i data-lucide="thermometer-snowflake" class="w-5 h-5"></i>
+      <!-- Left Side: Live Streaming Clock (Saat : Dakika : Saniye) -->
+      <div class="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+        <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-500 flex items-center justify-center shadow-md shadow-emerald-500/20 text-white dark:text-slate-950 font-bold flex-shrink-0">
+          <i data-lucide="clock" class="w-5 h-5"></i>
         </div>
         <div class="min-w-0">
-          <div class="flex items-center gap-1.5 sm:gap-2">
-            <h1 class="text-sm sm:text-lg font-bold tracking-tight text-slate-900 dark:text-white truncate">
-              Xiaomi SmartTemp Pro
-            </h1>
-            <span class="text-[9px] sm:text-[10px] font-semibold uppercase px-1.5 sm:px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex-shrink-0">
-              LYWSD03MMC
+          <div class="flex items-center gap-2">
+            <span id="liveClockTime" class="text-xl sm:text-2xl font-extrabold font-mono tracking-wider text-slate-900 dark:text-white tabular-nums">
+              00:00:00
             </span>
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0"></span>
           </div>
-          <p class="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5 truncate">
-            <span id="connectionDot" class="w-2 h-2 rounded-full bg-slate-400 dark:bg-slate-500 inline-block flex-shrink-0"></span>
-            <span id="connectionStatusText" class="truncate">Cihaz bekleniyor</span>
-            <span id="lastUpdatedAgo" class="text-slate-400 hidden flex-shrink-0">• Az önce</span>
+          <p id="liveClockDate" class="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium capitalize truncate">
+            -- -------- ----
           </p>
         </div>
       </div>
 
-      <!-- Action Controls -->
-      <div class="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+      <!-- Right Side: Controls & Actions -->
+      <div class="flex items-center gap-1.5 sm:gap-2.5 flex-shrink-0">
         
+        <!-- Connection Status Pill (Compact) -->
+        <div class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 text-xs">
+          <span id="connectionDot" class="w-2 h-2 rounded-full bg-slate-400 dark:bg-slate-500 flex-shrink-0"></span>
+          <span id="connectionStatusText" class="font-medium text-slate-600 dark:text-slate-300">Cihaz bekleniyor</span>
+          <span id="lastUpdatedAgo" class="text-slate-400 hidden">• Az önce</span>
+        </div>
+
         <!-- Theme Toggle Button (Light / Dark) -->
-        <button id="btnThemeToggle" title="Temayı Değiştir (Açık / Koyu)" aria-label="Temayı Değiştir" class="p-2 sm:px-3 sm:py-2 rounded-xl text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-slate-200/70 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300/80 dark:border-slate-700/80 transition-all active:scale-95 flex items-center gap-1.5">
+        <button id="btnThemeToggle" title="Temayı Değiştir (Açık / Koyu)" aria-label="Temayı Değiştir" class="p-2 sm:px-3 sm:py-2 rounded-xl text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700/80 transition-all active:scale-95 flex items-center gap-1.5">
           <i id="themeIcon" data-lucide="moon" class="w-4 h-4"></i>
-          <span id="themeLabel" class="text-xs font-semibold hidden md:inline">Koyu</span>
+          <span id="themeLabel" class="text-xs font-semibold hidden lg:inline">Koyu</span>
         </button>
 
         <!-- Bluetooth Connect Button -->
-        <button id="btnConnect" class="px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 bg-emerald-500 hover:bg-emerald-600 dark:bg-gradient-to-r dark:from-emerald-500 dark:to-teal-500 dark:hover:from-emerald-400 dark:hover:to-teal-400 text-white dark:text-slate-950 shadow-md shadow-emerald-500/20 transition-all active:scale-95">
+        <button id="btnConnect" class="px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 bg-emerald-500 hover:bg-emerald-600 dark:bg-gradient-to-r dark:from-emerald-500 dark:to-teal-500 dark:hover:from-emerald-400 dark:hover:to-teal-400 text-white dark:text-slate-950 shadow-md shadow-emerald-500/20 transition-all active:scale-95">
           <i data-lucide="bluetooth" class="w-4 h-4"></i>
-          <span class="hidden xs:inline sm:inline">Bağlan</span>
+          <span>Cihaza Bağlan</span>
         </button>
 
         <!-- Fetch Device History Button -->
-        <button id="btnFetchHistory" disabled title="Cihaz hafızasındaki geçmiş kayıtları çeker" class="p-2 sm:px-3.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium flex items-center gap-1.5 bg-slate-200/70 dark:bg-slate-800/80 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-300/80 dark:border-slate-700/80 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+        <button id="btnFetchHistory" disabled title="Cihaz hafızasındaki geçmiş kayıtları çeker" class="p-2 sm:px-3.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700/80 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
           <i data-lucide="history" class="w-4 h-4 text-cyan-600 dark:text-cyan-400"></i>
-          <span class="hidden md:inline">Geçmişi İndir</span>
-        </button>
-
-        <!-- Demo Mode Toggle -->
-        <button id="btnDemo" title="Simülasyon Modu" class="p-2 sm:px-3.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium flex items-center gap-1.5 bg-slate-200/70 dark:bg-slate-800/80 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-300/80 dark:border-slate-700/80 transition-all">
-          <i data-lucide="play" class="w-4 h-4 text-amber-500 dark:text-amber-400"></i>
-          <span class="hidden lg:inline">Demo</span>
+          <span class="hidden sm:inline">Geçmişi İndir</span>
         </button>
 
         <!-- Help / Info Modal Trigger -->
@@ -123,7 +120,7 @@
   </header>
 
   <!-- Main Dashboard Container -->
-  <main class="relative z-10 flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
+  <main class="relative z-10 flex-1 max-w-7xl w-full mx-auto p-3.5 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
 
     <!-- Progress Notification Banner (Hidden by default, shown during history sync) -->
     <div id="syncProgressBanner" class="hidden p-3.5 sm:p-4 rounded-2xl bg-cyan-50 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-800/50 backdrop-blur-md transition-all">
@@ -149,7 +146,7 @@
             <span class="p-1.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
               <i data-lucide="thermometer" class="w-4 h-4"></i>
             </span>
-            <span class="text-slate-700 dark:text-slate-300">Sıcaklık</span>
+            <span class="text-slate-700 dark:text-slate-300 font-semibold">Sıcaklık</span>
           </div>
           <!-- Unit Switcher -->
           <button id="btnToggleUnit" class="text-xs font-mono font-semibold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800/90 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-all">
@@ -187,7 +184,7 @@
             <span class="p-1.5 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
               <i data-lucide="droplets" class="w-4 h-4"></i>
             </span>
-            <span class="text-slate-700 dark:text-slate-300">Bağıl Nem</span>
+            <span class="text-slate-700 dark:text-slate-300 font-semibold">Bağıl Nem</span>
           </div>
           <span id="humidityStatusBadge" class="text-xs px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border border-cyan-500/20 font-medium">
             Bekleniyor
@@ -226,7 +223,7 @@
             <span class="p-1.5 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
               <i data-lucide="battery-charging" class="w-4 h-4"></i>
             </span>
-            <span class="text-slate-700 dark:text-slate-300">Pil & Donanım</span>
+            <span class="text-slate-700 dark:text-slate-300 font-semibold">Pil & Donanım</span>
           </div>
           <span id="badgeFirmwareType" class="text-[10px] uppercase font-mono px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
             BLE GATT
@@ -354,7 +351,7 @@
           <tbody id="historyTableBody" class="divide-y divide-slate-200/80 dark:divide-slate-800/60 font-mono">
             <tr>
               <td colspan="6" class="py-8 text-center text-slate-400 dark:text-slate-500 font-sans">
-                Henüz kayıt bulunmuyor. Cihaza bağlanın veya Demo Modunu açın.
+                Henüz kayıt bulunmuyor. Cihazınıza bağlanarak ölçüm alabilirsiniz.
               </td>
             </tr>
           </tbody>
@@ -401,7 +398,7 @@
           <ol class="list-decimal list-inside space-y-1 text-slate-500 dark:text-slate-400">
             <li>Cihazınızda (bilgisayar veya Android telefon) Bluetooth'un açık olduğundan emin olun.</li>
             <li>Google Chrome, Microsoft Edge veya Opera tarayıcısı ile açın.</li>
-            <li><strong>"Bağlan"</strong> butonuna tıklayın.</li>
+            <li><strong>"Cihaza Bağlan"</strong> butonuna tıklayın.</li>
             <li>Açılan pencerede <code>LYWSD03MMC</code> cihazınızı seçip <strong>"Eşle / Bağlan"</strong> butonuna basın.</li>
           </ol>
         </div>

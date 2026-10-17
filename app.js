@@ -1,8 +1,8 @@
 /**
  * Xiaomi SmartTemp Pro — Poppins Typography & Dual Theme (Light / Dark)
  * Device: Xiaomi Mijia LYWSD03MMC
- * Features: Web Bluetooth GATT Live Streaming, Internal Flash Memory History Sync,
- *           IndexedDB Persistent Storage, Chart.js Time Series & Physical Metrics.
+ * Features: Live Streaming Digital Clock (HH:MM:SS), Web Bluetooth GATT Live Streaming,
+ *           Internal Flash Memory History Sync, IndexedDB Persistent Storage, Chart.js Time Series.
  */
 
 // ==========================================
@@ -405,7 +405,6 @@ class XiaomiBleManager {
 // 4. PHYSICAL METRICS CALCULATOR
 // ==========================================
 class PhysicalMetrics {
-  // Magnus Formula for Dew Point (Çiğ Noktası)
   static calculateDewPoint(temperature, humidity) {
     const a = 17.27;
     const b = 237.7;
@@ -414,7 +413,6 @@ class PhysicalMetrics {
     return Number(dewPoint.toFixed(1));
   }
 
-  // Vapor Pressure Deficit (VPD in kPa)
   static calculateVPD(temperature, humidity) {
     const vpSat = 0.61078 * Math.exp((17.27 * temperature) / (temperature + 237.3));
     const vpAir = vpSat * (humidity / 100.0);
@@ -436,11 +434,9 @@ class AppController {
     );
 
     // State
-    this.currentUnit = 'C'; // 'C' or 'F'
+    this.currentUnit = 'C';
     this.currentTheme = localStorage.getItem('smarttemp_theme') || 'light';
     this.latestTelemetry = null;
-    this.demoInterval = null;
-    this.isDemoActive = false;
     this.chartRange = '1h';
     this.chartMode = 'both';
     this.currentPage = 1;
@@ -457,7 +453,6 @@ class AppController {
 
       btnConnect: document.getElementById('btnConnect'),
       btnFetchHistory: document.getElementById('btnFetchHistory'),
-      btnDemo: document.getElementById('btnDemo'),
       btnHelp: document.getElementById('btnHelp'),
       btnCloseHelp: document.getElementById('btnCloseHelp'),
       btnGotIt: document.getElementById('btnGotIt'),
@@ -510,6 +505,7 @@ class AppController {
   }
 
   async init() {
+    this.initLiveClock();
     this.applyTheme(this.currentTheme);
     lucide.createIcons();
     this.setupEventListeners();
@@ -523,6 +519,29 @@ class AppController {
       this.renderTelemetryCards(last);
       this.updateChart();
     }
+  }
+
+  // Live Digital Clock (Saat : Dakika : Saniye)
+  initLiveClock() {
+    const timeEl = document.getElementById('liveClockTime');
+    const dateEl = document.getElementById('liveClockDate');
+    if (!timeEl) return;
+
+    const updateClock = () => {
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2, '0');
+      const m = String(now.getMinutes()).padStart(2, '0');
+      const s = String(now.getSeconds()).padStart(2, '0');
+      timeEl.textContent = `${h}:${m}:${s}`;
+
+      if (dateEl) {
+        const options = { day: 'numeric', month: 'long', year: 'numeric', weekday: 'long' };
+        dateEl.textContent = now.toLocaleDateString('tr-TR', options);
+      }
+    };
+
+    updateClock();
+    setInterval(updateClock, 1000);
   }
 
   applyTheme(theme) {
@@ -545,7 +564,6 @@ class AppController {
 
     lucide.createIcons();
 
-    // Adapt chart styling to theme
     if (this.chart) {
       this.adaptChartTheme();
     }
@@ -567,7 +585,6 @@ class AppController {
         await this.ble.disconnect();
       } else {
         try {
-          if (this.isDemoActive) this.stopDemo();
           await this.ble.connect();
           this.showToast('Xiaomi sensörü başarıyla bağlandı!', 'success');
         } catch (err) {
@@ -596,15 +613,6 @@ class AppController {
         this.showToast('Geçmiş alınırken hata: ' + err.message, 'error');
       } finally {
         this.dom.btnFetchHistory.disabled = false;
-      }
-    });
-
-    // Demo Mode Toggle
-    this.dom.btnDemo.addEventListener('click', () => {
-      if (this.isDemoActive) {
-        this.stopDemo();
-      } else {
-        this.startDemo();
       }
     });
 
@@ -696,22 +704,22 @@ class AppController {
   }
 
   handleBleStatus(status, text) {
-    this.dom.connectionStatusText.textContent = text;
-    this.dom.connectionDot.className = 'w-2 h-2 rounded-full inline-block flex-shrink-0';
+    if (this.dom.connectionStatusText) this.dom.connectionStatusText.textContent = text;
+    if (this.dom.connectionDot) this.dom.connectionDot.className = 'w-2 h-2 rounded-full inline-block flex-shrink-0';
 
     if (status === 'connected') {
-      this.dom.connectionDot.classList.add('bg-emerald-500', 'dot-live');
-      this.dom.btnConnect.innerHTML = `<i data-lucide="power" class="w-4 h-4"></i><span>Kapat</span>`;
-      this.dom.btnConnect.className = 'px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 bg-rose-500 hover:bg-rose-600 text-white shadow-md shadow-rose-500/20 transition-all active:scale-95';
+      if (this.dom.connectionDot) this.dom.connectionDot.classList.add('bg-emerald-500', 'dot-live');
+      this.dom.btnConnect.innerHTML = `<i data-lucide="power" class="w-4 h-4"></i><span>Bağlantıyı Kes</span>`;
+      this.dom.btnConnect.className = 'px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 bg-rose-500 hover:bg-rose-600 text-white shadow-md shadow-rose-500/20 transition-all active:scale-95';
       this.dom.btnFetchHistory.disabled = false;
-      this.dom.lastUpdatedAgo.classList.remove('hidden');
+      if (this.dom.lastUpdatedAgo) this.dom.lastUpdatedAgo.classList.remove('hidden');
     } else if (status === 'connecting' || status === 'scanning') {
-      this.dom.connectionDot.classList.add('bg-amber-500', 'animate-ping');
+      if (this.dom.connectionDot) this.dom.connectionDot.classList.add('bg-amber-500', 'animate-ping');
       this.dom.btnFetchHistory.disabled = true;
     } else {
-      this.dom.connectionDot.classList.add('bg-slate-400', 'dark:bg-slate-500');
-      this.dom.btnConnect.innerHTML = `<i data-lucide="bluetooth" class="w-4 h-4"></i><span class="hidden xs:inline sm:inline">Bağlan</span>`;
-      this.dom.btnConnect.className = 'px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 bg-emerald-500 hover:bg-emerald-600 dark:bg-gradient-to-r dark:from-emerald-500 dark:to-teal-500 dark:hover:from-emerald-400 dark:hover:to-teal-400 text-white dark:text-slate-950 shadow-md shadow-emerald-500/20 transition-all active:scale-95';
+      if (this.dom.connectionDot) this.dom.connectionDot.classList.add('bg-slate-400', 'dark:bg-slate-500');
+      this.dom.btnConnect.innerHTML = `<i data-lucide="bluetooth" class="w-4 h-4"></i><span>Cihaza Bağlan</span>`;
+      this.dom.btnConnect.className = 'px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 bg-emerald-500 hover:bg-emerald-600 dark:bg-gradient-to-r dark:from-emerald-500 dark:to-teal-500 dark:hover:from-emerald-400 dark:hover:to-teal-400 text-white dark:text-slate-950 shadow-md shadow-emerald-500/20 transition-all active:scale-95';
       this.dom.btnFetchHistory.disabled = true;
     }
     lucide.createIcons();
@@ -743,18 +751,15 @@ class AppController {
   }
 
   renderTelemetryCards(data) {
-    // Temperature conversion
     let displayTemp = data.temperature;
     if (this.currentUnit === 'F') {
       displayTemp = (data.temperature * 9 / 5) + 32;
     }
     this.dom.valTemp.textContent = displayTemp.toFixed(1);
 
-    // Humidity
     this.dom.valHum.textContent = data.humidity;
     this.dom.humProgressBar.style.width = `${Math.min(100, data.humidity)}%`;
 
-    // Humidity status
     if (data.humidity < 30) {
       this.dom.humidityStatusBadge.textContent = 'Kuru';
       this.dom.humidityStatusBadge.className = 'text-xs px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 font-medium';
@@ -766,11 +771,9 @@ class AppController {
       this.dom.humidityStatusBadge.className = 'text-xs px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 font-medium';
     }
 
-    // Physical dew point and VPD
     this.dom.valDewPoint.textContent = `${data.dewPoint} °C`;
     this.dom.valVpd.textContent = `${data.vpd} kPa`;
 
-    // Battery
     if (data.battery != null) {
       this.dom.valBattery.textContent = data.battery;
       this.dom.batteryProgressBar.style.width = `${Math.min(100, data.battery)}%`;
@@ -786,7 +789,9 @@ class AppController {
       this.dom.valVoltage.textContent = `${data.voltage.toFixed(2)} V`;
     }
 
-    this.dom.lastUpdatedAgo.textContent = `• ${new Date().toLocaleTimeString('tr-TR')}`;
+    if (this.dom.lastUpdatedAgo) {
+      this.dom.lastUpdatedAgo.textContent = `• ${new Date().toLocaleTimeString('tr-TR')}`;
+    }
   }
 
   updateStatsAndTable() {
@@ -805,7 +810,6 @@ class AppController {
       this.dom.tempMinMax.textContent = `${conv(minTemp)} / ${conv(maxTemp)} °${this.currentUnit}`;
       this.dom.humMinMax.textContent = `%${minHum} / %${maxHum}`;
 
-      // Trend check
       if (list.length >= 3) {
         const last3 = list.slice(-3);
         const diff = last3[2].temperature - last3[0].temperature;
@@ -832,7 +836,7 @@ class AppController {
       this.dom.historyTableBody.innerHTML = `
         <tr>
           <td colspan="6" class="py-8 text-center text-slate-400 dark:text-slate-500 font-sans">
-            Henüz kayıt bulunmuyor. Cihaza bağlanın veya Demo Modunu açın.
+            Henüz kayıt bulunmuyor. Cihazınıza bağlanarak ölçüm alabilirsiniz.
           </td>
         </tr>
       `;
@@ -1054,72 +1058,6 @@ class AppController {
     }
 
     this.chart.update('none');
-  }
-
-  startDemo() {
-    this.isDemoActive = true;
-    this.dom.btnDemo.innerHTML = `<i data-lucide="square" class="w-4 h-4 text-rose-500"></i><span>Durdur</span>`;
-    this.handleBleStatus('connected', 'Demo Modu (Simülasyon)');
-    this.showToast('Demo modu başlatıldı. Gerçekçi simüle veriler üretiliyor.', 'info');
-
-    if (this.storage.records.length === 0) {
-      const now = Date.now();
-      const mockHistory = [];
-      let baseTemp = 21.5;
-      let baseHum = 48;
-
-      for (let i = 48; i >= 1; i--) {
-        const time = now - (i * 3600 * 1000);
-        baseTemp += (Math.random() - 0.5) * 0.4;
-        baseHum += (Math.random() - 0.5) * 2;
-        baseTemp = Math.max(18, Math.min(26, baseTemp));
-        baseHum = Math.max(35, Math.min(65, baseHum));
-
-        mockHistory.push({
-          timestamp: time,
-          temperature: Number(baseTemp.toFixed(1)),
-          humidity: Math.round(baseHum),
-          tempMax: Number((baseTemp + 0.4).toFixed(1)),
-          tempMin: Number((baseTemp - 0.4).toFixed(1)),
-          humMax: Math.round(baseHum + 3),
-          humMin: Math.round(baseHum - 3),
-          voltage: 3.02,
-          battery: 95,
-          type: 'history_hour',
-          dewPoint: PhysicalMetrics.calculateDewPoint(baseTemp, baseHum),
-          vpd: PhysicalMetrics.calculateVPD(baseTemp, baseHum)
-        });
-      }
-      this.storage.addBatch(mockHistory);
-      this.updateStatsAndTable();
-      this.updateChart();
-    }
-
-    let currentTemp = 22.4;
-    let currentHum = 51;
-    this.demoInterval = setInterval(() => {
-      currentTemp += (Math.random() - 0.48) * 0.15;
-      currentHum += (Math.random() - 0.5) * 0.8;
-      currentTemp = Math.max(19, Math.min(25, currentTemp));
-      currentHum = Math.max(40, Math.min(60, Math.round(currentHum)));
-
-      this.handleNewData({
-        temperature: Number(currentTemp.toFixed(2)),
-        humidity: currentHum,
-        voltage: 3.01,
-        battery: 94,
-        timestamp: Date.now(),
-        type: 'live'
-      });
-    }, 2500);
-  }
-
-  stopDemo() {
-    this.isDemoActive = false;
-    clearInterval(this.demoInterval);
-    this.dom.btnDemo.innerHTML = `<i data-lucide="play" class="w-4 h-4 text-amber-500"></i><span class="hidden lg:inline">Demo</span>`;
-    this.handleBleStatus('disconnected', 'Cihaz bekleniyor');
-    this.showToast('Demo modu durduruldu.', 'info');
   }
 
   downloadFile(filename, content, mimeType) {
