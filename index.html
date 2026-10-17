@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
-  <!-- Tailwind CSS CDN -->
+  <!-- Tailwind CSS CDN with Google Material 3 Blue Tokens -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -35,12 +35,22 @@
             'xs': '380px',
           },
           colors: {
-            brand: {
-              50: '#f0fdf4',
-              100: '#dcfce7',
-              400: '#4ade80',
-              500: '#22c55e',
-              600: '#16a34a',
+            m3: {
+              primary: '#0b57d0',
+              primaryHover: '#0842a0',
+              onPrimary: '#ffffff',
+              primaryContainer: '#d3e3fd',
+              onPrimaryContainer: '#041e49',
+              primaryDark: '#a8c7fa',
+              primaryDarkContainer: '#0842a0',
+              surface: '#f8fafd',
+              surfaceContainer: '#edf2f9',
+              surfaceContainerHigh: '#e3eaf4',
+              surfaceDark: '#0c131c',
+              surfaceDarkContainer: '#161f2b',
+              surfaceDarkContainerHigh: '#1e2938',
+              outline: '#c2c7d0',
+              outlineDark: '#2e3b4e',
             }
           }
         }
@@ -57,22 +67,21 @@
   <!-- Custom CSS -->
   <link rel="stylesheet" href="style.css" />
 </head>
-<body class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-screen flex flex-col font-sans selection:bg-brand-500 selection:text-white transition-colors duration-300 pb-10 sm:pb-0">
+<body class="bg-[#f8fafd] dark:bg-[#0c131c] text-[#1b1f24] dark:text-[#e2e8f0] min-h-screen flex flex-col font-sans selection:bg-[#0b57d0] selection:text-white transition-colors duration-300 pb-10 sm:pb-0">
 
-  <!-- Glow Background Accents -->
+  <!-- M3 Soft Blue Ambient Background Glows -->
   <div class="fixed inset-0 pointer-events-none overflow-hidden z-0">
-    <div class="absolute -top-32 -left-32 w-72 sm:w-96 h-72 sm:h-96 bg-emerald-500/15 dark:bg-emerald-500/10 rounded-full blur-3xl"></div>
-    <div class="absolute top-1/3 -right-32 w-72 sm:w-96 h-72 sm:h-96 bg-cyan-500/15 dark:bg-cyan-500/10 rounded-full blur-3xl"></div>
-    <div class="absolute -bottom-32 left-1/3 w-72 sm:w-96 h-72 sm:h-96 bg-purple-500/10 dark:bg-purple-500/10 rounded-full blur-3xl"></div>
+    <div class="absolute -top-32 -left-32 w-80 sm:w-[32rem] h-80 sm:h-[32rem] bg-blue-500/10 dark:bg-blue-600/10 rounded-full blur-3xl"></div>
+    <div class="absolute top-1/3 -right-32 w-80 sm:w-[32rem] h-80 sm:h-[32rem] bg-sky-500/10 dark:bg-sky-600/10 rounded-full blur-3xl"></div>
   </div>
 
-  <!-- Header -->
-  <header class="relative z-10 border-b border-slate-200/90 dark:border-slate-800/80 bg-white/85 dark:bg-slate-900/75 backdrop-blur-xl sticky top-0 px-3.5 sm:px-6 lg:px-8 py-2.5 sm:py-3 transition-colors duration-300">
+  <!-- Header (Material 3 Top App Bar) -->
+  <header class="relative z-10 border-b border-[#d8e2ee] dark:border-[#263445] bg-[#ffffff]/90 dark:bg-[#161f2b]/90 backdrop-blur-xl sticky top-0 px-3.5 sm:px-6 lg:px-8 py-2.5 sm:py-3 transition-colors duration-300">
     <div class="max-w-7xl mx-auto flex items-center justify-between gap-3">
       
       <!-- Left Side: Live Streaming Clock (Saat : Dakika : Saniye) -->
       <div class="flex items-center gap-2 sm:gap-3.5 min-w-0">
-        <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-500 flex items-center justify-center shadow-md shadow-emerald-500/20 text-white dark:text-slate-950 font-bold flex-shrink-0">
+        <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[#d3e3fd] text-[#041e49] dark:bg-[#0842a0] dark:text-[#d3e3fd] flex items-center justify-center font-bold flex-shrink-0 shadow-sm">
           <i data-lucide="clock" class="w-4 h-4 sm:w-5 sm:h-5"></i>
         </div>
         <div class="min-w-0">
@@ -80,7 +89,7 @@
             <span id="liveClockTime" class="text-lg sm:text-2xl font-extrabold font-mono tracking-wider text-slate-900 dark:text-white tabular-nums">
               00:00:00
             </span>
-            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0"></span>
+            <span class="w-2 h-2 rounded-full bg-[#0b57d0] dark:bg-[#a8c7fa] animate-pulse flex-shrink-0"></span>
           </div>
           <p id="liveClockDate" class="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium capitalize truncate">
             -- -------- ----
@@ -88,18 +97,18 @@
         </div>
       </div>
 
-      <!-- Right Side Controls (Desktop & Mobile Unified) -->
-      <div class="flex items-center gap-1.5 sm:gap-2.5 flex-shrink-0">
+      <!-- Right Side Controls (Material 3 Style) -->
+      <div class="flex items-center gap-2 sm:gap-3 flex-shrink-0">
         
         <!-- Connection Status Pill (Desktop only) -->
-        <div class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 text-xs">
+        <div class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#edf2f9] dark:bg-[#1e2938] border border-[#d8e2ee] dark:border-[#2e3b4e] text-xs">
           <span id="connectionDot" class="w-2 h-2 rounded-full bg-slate-400 dark:bg-slate-500 flex-shrink-0"></span>
           <span id="connectionStatusText" class="font-medium text-slate-600 dark:text-slate-300">Cihaz bekleniyor</span>
           <span id="lastUpdatedAgo" class="text-slate-400 hidden">• Az önce</span>
         </div>
 
         <!-- Live Signal / RSSI Pill (Desktop) with 4-Bar Signal Meter -->
-        <div id="signalPill" class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 text-xs font-mono font-semibold text-emerald-600 dark:text-emerald-400" title="Bluetooth Sinyal Gücü (RSSI)">
+        <div id="signalPill" class="hidden md:flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#edf2f9] dark:bg-[#1e2938] border border-[#d8e2ee] dark:border-[#2e3b4e] text-xs font-mono font-semibold text-[#0b57d0] dark:text-[#a8c7fa]" title="Bluetooth Sinyal Gücü (RSSI)">
           <div class="signal-bars" id="signalBarsHeader">
             <span class="signal-bar"></span>
             <span class="signal-bar"></span>
@@ -109,47 +118,32 @@
           <span id="signalRssiText">-- dBm</span>
         </div>
 
-        <!-- Desktop Action Buttons -->
-        <div class="hidden sm:flex items-center gap-2">
-          <button id="btnConnect" class="px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 bg-emerald-500 hover:bg-emerald-600 dark:bg-gradient-to-r dark:from-emerald-500 dark:to-teal-500 text-white dark:text-slate-950 shadow-md shadow-emerald-500/20 transition-all active:scale-95">
+        <!-- Desktop Connect Button (M3 Filled Button) -->
+        <div class="hidden sm:flex items-center">
+          <button id="btnConnect" class="px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold flex items-center gap-2 bg-[#0b57d0] hover:bg-[#0842a0] dark:bg-[#a8c7fa] dark:hover:bg-[#8ab4f8] text-white dark:text-[#041e49] shadow-sm hover:shadow transition-all active:scale-95">
             <i data-lucide="bluetooth" class="w-4 h-4"></i>
             <span>Cihaza Bağlan</span>
-          </button>
-
-          <button id="btnFetchHistory" disabled title="Cihaz hafızasındaki geçmiş kayıtları çeker" class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700/80 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
-            <i data-lucide="history" class="w-4 h-4 text-cyan-600 dark:text-cyan-400"></i>
-            <span>Geçmişi İndir</span>
           </button>
         </div>
 
         <!-- Theme Toggle Button (Light / Dark) -->
-        <button id="btnThemeToggle" title="Temayı Değiştir (Açık / Koyu)" aria-label="Temayı Değiştir" class="p-2 sm:px-3 sm:py-2 rounded-xl text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700/80 transition-all active:scale-95 flex items-center gap-1.5">
+        <button id="btnThemeToggle" title="Temayı Değiştir (Açık / Koyu)" aria-label="Temayı Değiştir" class="p-2.5 rounded-full text-slate-600 dark:text-slate-300 hover:text-[#0b57d0] dark:hover:text-[#a8c7fa] bg-[#edf2f9] dark:bg-[#1e2938] hover:bg-[#e0e8f4] dark:hover:bg-[#253346] border border-[#d8e2ee] dark:border-[#2e3b4e] transition-all active:scale-95 flex items-center justify-center">
           <i id="themeIcon" data-lucide="moon" class="w-4 h-4"></i>
-          <span id="themeLabel" class="text-xs font-semibold hidden lg:inline">Koyu</span>
-        </button>
-
-        <!-- Help / Info Modal Trigger -->
-        <button id="btnHelp" title="Kullanım ve Rehber" class="p-2 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200/70 dark:hover:bg-slate-800/80 border border-transparent transition-all">
-          <i data-lucide="help-circle" class="w-5 h-5"></i>
+          <span id="themeLabel" class="text-xs font-semibold hidden lg:inline ml-1.5">Koyu</span>
         </button>
       </div>
 
     </div>
 
     <!-- Mobile-Exclusive Action Bar -->
-    <div class="sm:hidden pt-2.5 mt-2 border-t border-slate-200/80 dark:border-slate-800/60 flex items-center gap-2">
-      <button id="btnConnectMobile" class="flex-1 py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white shadow-md shadow-emerald-500/20 active:scale-95 transition-all">
+    <div class="sm:hidden pt-2.5 mt-2 border-t border-[#d8e2ee] dark:border-[#263445] flex items-center gap-2">
+      <button id="btnConnectMobile" class="flex-1 py-2.5 px-4 rounded-full text-xs font-bold flex items-center justify-center gap-2 bg-[#0b57d0] hover:bg-[#0842a0] text-white shadow-sm active:scale-95 transition-all">
         <i data-lucide="bluetooth" class="w-4 h-4"></i>
         <span>Cihaza Bağlan</span>
       </button>
 
-      <button id="btnFetchHistoryMobile" disabled class="py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
-        <i data-lucide="history" class="w-4 h-4 text-cyan-600 dark:text-cyan-400"></i>
-        <span>Geçmiş</span>
-      </button>
-
       <!-- Live Signal on Mobile with 4-Bar Signal Meter -->
-      <div id="signalPillMobile" class="hidden px-2.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 items-center gap-1.5 font-mono text-[11px] font-bold text-emerald-600 dark:text-emerald-400" title="Bluetooth Sinyal Gücü">
+      <div id="signalPillMobile" class="hidden px-3 py-2 rounded-full bg-[#edf2f9] dark:bg-[#1e2938] border border-[#d8e2ee] dark:border-[#2e3b4e] items-center gap-1.5 font-mono text-[11px] font-bold text-[#0b57d0] dark:text-[#a8c7fa]" title="Bluetooth Sinyal Gücü">
         <div class="signal-bars" id="signalBarsMobile">
           <span class="signal-bar"></span>
           <span class="signal-bar"></span>
@@ -159,7 +153,7 @@
         <span id="signalRssiTextMobile">-- dBm</span>
       </div>
 
-      <div class="px-2.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center" title="Bağlantı Durumu">
+      <div class="px-3 py-2.5 rounded-full bg-[#edf2f9] dark:bg-[#1e2938] border border-[#d8e2ee] dark:border-[#2e3b4e] flex items-center justify-center" title="Bağlantı Durumu">
         <span id="connectionDotMobile" class="w-2.5 h-2.5 rounded-full bg-slate-400 dark:bg-slate-500"></span>
       </div>
     </div>
@@ -168,69 +162,49 @@
   <!-- Main Dashboard Container -->
   <main class="relative z-10 flex-1 max-w-7xl w-full mx-auto p-3.5 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
 
-    <!-- Progress Notification Banner -->
-    <div id="syncProgressBanner" class="hidden p-3.5 sm:p-4 rounded-2xl bg-cyan-50 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-800/50 backdrop-blur-md transition-all">
+    <!-- Progress Notification Banner (Clean M3 Tonal Style) -->
+    <div id="syncProgressBanner" class="hidden p-3.5 sm:p-4 rounded-3xl bg-[#d3e3fd]/80 dark:bg-[#0842a0]/40 border border-[#0b57d0]/20 backdrop-blur-md transition-all">
       <div class="flex items-center justify-between gap-3 mb-2">
         <div class="flex items-center gap-2">
-          <div class="w-2.5 h-2.5 rounded-full bg-cyan-500 dark:bg-cyan-400 animate-ping"></div>
-          <span id="syncProgressLabel" class="text-xs sm:text-sm font-medium text-cyan-900 dark:text-cyan-200">Cihaz hafızasındaki geçmiş kayıtlar indiriliyor...</span>
+          <div class="w-2.5 h-2.5 rounded-full bg-[#0b57d0] dark:bg-[#a8c7fa] animate-ping"></div>
+          <span id="syncProgressLabel" class="text-xs sm:text-sm font-medium text-[#041e49] dark:text-[#d3e3fd]">Veriler senkronize ediliyor...</span>
         </div>
-        <span id="syncProgressPercent" class="text-xs font-mono font-bold text-cyan-600 dark:text-cyan-400">0%</span>
+        <span id="syncProgressPercent" class="text-xs font-mono font-bold text-[#0b57d0] dark:text-[#a8c7fa]">0%</span>
       </div>
       <div class="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
-        <div id="syncProgressBar" class="h-full bg-gradient-to-r from-cyan-500 to-emerald-400 rounded-full transition-all duration-300" style="width: 0%"></div>
+        <div id="syncProgressBar" class="h-full bg-[#0b57d0] dark:bg-[#a8c7fa] rounded-full transition-all duration-300" style="width: 0%"></div>
       </div>
     </div>
 
-    <!-- BLE Multi-Protocol & Signal Status Banner -->
-    <div id="bleModeBanner" class="p-3 sm:p-3.5 rounded-2xl bg-white/90 dark:bg-slate-900/70 border border-emerald-500/30 backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
-      <div class="flex items-center gap-2.5 min-w-0">
-        <div class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse flex-shrink-0"></div>
-        <div class="min-w-0">
-          <p class="font-semibold text-slate-800 dark:text-slate-200">
-            <span class="text-emerald-600 dark:text-emerald-400">Çoklu BLE Uyumluluğu:</span> ATC Modlu Firmware & Xiaomi Orijinal LYWSD03MMC
-          </p>
-          <p class="text-[11px] text-slate-500 dark:text-slate-400">
-            Cihaza Bağlan dediğinizde çevredeki tüm BLE cihazları listelenir; <strong class="text-emerald-600 dark:text-emerald-400">ATC_...</strong> cihazınızı seçtiğinizde yayın sinyalleri ve sensör verileri anında yakalanır.
-          </p>
-        </div>
-      </div>
-      <div class="flex items-center gap-2 flex-shrink-0">
-        <span id="bleLiveStatusTag" class="font-mono text-[10px] uppercase px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-bold border border-emerald-500/20">
-          Sinyal Dinleme Hazır
-        </span>
-      </div>
-    </div>
-
-    <!-- 6 SEPARATE TELEMETRY & DERIVED METRIC CARDS (2 rows x 3 columns on desktop) -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-6">
+    <!-- 6 SEPARATE TELEMETRY & DERIVED METRIC CARDS (Material 3 Elevated Grid) -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-5">
       
       <!-- Card 1: Sıcaklık (Temperature) -->
-      <div class="metric-card group relative p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-white/95 dark:bg-slate-900/60 border border-slate-200/90 dark:border-slate-800/80 hover:border-emerald-500/40 backdrop-blur-xl shadow-sm dark:shadow-xl transition-all duration-300">
+      <div class="m3-card group relative p-4 sm:p-5 transition-all duration-300">
         <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2 sm:mb-3">
           <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider">
-            <span class="p-1.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+            <span class="p-2 rounded-2xl bg-[#d3e3fd] text-[#041e49] dark:bg-[#0842a0] dark:text-[#d3e3fd]">
               <i data-lucide="thermometer" class="w-4 h-4"></i>
             </span>
             <span class="text-slate-700 dark:text-slate-300 font-semibold">Sıcaklık</span>
           </div>
           <!-- Unit Switcher -->
-          <button id="btnToggleUnit" class="text-xs font-mono font-bold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800/90 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 active:scale-95 transition-all">
+          <button id="btnToggleUnit" class="text-xs font-mono font-bold px-3 py-1 rounded-full bg-[#edf2f9] dark:bg-[#1e2938] text-[#0b57d0] dark:text-[#a8c7fa] hover:bg-[#e0e8f4] dark:hover:bg-[#253346] border border-[#d8e2ee] dark:border-[#2e3b4e] active:scale-95 transition-all">
             °C / °F
           </button>
         </div>
 
         <div class="flex items-baseline gap-2 mb-2">
           <span id="valTemp" class="text-4xl sm:text-5xl font-extrabold tracking-tight font-mono text-slate-900 dark:text-slate-100 tabular-nums">--.-</span>
-          <span id="lblTempUnit" class="text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400">°C</span>
+          <span id="lblTempUnit" class="text-xl sm:text-2xl font-bold text-[#0b57d0] dark:text-[#a8c7fa]">°C</span>
         </div>
 
-        <div class="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800/60 text-xs text-slate-500 dark:text-slate-400">
+        <div class="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800/80 text-xs text-slate-500 dark:text-slate-400">
           <div class="flex items-center gap-1">
             <span class="text-slate-400 dark:text-slate-500">Min/Maks:</span>
             <span id="tempMinMax" class="font-mono font-medium text-slate-700 dark:text-slate-300">-- / --</span>
           </div>
-          <div id="tempTrendBadge" class="flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 font-medium text-[11px]">
+          <div id="tempTrendBadge" class="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#edf2f9] dark:bg-[#1e2938] text-slate-600 dark:text-slate-300 font-medium text-[11px]">
             <i data-lucide="minus" class="w-3 h-3"></i>
             <span>Dengeli</span>
           </div>
@@ -238,30 +212,30 @@
       </div>
 
       <!-- Card 2: Bağıl Nem (Relative Humidity) -->
-      <div class="metric-card group relative p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-white/95 dark:bg-slate-900/60 border border-slate-200/90 dark:border-slate-800/80 hover:border-cyan-500/40 backdrop-blur-xl shadow-sm dark:shadow-xl transition-all duration-300">
+      <div class="m3-card group relative p-4 sm:p-5 transition-all duration-300">
         <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2 sm:mb-3">
           <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider">
-            <span class="p-1.5 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
+            <span class="p-2 rounded-2xl bg-sky-100 text-[#0284c7] dark:bg-sky-950/70 dark:text-sky-300">
               <i data-lucide="droplets" class="w-4 h-4"></i>
             </span>
             <span class="text-slate-700 dark:text-slate-300 font-semibold">Bağıl Nem</span>
           </div>
-          <span id="humidityStatusBadge" class="text-xs px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border border-cyan-500/20 font-medium">
+          <span id="humidityStatusBadge" class="text-xs px-2.5 py-0.5 rounded-full bg-sky-100 text-[#0284c7] dark:bg-sky-950/80 dark:text-sky-300 border border-sky-200 dark:border-sky-800 font-medium">
             Bekleniyor
           </span>
         </div>
 
         <div class="flex items-baseline gap-2 mb-2">
           <span id="valHum" class="text-4xl sm:text-5xl font-extrabold tracking-tight font-mono text-slate-900 dark:text-slate-100 tabular-nums">--</span>
-          <span class="text-xl sm:text-2xl font-bold text-cyan-600 dark:text-cyan-400">%</span>
+          <span class="text-xl sm:text-2xl font-bold text-[#0284c7] dark:text-sky-400">%</span>
         </div>
 
         <!-- Humidity Bar -->
         <div class="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden mb-2.5">
-          <div id="humProgressBar" class="h-full bg-gradient-to-r from-amber-400 via-cyan-400 to-blue-500 rounded-full transition-all duration-500" style="width: 0%"></div>
+          <div id="humProgressBar" class="h-full bg-gradient-to-r from-sky-400 to-[#0b57d0] rounded-full transition-all duration-500" style="width: 0%"></div>
         </div>
 
-        <div class="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800/60 text-xs text-slate-500 dark:text-slate-400">
+        <div class="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800/80 text-xs text-slate-500 dark:text-slate-400">
           <div class="flex items-center gap-1">
             <span class="text-slate-400 dark:text-slate-500">Min/Maks:</span>
             <span id="humMinMax" class="font-mono font-medium text-slate-700 dark:text-slate-300">-- / --</span>
@@ -271,43 +245,43 @@
       </div>
 
       <!-- Card 3: TÜRETİLMİŞ PARAMETRE — Hissedilen Sıcaklık (Apparent Temperature) -->
-      <div class="metric-card group relative p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-white/95 dark:bg-slate-900/60 border border-slate-200/90 dark:border-slate-800/80 hover:border-amber-500/40 backdrop-blur-xl shadow-sm dark:shadow-xl transition-all duration-300">
+      <div class="m3-card group relative p-4 sm:p-5 transition-all duration-300">
         <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2 sm:mb-3">
           <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider">
-            <span class="p-1.5 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+            <span class="p-2 rounded-2xl bg-amber-100 text-amber-700 dark:bg-amber-950/70 dark:text-amber-300">
               <i data-lucide="sun-medium" class="w-4 h-4"></i>
             </span>
             <span class="text-slate-700 dark:text-slate-300 font-semibold">Hissedilen Sıcaklık</span>
           </div>
-          <span id="apparentDiffBadge" class="text-xs px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 font-mono font-semibold">
+          <span id="apparentDiffBadge" class="text-xs px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-200 dark:border-amber-800 font-mono font-semibold">
             ±0.0°C
           </span>
         </div>
 
         <div class="flex items-baseline gap-2 mb-2">
           <span id="valApparentTemp" class="text-4xl sm:text-5xl font-extrabold tracking-tight font-mono text-slate-900 dark:text-slate-100 tabular-nums">--.-</span>
-          <span id="lblApparentUnit" class="text-xl sm:text-2xl font-bold text-amber-500 dark:text-amber-400">°C</span>
+          <span id="lblApparentUnit" class="text-xl sm:text-2xl font-bold text-amber-600 dark:text-amber-400">°C</span>
         </div>
 
-        <div class="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800/60 text-xs text-slate-500 dark:text-slate-400">
+        <div class="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800/80 text-xs text-slate-500 dark:text-slate-400">
           <div class="flex items-center gap-1">
             <span class="text-slate-400 dark:text-slate-500">Min/Maks:</span>
             <span id="apparentMinMax" class="font-mono font-medium text-slate-700 dark:text-slate-300">-- / --</span>
           </div>
-          <span class="text-slate-500 dark:text-slate-400 text-[11px]">Steadman / Rothfusz</span>
+          <span class="text-slate-500 dark:text-slate-400 text-[11px]">Steadman Modeli</span>
         </div>
       </div>
 
       <!-- Card 4: TÜRETİLMİŞ PARAMETRE — Çiğ Noktası (Dew Point) -->
-      <div class="metric-card group relative p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-white/95 dark:bg-slate-900/60 border border-slate-200/90 dark:border-slate-800/80 hover:border-purple-500/40 backdrop-blur-xl shadow-sm dark:shadow-xl transition-all duration-300">
+      <div class="m3-card group relative p-4 sm:p-5 transition-all duration-300">
         <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2 sm:mb-3">
           <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider">
-            <span class="p-1.5 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+            <span class="p-2 rounded-2xl bg-purple-100 text-purple-700 dark:bg-purple-950/70 dark:text-purple-300">
               <i data-lucide="cloud-rain" class="w-4 h-4"></i>
             </span>
             <span class="text-slate-700 dark:text-slate-300 font-semibold">Çiğ Noktası (Td)</span>
           </div>
-          <span id="dewPointRiskBadge" class="text-xs px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20 font-medium">
+          <span id="dewPointRiskBadge" class="text-xs px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-950/80 dark:text-purple-300 border border-purple-200 dark:border-purple-800 font-medium">
             Yoğuşma
           </span>
         </div>
@@ -317,7 +291,7 @@
           <span id="lblDewPointUnit" class="text-xl sm:text-2xl font-bold text-purple-600 dark:text-purple-400">°C</span>
         </div>
 
-        <div class="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800/60 text-xs text-slate-500 dark:text-slate-400">
+        <div class="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800/80 text-xs text-slate-500 dark:text-slate-400">
           <div class="flex items-center gap-1">
             <span class="text-slate-400 dark:text-slate-500">Min/Maks:</span>
             <span id="dewPointMinMax" class="font-mono font-medium text-slate-700 dark:text-slate-300">-- / --</span>
@@ -327,25 +301,25 @@
       </div>
 
       <!-- Card 5: TÜRETİLMİŞ PARAMETRE — Buhar Basıncı (Vapor Pressure & VPD) -->
-      <div class="metric-card group relative p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-white/95 dark:bg-slate-900/60 border border-slate-200/90 dark:border-slate-800/80 hover:border-indigo-500/40 backdrop-blur-xl shadow-sm dark:shadow-xl transition-all duration-300">
+      <div class="m3-card group relative p-4 sm:p-5 transition-all duration-300">
         <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2 sm:mb-3">
           <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider">
-            <span class="p-1.5 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+            <span class="p-2 rounded-2xl bg-blue-100 text-[#0b57d0] dark:bg-blue-950/70 dark:text-blue-300">
               <i data-lucide="gauge" class="w-4 h-4"></i>
             </span>
             <span class="text-slate-700 dark:text-slate-300 font-semibold">Buhar Basıncı</span>
           </div>
-          <span id="vpdBadge" class="text-xs px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border border-indigo-500/20 font-mono font-semibold">
+          <span id="vpdBadge" class="text-xs px-2.5 py-0.5 rounded-full bg-blue-100 text-[#0b57d0] dark:bg-blue-950/80 dark:text-blue-300 border border-blue-200 dark:border-blue-800 font-mono font-semibold">
             VPD: -- kPa
           </span>
         </div>
 
         <div class="flex items-baseline gap-2 mb-2">
           <span id="valVaporPressure" class="text-4xl sm:text-5xl font-extrabold tracking-tight font-mono text-slate-900 dark:text-slate-100 tabular-nums">--.-</span>
-          <span class="text-xl sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400">hPa</span>
+          <span class="text-xl sm:text-2xl font-bold text-[#0b57d0] dark:text-blue-400">hPa</span>
         </div>
 
-        <div class="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800/60 text-xs text-slate-500 dark:text-slate-400">
+        <div class="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800/80 text-xs text-slate-500 dark:text-slate-400">
           <div class="flex items-center gap-1">
             <span class="text-slate-400 dark:text-slate-500">Doygunluk:</span>
             <span id="valVpSat" class="font-mono font-medium text-slate-700 dark:text-slate-300">--.- hPa</span>
@@ -355,15 +329,15 @@
       </div>
 
       <!-- Card 6: Pil & Donanım Durumu (Battery & Hardware) -->
-      <div class="metric-card group relative p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-white/95 dark:bg-slate-900/60 border border-slate-200/90 dark:border-slate-800/80 hover:border-slate-400/40 backdrop-blur-xl shadow-sm dark:shadow-xl transition-all duration-300">
+      <div class="m3-card group relative p-4 sm:p-5 transition-all duration-300">
         <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2 sm:mb-3">
           <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider">
-            <span class="p-1.5 rounded-xl bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20">
+            <span class="p-2 rounded-2xl bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
               <i data-lucide="battery-charging" class="w-4 h-4"></i>
             </span>
             <span class="text-slate-700 dark:text-slate-300 font-semibold">Pil & Donanım</span>
           </div>
-          <span class="text-[10px] uppercase font-mono px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+          <span class="text-[10px] uppercase font-mono px-2.5 py-0.5 rounded-full bg-[#edf2f9] dark:bg-[#1e2938] text-slate-600 dark:text-slate-300 border border-[#d8e2ee] dark:border-[#2e3b4e]">
             BLE GATT
           </span>
         </div>
@@ -375,10 +349,10 @@
 
         <!-- Battery Bar -->
         <div class="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden mb-2.5">
-          <div id="batteryProgressBar" class="h-full bg-emerald-500 dark:bg-emerald-400 rounded-full transition-all duration-500" style="width: 0%"></div>
+          <div id="batteryProgressBar" class="h-full bg-[#0b57d0] dark:bg-[#a8c7fa] rounded-full transition-all duration-500" style="width: 0%"></div>
         </div>
 
-        <div class="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800/60 text-xs text-slate-500 dark:text-slate-400">
+        <div class="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800/80 text-xs text-slate-500 dark:text-slate-400">
           <div class="flex items-center gap-1">
             <span class="text-slate-400 dark:text-slate-500">Voltaj:</span>
             <span id="valVoltage" class="font-mono font-medium text-slate-700 dark:text-slate-300">-.-- V</span>
@@ -389,7 +363,7 @@
           </div>
         </div>
 
-        <div class="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800/60 text-xs text-slate-500 dark:text-slate-400">
+        <div class="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800/80 text-xs text-slate-500 dark:text-slate-400">
           <div class="flex items-center gap-2">
             <span class="text-slate-400 dark:text-slate-500">Sinyal:</span>
             <div class="signal-bars" id="signalBarsCard">
@@ -398,159 +372,147 @@
               <span class="signal-bar"></span>
               <span class="signal-bar"></span>
             </div>
-            <span id="valRssi" class="font-mono font-bold text-emerald-600 dark:text-emerald-400">-- dBm</span>
+            <span id="valRssi" class="font-mono font-bold text-[#0b57d0] dark:text-[#a8c7fa]">-- dBm</span>
           </div>
-          <span id="valFirmwareBadge" class="text-[10px] font-mono px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 font-medium">
-            Otomatik Algılama
-          </span>
         </div>
       </div>
 
     </div>
 
-    <!-- Interactive Charts Section (With All 5 Parameters Displayed) -->
-    <div class="p-3.5 sm:p-6 rounded-2xl sm:rounded-3xl bg-white/95 dark:bg-slate-900/60 border border-slate-200/90 dark:border-slate-800/80 backdrop-blur-xl shadow-sm dark:shadow-2xl space-y-3 sm:space-y-4 transition-colors duration-300">
+    <!-- Interactive Charts Section (Material 3 High-Utility Card) -->
+    <div class="m3-card p-4 sm:p-6 space-y-4 transition-colors duration-300">
       
-      <!-- Chart Controls Header -->
-      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800/80 pb-3">
+      <!-- Chart Controls Header (Material 3 Tabs & Filter Chips) -->
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-[#d8e2ee] dark:border-[#263445] pb-3.5">
         <div>
           <h2 class="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <i data-lucide="line-chart" class="w-5 h-5 text-emerald-600 dark:text-emerald-400"></i>
-            <span>Zaman Serisi ve Türetilmiş Parametreler Grafiği</span>
+            <i data-lucide="line-chart" class="w-5 h-5 text-[#0b57d0] dark:text-[#a8c7fa]"></i>
+            <span>Analitik Telemetri & Zaman Serisi</span>
           </h2>
-          <p class="text-xs text-slate-500 dark:text-slate-400">Sıcaklık, Hissedilen, Çiğ Noktası, Nem ve Buhar Basıncı eğrileri</p>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Termal konfor, bağıl nem ve yoğuşma dinamikleri grafiği</p>
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
           
-          <!-- Range Filters -->
-          <div class="inline-flex rounded-xl bg-slate-100 dark:bg-slate-800/80 p-1 border border-slate-200 dark:border-slate-700/60 text-xs">
-            <button class="filter-btn active px-2 sm:px-3 py-1 rounded-lg font-medium transition-all" data-range="1h">
-              <span class="sm:hidden">1S</span><span class="hidden sm:inline">1 Saat</span>
-            </button>
-            <button class="filter-btn px-2 sm:px-3 py-1 rounded-lg font-medium transition-all" data-range="24h">
-              <span class="sm:hidden">24S</span><span class="hidden sm:inline">24 Saat</span>
-            </button>
-            <button class="filter-btn px-2 sm:px-3 py-1 rounded-lg font-medium transition-all" data-range="7d">
-              <span class="sm:hidden">7G</span><span class="hidden sm:inline">7 Gün</span>
-            </button>
-            <button class="filter-btn px-2 sm:px-3 py-1 rounded-lg font-medium transition-all" data-range="all">Tümü</button>
+          <!-- Range Filters (Material 3 Chips) -->
+          <div class="inline-flex rounded-full bg-[#edf2f9] dark:bg-[#1e2938] p-1 border border-[#d8e2ee] dark:border-[#2e3b4e] text-xs">
+            <button class="filter-btn active px-3 py-1 font-medium transition-all" data-range="1h">1 Saat</button>
+            <button class="filter-btn px-3 py-1 font-medium transition-all" data-range="24h">24 Saat</button>
+            <button class="filter-btn px-3 py-1 font-medium transition-all" data-range="7d">7 Gün</button>
+            <button class="filter-btn px-3 py-1 font-medium transition-all" data-range="all">Tümü</button>
           </div>
 
-          <!-- Parameter Toggle Filters (Touch-scrollable on mobile) -->
-          <div class="inline-flex rounded-xl bg-slate-100 dark:bg-slate-800/80 p-1 border border-slate-200 dark:border-slate-700/60 text-xs overflow-x-auto max-w-full touch-scroll gap-1">
-            <button class="mode-btn active px-2 sm:px-2.5 py-1 rounded-lg font-medium transition-all" data-mode="all">Tümü</button>
-            <button class="mode-btn px-2 sm:px-2.5 py-1 rounded-lg font-medium transition-all flex items-center gap-1.5" data-mode="temps" title="Tüm Sıcaklık Parametreleri (Aynı °C Ölçeğinde)">
-              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-              <span>Sıcaklıklar</span>
+          <!-- Parameter View Tabs (Dedicated, Clear Material 3 Modes) -->
+          <div class="inline-flex rounded-full bg-[#edf2f9] dark:bg-[#1e2938] p-1 border border-[#d8e2ee] dark:border-[#2e3b4e] text-xs overflow-x-auto max-w-full touch-scroll gap-1">
+            <button class="mode-btn active px-3 py-1 font-semibold flex items-center gap-1.5" data-mode="temps" title="Ortam Sıcaklığı, Hissedilen ve Çiğ Noktası — Hepsi Aynı °C Ölçeğinde">
+              <span class="w-2 h-2 rounded-full bg-[#0b57d0]"></span>
+              <span>Sıcaklık Grubu (°C)</span>
             </button>
-            <button class="mode-btn px-2 sm:px-2.5 py-1 rounded-lg font-medium transition-all flex items-center gap-1.5" data-mode="temp">
-              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-              <span>Sıcaklık</span>
+            <button class="mode-btn px-3 py-1 font-semibold flex items-center gap-1.5" data-mode="hum" title="Bağıl Nem Eğrisi ve İdeal Nem Konfor Alanı (%40-%60)">
+              <span class="w-2 h-2 rounded-full bg-[#0284c7]"></span>
+              <span>Bağıl Nem (%)</span>
             </button>
-            <button class="mode-btn px-2 sm:px-2.5 py-1 rounded-lg font-medium transition-all flex items-center gap-1.5" data-mode="apparent">
-              <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-              <span>Hissedilen</span>
+            <button class="mode-btn px-3 py-1 font-semibold flex items-center gap-1.5" data-mode="press" title="Atmosferik Su Buharı Basıncı">
+              <span class="w-2 h-2 rounded-full bg-[#2563eb]"></span>
+              <span>Buhar Basıncı (hPa)</span>
             </button>
-            <button class="mode-btn px-2 sm:px-2.5 py-1 rounded-lg font-medium transition-all flex items-center gap-1.5" data-mode="dew">
-              <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
-              <span>Çiğ Noktası</span>
-            </button>
-            <button class="mode-btn px-2 sm:px-2.5 py-1 rounded-lg font-medium transition-all flex items-center gap-1.5" data-mode="hum">
-              <span class="w-1.5 h-1.5 rounded-full bg-cyan-500"></span>
-              <span>Nem</span>
-            </button>
-            <button class="mode-btn px-2 sm:px-2.5 py-1 rounded-lg font-medium transition-all flex items-center gap-1.5" data-mode="press">
-              <span class="w-1.5 h-1.5 rounded-full bg-pink-500"></span>
-              <span>Buhar B.</span>
+            <button class="mode-btn px-3 py-1 font-semibold flex items-center gap-1.5" data-mode="all" title="Çift Eksenli Tüm Parametreler">
+              <span>Tüm Parametreler</span>
             </button>
           </div>
 
         </div>
       </div>
 
-      <!-- Chart Live Statistics Summary Strip -->
-      <div id="chartStatsStrip" class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-2xl bg-slate-50/90 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800/80 text-xs">
+      <!-- Material 3 Live KPI Cards (Dynamic Statistics Grid) -->
+      <div id="chartStatsStrip" class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 p-3 rounded-2xl bg-[#edf2f9]/70 dark:bg-[#1e2938]/60 border border-[#d8e2ee] dark:border-[#2e3b4e] text-xs">
         <div class="flex flex-col">
-          <span class="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-sans font-medium flex items-center gap-1">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-            Ortalama Sıcaklık
+          <span class="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-sans font-semibold flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-[#0b57d0]"></span>
+            Son Okunan Değer
           </span>
           <div class="flex items-baseline gap-1 mt-0.5">
-            <span id="chartStatAvgTemp" class="font-mono font-bold text-sm sm:text-base text-emerald-600 dark:text-emerald-400">--.-</span>
-            <span class="text-[10px] font-bold text-emerald-600 dark:text-emerald-400" id="chartStatTempUnit">°C</span>
-            <span id="chartStatTempMinMax" class="text-[10px] font-mono text-slate-400 dark:text-slate-500 ml-auto truncate">(-- / --)</span>
+            <span id="chartKpiCurrent" class="font-mono font-bold text-base sm:text-lg text-[#0b57d0] dark:text-[#a8c7fa]">--.-</span>
+            <span id="chartKpiCurrentUnit" class="text-xs font-bold text-[#0b57d0] dark:text-[#a8c7fa]">°C</span>
           </div>
         </div>
+
         <div class="flex flex-col">
-          <span class="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-sans font-medium flex items-center gap-1">
+          <span class="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-sans font-semibold flex items-center gap-1">
             <span class="w-1.5 h-1.5 rounded-full bg-cyan-500"></span>
-            Ortalama Bağıl Nem
+            Periyot Minimum
           </span>
           <div class="flex items-baseline gap-1 mt-0.5">
-            <span id="chartStatAvgHum" class="font-mono font-bold text-sm sm:text-base text-cyan-600 dark:text-cyan-400">--</span>
-            <span class="text-[10px] font-bold text-cyan-600 dark:text-cyan-400">%</span>
-            <span id="chartStatHumMinMax" class="text-[10px] font-mono text-slate-400 dark:text-slate-500 ml-auto truncate">(-- / --)</span>
+            <span id="chartKpiMin" class="font-mono font-bold text-base sm:text-lg text-cyan-600 dark:text-cyan-400">--.-</span>
+            <span id="chartKpiMinTime" class="text-[10px] font-mono text-slate-400 dark:text-slate-500 ml-auto">--:--</span>
           </div>
         </div>
+
         <div class="flex flex-col">
-          <span class="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-sans font-medium flex items-center gap-1">
-            <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
-            Ortalama Çiğ Noktası
-          </span>
-          <div class="flex items-baseline gap-1 mt-0.5">
-            <span id="chartStatAvgDew" class="font-mono font-bold text-sm sm:text-base text-purple-600 dark:text-purple-400">--.-</span>
-            <span class="text-[10px] font-bold text-purple-600 dark:text-purple-400" id="chartStatDewUnit">°C</span>
-          </div>
-        </div>
-        <div class="flex flex-col">
-          <span class="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-sans font-medium flex items-center gap-1">
+          <span class="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-sans font-semibold flex items-center gap-1">
             <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-            Grafik Penceresi
+            Periyot Maksimum
           </span>
           <div class="flex items-baseline gap-1 mt-0.5">
-            <span id="chartStatPoints" class="font-mono font-bold text-sm sm:text-base text-slate-700 dark:text-slate-200">0</span>
-            <span class="text-[10px] text-slate-400 dark:text-slate-500">nokta</span>
-            <span id="chartStatTimeSpan" class="text-[10px] font-mono text-slate-400 dark:text-slate-500 ml-auto truncate">--</span>
+            <span id="chartKpiMax" class="font-mono font-bold text-base sm:text-lg text-amber-600 dark:text-amber-400">--.-</span>
+            <span id="chartKpiMaxTime" class="text-[10px] font-mono text-slate-400 dark:text-slate-500 ml-auto">--:--</span>
+          </div>
+        </div>
+
+        <div class="flex flex-col">
+          <span class="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-sans font-semibold flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+            Ortalama / Ölçüm
+          </span>
+          <div class="flex items-baseline gap-1 mt-0.5">
+            <span id="chartKpiAvg" class="font-mono font-bold text-base sm:text-lg text-slate-800 dark:text-slate-200">--.-</span>
+            <span id="chartKpiCount" class="text-[10px] font-mono text-slate-400 dark:text-slate-500 ml-auto">0 nokta</span>
           </div>
         </div>
       </div>
 
-      <!-- Chart Canvas Container -->
+      <!-- Chart Canvas Container with Empty State Overlay -->
       <div class="relative w-full h-64 sm:h-80 lg:h-96">
+        <div id="chartEmptyOverlay" class="absolute inset-0 flex flex-col items-center justify-center bg-white/85 dark:bg-[#161f2b]/85 backdrop-blur-sm z-10 rounded-2xl p-6 text-center transition-opacity duration-300">
+          <div class="w-12 h-12 rounded-2xl bg-[#d3e3fd] text-[#0b57d0] dark:bg-[#0842a0] dark:text-[#a8c7fa] flex items-center justify-center mb-2.5 shadow-sm">
+            <i data-lucide="radio" class="w-6 h-6 animate-pulse"></i>
+          </div>
+          <h3 class="text-sm sm:text-base font-bold text-slate-800 dark:text-slate-200 mb-1">Ölçüm Akışı Bekleniyor</h3>
+          <p class="text-xs text-slate-500 dark:text-slate-400 max-w-sm">Grafiklerin çizilmesi için lütfen yukarıdaki <strong>"Cihaza Bağlan"</strong> butonuna tıklayarak cihazınızdan canlı telemetri akışını başlatın.</p>
+        </div>
         <canvas id="telemetryChart"></canvas>
       </div>
 
     </div>
 
-    <!-- Historical Archive & Records Section -->
-    <div class="p-3.5 sm:p-6 rounded-2xl sm:rounded-3xl bg-white/95 dark:bg-slate-900/60 border border-slate-200/90 dark:border-slate-800/80 backdrop-blur-xl shadow-sm dark:shadow-2xl space-y-3.5 sm:space-y-4 transition-colors duration-300">
+    <!-- Historical Archive & Records Section (Material 3 Card) -->
+    <div class="m3-card p-4 sm:p-6 space-y-4 transition-colors duration-300">
       
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800/80 pb-3">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#d8e2ee] dark:border-[#263445] pb-3.5">
         <div>
           <h2 class="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <i data-lucide="database" class="w-5 h-5 text-cyan-600 dark:text-cyan-400"></i>
-            <span>Veri Kayıt Defteri & Türetilmiş Değerler</span>
+            <i data-lucide="database" class="w-5 h-5 text-[#0b57d0] dark:text-[#a8c7fa]"></i>
+            <span>Veri Kayıt Defteri & Ölçümler</span>
           </h2>
-          <p class="text-xs text-slate-500 dark:text-slate-400">Toplanan ölçümler ve matematiksel olarak hesaplanan atmosferik parametreler</p>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Toplanan ölçümler ve matematiksel atmosferik parametreler</p>
         </div>
 
         <div class="flex items-center flex-wrap gap-2">
           
           <!-- Export CSV Button -->
-          <button id="btnExportCsv" class="flex-1 sm:flex-none px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 active:scale-95 transition-all">
-            <i data-lucide="download" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+          <button id="btnExportCsv" class="flex-1 sm:flex-none px-4 py-2 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 bg-[#edf2f9] dark:bg-[#1e2938] hover:bg-[#e0e8f4] dark:hover:bg-[#253346] text-[#0b57d0] dark:text-[#a8c7fa] border border-[#d8e2ee] dark:border-[#2e3b4e] active:scale-95 transition-all">
+            <i data-lucide="download" class="w-4 h-4"></i>
             <span>CSV</span>
           </button>
 
           <!-- Export JSON Button -->
-          <button id="btnExportJson" class="flex-1 sm:flex-none px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 active:scale-95 transition-all">
-            <i data-lucide="file-code-2" class="w-4 h-4 text-cyan-600 dark:text-cyan-400"></i>
+          <button id="btnExportJson" class="flex-1 sm:flex-none px-4 py-2 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 bg-[#edf2f9] dark:bg-[#1e2938] hover:bg-[#e0e8f4] dark:hover:bg-[#253346] text-[#0b57d0] dark:text-[#a8c7fa] border border-[#d8e2ee] dark:border-[#2e3b4e] active:scale-95 transition-all">
+            <i data-lucide="file-code-2" class="w-4 h-4"></i>
             <span>JSON</span>
           </button>
 
           <!-- Clear Database Button -->
-          <button id="btnClearData" class="px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/20 active:scale-95 transition-all">
+          <button id="btnClearData" class="px-4 py-2 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/50 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 active:scale-95 transition-all">
             <i data-lucide="trash-2" class="w-4 h-4"></i>
             <span>Temizle</span>
           </button>
@@ -566,9 +528,9 @@
       </div>
 
       <!-- 2. Desktop Table View -->
-      <div class="hidden sm:block overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
+      <div class="hidden sm:block overflow-x-auto rounded-2xl border border-[#d8e2ee] dark:border-[#263445]">
         <table class="w-full text-left text-xs sm:text-sm text-slate-700 dark:text-slate-300">
-          <thead class="bg-slate-100/90 dark:bg-slate-800/80 uppercase font-mono text-[11px] text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700/60">
+          <thead class="bg-[#edf2f9] dark:bg-[#1e2938] uppercase font-mono text-[11px] text-slate-600 dark:text-slate-400 border-b border-[#d8e2ee] dark:border-[#263445]">
             <tr>
               <th scope="col" class="py-3 px-3">Tarih / Saat</th>
               <th scope="col" class="py-3 px-3">Tür</th>
@@ -580,7 +542,7 @@
               <th scope="col" class="py-3 px-3">Pil / Voltaj</th>
             </tr>
           </thead>
-          <tbody id="historyTableBody" class="divide-y divide-slate-200/80 dark:divide-slate-800/60 font-mono">
+          <tbody id="historyTableBody" class="divide-y divide-[#d8e2ee]/60 dark:divide-[#263445]/60 font-mono">
             <tr>
               <td colspan="8" class="py-8 text-center text-slate-400 dark:text-slate-500 font-sans">
                 Henüz kayıt bulunmuyor. Cihazınıza bağlanarak ölçüm alabilirsiniz.
@@ -594,9 +556,9 @@
       <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-1">
         <span id="tableSummaryText">0 kayıt</span>
         <div class="flex items-center gap-1.5 sm:gap-2">
-          <button id="btnPrevPage" disabled class="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 disabled:opacity-40 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-all">Önceki</button>
-          <span id="pageIndicator" class="font-mono text-slate-700 dark:text-slate-300 font-semibold px-1">1 / 1</span>
-          <button id="btnNextPage" disabled class="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 disabled:opacity-40 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-all">Sonraki</button>
+          <button id="btnPrevPage" disabled class="px-3.5 py-1.5 rounded-full bg-[#edf2f9] dark:bg-[#1e2938] disabled:opacity-40 hover:bg-[#e0e8f4] dark:hover:bg-[#253346] text-slate-700 dark:text-slate-300 border border-[#d8e2ee] dark:border-[#2e3b4e] transition-all">Önceki</button>
+          <span id="pageIndicator" class="font-mono text-slate-700 dark:text-slate-300 font-semibold px-2">1 / 1</span>
+          <button id="btnNextPage" disabled class="px-3.5 py-1.5 rounded-full bg-[#edf2f9] dark:bg-[#1e2938] disabled:opacity-40 hover:bg-[#e0e8f4] dark:hover:bg-[#253346] text-slate-700 dark:text-slate-300 border border-[#d8e2ee] dark:border-[#2e3b4e] transition-all">Sonraki</button>
         </div>
       </div>
 
@@ -604,72 +566,8 @@
 
   </main>
 
-  <!-- Help / Info Modal -->
-  <div id="helpModal" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-md hidden opacity-0 transition-opacity duration-300">
-    <div class="relative w-full max-w-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 sm:p-8 shadow-2xl max-h-[90vh] overflow-y-auto space-y-4 sm:space-y-6">
-      
-      <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
-        <div class="flex items-center gap-2.5">
-          <div class="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-            <i data-lucide="info" class="w-5 h-5"></i>
-          </div>
-          <h3 class="text-base sm:text-lg font-bold text-slate-900 dark:text-white">Türetilmiş Parametreler & Hesaplama Formülleri</h3>
-        </div>
-        <button id="btnCloseHelp" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
-          <i data-lucide="x" class="w-5 h-5"></i>
-        </button>
-      </div>
-
-      <div class="space-y-3 text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-        
-        <div class="p-3.5 sm:p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 space-y-1.5">
-          <h4 class="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-            <i data-lucide="sun-medium" class="w-4 h-4 text-amber-500"></i>
-            Hissedilen Sıcaklık (Apparent Temperature)
-          </h4>
-          <p class="text-slate-500 dark:text-slate-400">
-            Havadaki bağıl nem ve su buharı kısmi basıncının insan cildindeki buharlaşma hızına etkisini simüle eden <strong>Steadman (1984)</strong> ve yüksek sıcaklıklarda <strong>NOAA Rothfusz</strong> denklemleri ile hesaplanır. Nem arttıkça terleme zorlaştığı için hava daha sıcak hissedilir.
-          </p>
-        </div>
-
-        <div class="p-3.5 sm:p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 space-y-1.5">
-          <h4 class="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-            <i data-lucide="cloud-rain" class="w-4 h-4 text-purple-500"></i>
-            Çiğ Noktası (Dew Point)
-          </h4>
-          <p class="text-slate-500 dark:text-slate-400">
-            Havanın mevcut neme tamamen doygun hale gelip su damlacıklarının (yoğuşma, sis veya rutubet) oluşmaya başladığı sıcaklıktır. Uluslararası meteoroloji standardı olan <strong>Alduchov & Eskridge (1996) Magnus</strong> formülü ile hesaplanır.
-          </p>
-        </div>
-
-        <div class="p-3.5 sm:p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 space-y-1.5">
-          <h4 class="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-            <i data-lucide="gauge" class="w-4 h-4 text-indigo-500"></i>
-            Buhar Basıncı & VPD (Buhar Basıncı Açığı)
-          </h4>
-          <p class="text-slate-500 dark:text-slate-400">
-            Havadaki su buharının oluşturduğu kısmi basınç <strong>Buck (1981)</strong> denklemiyle hektopaskal (hPa) cinsinden hesaplanır. VPD ise havanın daha ne kadar nem tutabileceğini gösterir.
-          </p>
-        </div>
-
-      </div>
-
-      <div class="pt-3.5 border-t border-slate-200 dark:border-slate-800 flex justify-end">
-        <button id="btnGotIt" class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white dark:text-slate-950 font-semibold text-sm transition-all shadow-md shadow-emerald-500/20">
-          Anladım
-        </button>
-      </div>
-
-    </div>
-  </div>
-
   <!-- Toast Container -->
   <div id="toastContainer" class="fixed bottom-4 left-3 right-3 sm:left-auto sm:right-6 z-50 flex flex-col gap-2 pointer-events-none max-w-sm sm:max-w-md mx-auto sm:mx-0"></div>
-
-  <!-- Footer -->
-  <footer class="relative z-10 border-t border-slate-200 dark:border-slate-900 bg-white/60 dark:bg-slate-950/80 px-4 py-3.5 text-center text-[11px] sm:text-xs text-slate-500 dark:text-slate-500 transition-colors duration-300">
-    <p>Xiaomi SmartTemp Pro — Poppins Typography & Dual Theme • Berat Torun</p>
-  </footer>
 
   <!-- Scripts -->
   <script src="app.js"></script>

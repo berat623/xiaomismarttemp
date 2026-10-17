@@ -1,4 +1,4 @@
-/* Xiaomi SmartTemp Pro — Ultra-Modern Mobile-First Stylesheet */
+/* Xiaomi SmartTemp Pro — Google Material 3 (M3) Blue Stylesheet */
 
 /* Base Typography & Mobile Rendering */
 *, *::before, *::after {
@@ -19,17 +19,17 @@ body {
   padding-bottom: max(2rem, env(safe-area-inset-bottom));
 }
 
-/* Custom Sleek Scrollbars */
+/* Custom Sleek Scrollbars (Material 3 Style) */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
   background: #cbd5e1;
-  border-radius: 6px;
+  border-radius: 8px;
 }
 .dark ::-webkit-scrollbar-thumb {
   background: #334155;
@@ -41,118 +41,127 @@ body {
   background: #475569;
 }
 
-/* Glassmorphism & Card Styles */
-.glass-panel {
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(226, 232, 240, 0.85);
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.03), 0 2px 6px -1px rgba(0, 0, 0, 0.02);
+/* Material 3 Surface & Card Styles */
+.m3-surface {
+  background-color: #f8fafd;
+}
+.dark .m3-surface {
+  background-color: #0c131c;
 }
 
-.dark .glass-panel {
-  background: rgba(15, 23, 42, 0.75);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(51, 65, 85, 0.6);
-  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.4);
+.m3-card {
+  background: #ffffff;
+  border: 1px solid rgba(216, 226, 238, 0.85);
+  border-radius: 24px;
+  box-shadow: 0 1px 3px rgba(11, 87, 208, 0.05), 0 4px 12px rgba(11, 87, 208, 0.03);
+  transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.2s cubic-bezier(0.2, 0, 0, 1), border-color 0.2s ease;
 }
 
-/* Metric Cards Hover & Active Touch */
-.metric-card {
-  position: relative;
-  overflow: hidden;
-  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.22s ease, box-shadow 0.22s ease;
+.dark .m3-card {
+  background: #161f2b;
+  border: 1px solid rgba(46, 59, 78, 0.65);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.45);
 }
 
 @media (hover: hover) {
-  .metric-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 12px 28px -5px rgba(0, 0, 0, 0.08);
+  .m3-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(11, 87, 208, 0.08);
+    border-color: rgba(11, 87, 208, 0.3);
   }
-  .dark .metric-card:hover {
-    box-shadow: 0 12px 30px -5px rgba(0, 0, 0, 0.5);
+  .dark .m3-card:hover {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+    border-color: rgba(168, 199, 250, 0.3);
   }
 }
 
-.metric-card:active {
-  transform: scale(0.99);
+.m3-card:active {
+  transform: scale(0.995);
 }
 
-/* Filter and Mode Toggle Buttons (Light Mode) */
+/* Material 3 Filter Chips (Range Filters: 1h, 24h, 7d, all) */
 .filter-btn {
-  color: #64748b;
+  color: #444746;
   font-weight: 500;
+  border-radius: 9999px;
   touch-action: manipulation;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
 }
 .filter-btn:hover {
-  color: #0f172a;
+  color: #0b57d0;
+  background-color: rgba(11, 87, 208, 0.06);
 }
 .filter-btn.active {
-  background-color: #22c55e;
+  background-color: #0b57d0;
   color: #ffffff;
-  font-weight: 700;
-  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.35);
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(11, 87, 208, 0.3);
 }
 
-.mode-btn {
-  color: #64748b;
-  font-weight: 500;
-  touch-action: manipulation;
-  white-space: nowrap;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.mode-btn:hover {
-  color: #0f172a;
-}
-.mode-btn.active {
-  background-color: #0891b2;
-  color: #ffffff;
-  font-weight: 700;
-  box-shadow: 0 4px 12px rgba(8, 145, 178, 0.35);
-}
-
-/* Dark Mode Overrides for Filter/Mode Buttons */
 .dark .filter-btn {
-  color: #94a3b8;
+  color: #c4c7c5;
 }
 .dark .filter-btn:hover {
-  color: #f1f5f9;
+  color: #a8c7fa;
+  background-color: rgba(168, 199, 250, 0.08);
 }
 .dark .filter-btn.active {
-  background-color: #22c55e;
-  color: #020617;
+  background-color: #a8c7fa;
+  color: #041e49;
   font-weight: 700;
-  box-shadow: 0 4px 14px rgba(34, 197, 94, 0.45);
+  box-shadow: 0 2px 8px rgba(168, 199, 250, 0.35);
+}
+
+/* Material 3 Segmented Mode Tabs */
+.mode-btn {
+  color: #444746;
+  font-weight: 500;
+  border-radius: 9999px;
+  touch-action: manipulation;
+  white-space: nowrap;
+  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+  border: 1px solid transparent;
+}
+.mode-btn:hover {
+  color: #0b57d0;
+  background-color: rgba(11, 87, 208, 0.05);
+}
+.mode-btn.active {
+  background-color: #d3e3fd;
+  color: #041e49;
+  font-weight: 700;
+  border-color: rgba(11, 87, 208, 0.25);
+  box-shadow: 0 1px 3px rgba(11, 87, 208, 0.12);
 }
 
 .dark .mode-btn {
-  color: #94a3b8;
+  color: #c4c7c5;
 }
 .dark .mode-btn:hover {
-  color: #f1f5f9;
+  color: #a8c7fa;
+  background-color: rgba(168, 199, 250, 0.08);
 }
 .dark .mode-btn.active {
-  background-color: #06b6d4;
-  color: #020617;
+  background-color: #0842a0;
+  color: #d3e3fd;
   font-weight: 700;
-  box-shadow: 0 4px 14px rgba(6, 182, 212, 0.45);
+  border-color: rgba(168, 199, 250, 0.35);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-/* Pulsing Status Dot */
-@keyframes pulse-emerald {
+/* Pulsing Status Dot (Google Blue) */
+@keyframes pulse-blue {
   0%, 100% {
     opacity: 1;
     transform: scale(1);
   }
   50% {
     opacity: 0.55;
-    transform: scale(1.28);
+    transform: scale(1.25);
   }
 }
 .dot-live {
-  animation: pulse-emerald 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  animation: pulse-blue 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
 /* Toast Animation */
@@ -167,10 +176,10 @@ body {
   }
 }
 .toast-animate {
-  animation: slideInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: slideInUp 0.3s cubic-bezier(0.2, 0, 0, 1) forwards;
 }
 
-/* 4-Bar Signal Strength Meter Styles */
+/* 4-Bar Signal Strength Meter Styles (Google Blue) */
 .signal-bars {
   display: inline-flex;
   align-items: flex-end;
@@ -187,10 +196,10 @@ body {
   background-color: #334155;
 }
 .signal-bar.active {
-  background-color: #10b981;
+  background-color: #0b57d0;
 }
 .dark .signal-bar.active {
-  background-color: #34d399;
+  background-color: #a8c7fa;
 }
 .signal-bar:nth-child(1) { height: 4px; }
 .signal-bar:nth-child(2) { height: 7px; }
@@ -200,7 +209,12 @@ body {
 /* Numeric Flash Animation on Live Reading Arrival */
 @keyframes valueFlash {
   0% { transform: scale(1); }
-  50% { transform: scale(1.03); color: #10b981; }
+  50% { transform: scale(1.03); color: #0b57d0; }
+  100% { transform: scale(1); }
+}
+.dark @keyframes valueFlash {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.03); color: #a8c7fa; }
   100% { transform: scale(1); }
 }
 .value-flash {
@@ -214,7 +228,7 @@ body {
     width: 100%;
   }
 
-  /* Safe Area Insets for iPhones */
+  /* Safe Area Insets for Mobile */
   header {
     padding-top: max(0.625rem, env(safe-area-inset-top));
   }
@@ -225,7 +239,7 @@ body {
 
   /* Ergonomic touch targets */
   button {
-    min-height: 40px;
+    min-height: 42px;
   }
 
   /* Smooth scroll container for buttons */

@@ -841,7 +841,7 @@ class AppController {
     this.currentTheme = localStorage.getItem('smarttemp_theme') || 'light';
     this.latestTelemetry = null;
     this.chartRange = '1h';
-    this.chartMode = 'all';
+    this.chartMode = 'temps';
     this.currentPage = 1;
     this.pageSize = 15;
 
@@ -857,13 +857,6 @@ class AppController {
       // Desktop & Mobile Connect buttons
       btnConnect: document.getElementById('btnConnect'),
       btnConnectMobile: document.getElementById('btnConnectMobile'),
-      btnFetchHistory: document.getElementById('btnFetchHistory'),
-      btnFetchHistoryMobile: document.getElementById('btnFetchHistoryMobile'),
-
-      btnHelp: document.getElementById('btnHelp'),
-      btnCloseHelp: document.getElementById('btnCloseHelp'),
-      btnGotIt: document.getElementById('btnGotIt'),
-      helpModal: document.getElementById('helpModal'),
 
       connectionDot: document.getElementById('connectionDot'),
       connectionDotMobile: document.getElementById('connectionDotMobile'),
@@ -876,24 +869,22 @@ class AppController {
       signalPillMobile: document.getElementById('signalPillMobile'),
       signalRssiTextMobile: document.getElementById('signalRssiTextMobile'),
       valRssi: document.getElementById('valRssi'),
-      valFirmwareBadge: document.getElementById('valFirmwareBadge'),
-      bleLiveStatusTag: document.getElementById('bleLiveStatusTag'),
 
       // Signal Bar Meters
       signalBarsHeader: document.getElementById('signalBarsHeader'),
       signalBarsMobile: document.getElementById('signalBarsMobile'),
       signalBarsCard: document.getElementById('signalBarsCard'),
 
-      // Chart Live Statistics Summary Strip
-      chartStatAvgTemp: document.getElementById('chartStatAvgTemp'),
-      chartStatTempUnit: document.getElementById('chartStatTempUnit'),
-      chartStatTempMinMax: document.getElementById('chartStatTempMinMax'),
-      chartStatAvgHum: document.getElementById('chartStatAvgHum'),
-      chartStatHumMinMax: document.getElementById('chartStatHumMinMax'),
-      chartStatAvgDew: document.getElementById('chartStatAvgDew'),
-      chartStatDewUnit: document.getElementById('chartStatDewUnit'),
-      chartStatPoints: document.getElementById('chartStatPoints'),
-      chartStatTimeSpan: document.getElementById('chartStatTimeSpan'),
+      // Material 3 Live KPI Cards
+      chartKpiCurrent: document.getElementById('chartKpiCurrent'),
+      chartKpiCurrentUnit: document.getElementById('chartKpiCurrentUnit'),
+      chartKpiMin: document.getElementById('chartKpiMin'),
+      chartKpiMinTime: document.getElementById('chartKpiMinTime'),
+      chartKpiMax: document.getElementById('chartKpiMax'),
+      chartKpiMaxTime: document.getElementById('chartKpiMaxTime'),
+      chartKpiAvg: document.getElementById('chartKpiAvg'),
+      chartKpiCount: document.getElementById('chartKpiCount'),
+      chartEmptyOverlay: document.getElementById('chartEmptyOverlay'),
 
       // Card 1: Sıcaklık
       valTemp: document.getElementById('valTemp'),
@@ -1010,13 +1001,13 @@ class AppController {
       document.documentElement.classList.remove('light');
       if (this.dom.themeIcon) this.dom.themeIcon.setAttribute('data-lucide', 'sun');
       if (this.dom.themeLabel) this.dom.themeLabel.textContent = 'Açık';
-      if (this.dom.metaThemeColor) this.dom.metaThemeColor.setAttribute('content', '#020617');
+      if (this.dom.metaThemeColor) this.dom.metaThemeColor.setAttribute('content', '#0c131c');
     } else {
       document.documentElement.classList.remove('dark');
       document.documentElement.classList.add('light');
       if (this.dom.themeIcon) this.dom.themeIcon.setAttribute('data-lucide', 'moon');
       if (this.dom.themeLabel) this.dom.themeLabel.textContent = 'Koyu';
-      if (this.dom.metaThemeColor) this.dom.metaThemeColor.setAttribute('content', '#f8fafc');
+      if (this.dom.metaThemeColor) this.dom.metaThemeColor.setAttribute('content', '#f8fafd');
     }
 
     lucide.createIcons();
@@ -1051,29 +1042,6 @@ class AppController {
     }
   }
 
-  async triggerFetchHistory() {
-    try {
-      if (this.dom.btnFetchHistory) this.dom.btnFetchHistory.disabled = true;
-      if (this.dom.btnFetchHistoryMobile) this.dom.btnFetchHistoryMobile.disabled = true;
-
-      this.showToast('Geçmiş kayıtlar sorgulanıyor...', 'info');
-      const historyRecords = await this.ble.fetchDeviceHistory();
-      if (historyRecords && historyRecords.length > 0) {
-        await this.storage.addBatch(historyRecords);
-        this.updateStatsAndTable();
-        this.updateChart();
-        this.showToast(`${historyRecords.length} geçmiş kayıt başarıyla arşive eklendi!`, 'success');
-      } else {
-        this.showToast('Kayıtlar güncel. Anlık ve yayınlanan tüm ölçümler arşivde kaydediliyor.', 'info');
-      }
-    } catch (err) {
-      this.showToast('Geçmiş alınırken hata: ' + err.message, 'error');
-    } finally {
-      if (this.dom.btnFetchHistory) this.dom.btnFetchHistory.disabled = false;
-      if (this.dom.btnFetchHistoryMobile) this.dom.btnFetchHistoryMobile.disabled = false;
-    }
-  }
-
   setupEventListeners() {
     this.dom.btnThemeToggle.addEventListener('click', () => this.toggleTheme());
 
@@ -1082,13 +1050,6 @@ class AppController {
     }
     if (this.dom.btnConnectMobile) {
       this.dom.btnConnectMobile.addEventListener('click', () => this.triggerConnect());
-    }
-
-    if (this.dom.btnFetchHistory) {
-      this.dom.btnFetchHistory.addEventListener('click', () => this.triggerFetchHistory());
-    }
-    if (this.dom.btnFetchHistoryMobile) {
-      this.dom.btnFetchHistoryMobile.addEventListener('click', () => this.triggerFetchHistory());
     }
 
     this.dom.btnToggleUnit.addEventListener('click', () => {
@@ -1161,19 +1122,6 @@ class AppController {
         this.renderTable();
       }
     });
-
-    const toggleHelp = (show) => {
-      if (show) {
-        this.dom.helpModal.classList.remove('hidden');
-        setTimeout(() => this.dom.helpModal.classList.remove('opacity-0'), 10);
-      } else {
-        this.dom.helpModal.classList.add('opacity-0');
-        setTimeout(() => this.dom.helpModal.classList.add('hidden'), 300);
-      }
-    };
-    this.dom.btnHelp.addEventListener('click', () => toggleHelp(true));
-    this.dom.btnCloseHelp.addEventListener('click', () => toggleHelp(false));
-    this.dom.btnGotIt.addEventListener('click', () => toggleHelp(false));
   }
 
   handleBleStatus(status, text) {
@@ -1183,7 +1131,7 @@ class AppController {
       if (!el) return;
       el.className = 'w-2.5 h-2.5 rounded-full inline-block flex-shrink-0';
       if (status === 'connected') {
-        el.classList.add('bg-emerald-500', 'dot-live');
+        el.classList.add('bg-[#0b57d0]', 'dot-live');
       } else if (status === 'connecting' || status === 'scanning') {
         el.classList.add('bg-amber-500', 'animate-ping');
       } else {
@@ -1197,30 +1145,17 @@ class AppController {
       if (!btn) return;
       if (status === 'connected') {
         btn.innerHTML = `<i data-lucide="power" class="w-4 h-4"></i><span>Bağlantıyı Kes</span>`;
-        btn.className = `${isMobile ? 'flex-1' : ''} py-2.5 px-3.5 sm:px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 sm:gap-2 bg-rose-500 hover:bg-rose-600 text-white shadow-md shadow-rose-500/20 transition-all active:scale-95`;
+        btn.className = `${isMobile ? 'flex-1' : ''} py-2.5 px-4 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 bg-[#ba1a1a] hover:bg-[#93000a] text-white shadow-sm transition-all active:scale-95`;
       } else {
         btn.innerHTML = `<i data-lucide="bluetooth" class="w-4 h-4"></i><span>Cihaza Bağlan</span>`;
-        btn.className = `${isMobile ? 'flex-1' : ''} py-2.5 px-3.5 sm:px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 sm:gap-2 bg-emerald-500 hover:bg-emerald-600 text-white shadow-md shadow-emerald-500/20 transition-all active:scale-95`;
+        btn.className = `${isMobile ? 'flex-1' : ''} py-2.5 px-4 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 bg-[#0b57d0] hover:bg-[#0842a0] text-white shadow-sm transition-all active:scale-95`;
       }
     };
     updateBtn(this.dom.btnConnect, false);
     updateBtn(this.dom.btnConnectMobile, true);
 
     const isConnected = status === 'connected';
-    if (this.dom.btnFetchHistory) this.dom.btnFetchHistory.disabled = !isConnected;
-    if (this.dom.btnFetchHistoryMobile) this.dom.btnFetchHistoryMobile.disabled = !isConnected;
     if (this.dom.lastUpdatedAgo) this.dom.lastUpdatedAgo.classList.toggle('hidden', !isConnected);
-
-    if (this.dom.bleLiveStatusTag) {
-      if (isConnected) {
-        const fwName = this.ble.deviceProfile === 'atc' ? 'ATC Modlu FW Yayını' : 'Xiaomi Orijinal Yayın';
-        this.dom.bleLiveStatusTag.textContent = fwName;
-        this.dom.bleLiveStatusTag.className = 'font-mono text-[10px] uppercase px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-500/30';
-      } else {
-        this.dom.bleLiveStatusTag.textContent = 'Sinyal Dinleme Hazır';
-        this.dom.bleLiveStatusTag.className = 'font-mono text-[10px] uppercase px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold border border-slate-200 dark:border-slate-700';
-      }
-    }
 
     lucide.createIcons();
   }
@@ -1237,16 +1172,6 @@ class AppController {
       if (this.dom.signalPillMobile) this.dom.signalPillMobile.classList.add('flex');
 
       this.updateSignalBars(rssi);
-    }
-
-    if (this.dom.valFirmwareBadge) {
-      if (profile === 'atc') {
-        this.dom.valFirmwareBadge.textContent = 'ATC Modlu FW';
-        this.dom.valFirmwareBadge.className = 'text-[10px] font-mono px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 font-bold';
-      } else if (profile === 'stock_xiaomi') {
-        this.dom.valFirmwareBadge.textContent = 'Xiaomi Orijinal';
-        this.dom.valFirmwareBadge.className = 'text-[10px] font-mono px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 font-bold';
-      }
     }
   }
 
@@ -1330,13 +1255,13 @@ class AppController {
 
     if (data.humidity < 30) {
       this.dom.humidityStatusBadge.textContent = 'Kuru';
-      this.dom.humidityStatusBadge.className = 'text-xs px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 font-medium';
+      this.dom.humidityStatusBadge.className = 'text-xs px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 font-medium';
     } else if (data.humidity > 60) {
       this.dom.humidityStatusBadge.textContent = 'Yüksek Nem';
-      this.dom.humidityStatusBadge.className = 'text-xs px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20 font-medium';
+      this.dom.humidityStatusBadge.className = 'text-xs px-2.5 py-0.5 rounded-full bg-[#0b57d0]/10 text-[#0b57d0] dark:text-[#a8c7fa] border border-[#0b57d0]/20 font-medium';
     } else {
       this.dom.humidityStatusBadge.textContent = 'İdeal';
-      this.dom.humidityStatusBadge.className = 'text-xs px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 font-medium';
+      this.dom.humidityStatusBadge.className = 'text-xs px-2.5 py-0.5 rounded-full bg-[#0b57d0]/10 text-[#0b57d0] dark:text-[#a8c7fa] border border-[#0b57d0]/20 font-medium';
     }
 
     // 3. TÜRETİLMİŞ PARAMETRE: Hissedilen Sıcaklık Kartı
@@ -1352,11 +1277,11 @@ class AppController {
       const sign = diff >= 0 ? '+' : '';
       this.dom.apparentDiffBadge.textContent = `Fark: ${sign}${diff.toFixed(1)}°C`;
       if (Math.abs(diff) < 0.5) {
-        this.dom.apparentDiffBadge.className = 'text-xs px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 font-mono font-semibold';
+        this.dom.apparentDiffBadge.className = 'text-xs px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 font-mono font-semibold';
       } else if (diff > 0) {
-        this.dom.apparentDiffBadge.className = 'text-xs px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 font-mono font-semibold';
+        this.dom.apparentDiffBadge.className = 'text-xs px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 font-mono font-semibold';
       } else {
-        this.dom.apparentDiffBadge.className = 'text-xs px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border border-cyan-500/20 font-mono font-semibold';
+        this.dom.apparentDiffBadge.className = 'text-xs px-2.5 py-0.5 rounded-full bg-[#0b57d0]/10 text-[#0b57d0] dark:text-[#a8c7fa] border border-[#0b57d0]/20 font-mono font-semibold';
       }
     }
 
@@ -1372,19 +1297,19 @@ class AppController {
       const spread = data.temperature - data.dewPoint;
       if (spread <= 2.5) {
         this.dom.dewPointRiskBadge.textContent = 'Yoğuşma Riski!';
-        this.dom.dewPointRiskBadge.className = 'text-xs px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20 font-bold';
+        this.dom.dewPointRiskBadge.className = 'text-xs px-2.5 py-0.5 rounded-full bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20 font-bold';
       } else if (data.dewPoint >= 21) {
         this.dom.dewPointRiskBadge.textContent = 'Baskıcı Nem';
-        this.dom.dewPointRiskBadge.className = 'text-xs px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 font-medium';
+        this.dom.dewPointRiskBadge.className = 'text-xs px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 font-medium';
       } else if (data.dewPoint >= 10 && data.dewPoint < 16) {
         this.dom.dewPointRiskBadge.textContent = 'Konforlu';
-        this.dom.dewPointRiskBadge.className = 'text-xs px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 font-medium';
+        this.dom.dewPointRiskBadge.className = 'text-xs px-2.5 py-0.5 rounded-full bg-[#0b57d0]/10 text-[#0b57d0] dark:text-[#a8c7fa] border border-[#0b57d0]/20 font-medium';
       } else if (data.dewPoint < 10) {
         this.dom.dewPointRiskBadge.textContent = 'Kuru Hava';
-        this.dom.dewPointRiskBadge.className = 'text-xs px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border border-cyan-500/20 font-medium';
+        this.dom.dewPointRiskBadge.className = 'text-xs px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border border-cyan-500/20 font-medium';
       } else {
         this.dom.dewPointRiskBadge.textContent = 'Normal';
-        this.dom.dewPointRiskBadge.className = 'text-xs px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20 font-medium';
+        this.dom.dewPointRiskBadge.className = 'text-xs px-2.5 py-0.5 rounded-full bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20 font-medium';
       }
     }
 
@@ -1404,7 +1329,7 @@ class AppController {
       } else if (data.battery < 50) {
         this.dom.batteryProgressBar.className = 'h-full bg-amber-500 rounded-full transition-all duration-500';
       } else {
-        this.dom.batteryProgressBar.className = 'h-full bg-emerald-500 dark:bg-emerald-400 rounded-full transition-all duration-500';
+        this.dom.batteryProgressBar.className = 'h-full bg-[#0b57d0] dark:bg-[#a8c7fa] rounded-full transition-all duration-500';
       }
     }
     if (data.voltage != null) {
@@ -1415,14 +1340,6 @@ class AppController {
       if (this.dom.signalRssiText) this.dom.signalRssiText.textContent = `${data.rssi} dBm`;
       if (this.dom.signalRssiTextMobile) this.dom.signalRssiTextMobile.textContent = `${data.rssi} dBm`;
       this.updateSignalBars(data.rssi);
-    }
-
-    if (this.dom.valFirmwareBadge) {
-      const isAtc = (data.profile === 'atc' || (data.source && data.source.includes('atc')));
-      this.dom.valFirmwareBadge.textContent = isAtc ? 'ATC Modlu FW' : 'Xiaomi Orijinal';
-      this.dom.valFirmwareBadge.className = isAtc
-        ? 'text-[10px] font-mono px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 font-bold'
-        : 'text-[10px] font-mono px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 font-bold';
     }
 
     if (this.dom.lastUpdatedAgo) {
@@ -1583,10 +1500,10 @@ class AppController {
         const d = new Date(item.timestamp);
         const timeStr = `${d.toLocaleDateString('tr-TR')} ${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
         const typeBadge = item.type === 'history_hour'
-          ? '<span class="px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20 text-[10px] font-sans">Hafıza</span>'
+          ? '<span class="px-2.5 py-0.5 rounded-full bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20 text-[10px] font-sans font-medium">Hafıza</span>'
           : (item.source === 'ble_adv'
-            ? '<span class="px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border border-cyan-500/20 text-[10px] font-sans">BLE Sinyal</span>'
-            : '<span class="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-sans">GATT Canlı</span>');
+            ? '<span class="px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border border-cyan-500/20 text-[10px] font-sans font-medium">BLE Sinyal</span>'
+            : '<span class="px-2.5 py-0.5 rounded-full bg-[#0b57d0]/10 text-[#0b57d0] dark:text-[#a8c7fa] border border-[#0b57d0]/20 text-[10px] font-sans font-medium">GATT Canlı</span>');
 
         let t = item.temperature;
         let at = item.apparentTemp != null ? item.apparentTemp : t;
@@ -1603,7 +1520,7 @@ class AppController {
           <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
             <td class="py-2.5 sm:py-3 px-3 text-slate-600 dark:text-slate-300 font-sans font-medium">${timeStr}</td>
             <td class="py-2.5 sm:py-3 px-3">${typeBadge}</td>
-            <td class="py-2.5 sm:py-3 px-3 font-bold text-emerald-600 dark:text-emerald-400">
+            <td class="py-2.5 sm:py-3 px-3 font-bold text-[#0b57d0] dark:text-[#a8c7fa]">
               ${t.toFixed(1)} °${this.currentUnit}
             </td>
             <td class="py-2.5 sm:py-3 px-3 font-semibold text-amber-500 dark:text-amber-400">
@@ -1630,9 +1547,20 @@ class AppController {
     const isDark = this.currentTheme === 'dark';
     const isMobile = window.innerWidth < 640;
 
+    // Google Material 3 Blue Gradient for Temperature
     const tempGradient = ctx.createLinearGradient(0, 0, 0, 320);
-    tempGradient.addColorStop(0, isDark ? 'rgba(34, 197, 94, 0.35)' : 'rgba(34, 197, 94, 0.2)');
-    tempGradient.addColorStop(1, 'rgba(34, 197, 94, 0.0)');
+    tempGradient.addColorStop(0, isDark ? 'rgba(11, 87, 208, 0.35)' : 'rgba(11, 87, 208, 0.16)');
+    tempGradient.addColorStop(1, 'rgba(11, 87, 208, 0.0)');
+
+    // Soft Cyan Gradient for Humidity
+    const humGradient = ctx.createLinearGradient(0, 0, 0, 320);
+    humGradient.addColorStop(0, isDark ? 'rgba(2, 132, 199, 0.28)' : 'rgba(2, 132, 199, 0.14)');
+    humGradient.addColorStop(1, 'rgba(2, 132, 199, 0.0)');
+
+    // Deep Indigo Gradient for Vapor Pressure
+    const pressGradient = ctx.createLinearGradient(0, 0, 0, 320);
+    pressGradient.addColorStop(0, isDark ? 'rgba(30, 64, 175, 0.25)' : 'rgba(30, 64, 175, 0.12)');
+    pressGradient.addColorStop(1, 'rgba(30, 64, 175, 0.0)');
 
     this.chart = new Chart(ctx, {
       type: 'line',
@@ -1640,61 +1568,85 @@ class AppController {
         labels: [],
         datasets: [
           {
-            label: 'Sıcaklık',
+            // 0: Ortam Sıcaklığı (°C) - Google Material 3 Blue Primary
+            label: 'Ortam Sıcaklığı',
             data: [],
-            borderColor: '#22c55e',
+            borderColor: '#0b57d0',
             backgroundColor: tempGradient,
-            borderWidth: isMobile ? 2 : 2.5,
+            borderWidth: isMobile ? 2.2 : 2.8,
             fill: true,
-            tension: 0.35,
-            pointRadius: isMobile ? 1.5 : 2,
-            pointHoverRadius: 5,
+            tension: 0.38,
+            pointRadius: 0,
+            pointHoverRadius: 6,
+            pointHoverBackgroundColor: '#0b57d0',
+            pointHoverBorderColor: '#ffffff',
+            pointHoverBorderWidth: 2,
             yAxisID: 'yTemp'
           },
           {
+            // 1: Hissedilen Sıcaklık (°C) - M3 Amber/Orange (Dashed)
             label: 'Hissedilen Sıcaklık',
             data: [],
-            borderColor: '#f59e0b',
+            borderColor: '#ea580c',
+            backgroundColor: 'transparent',
             borderWidth: isMobile ? 1.8 : 2.2,
-            borderDash: [4, 4],
+            borderDash: [5, 4],
             fill: false,
-            tension: 0.35,
-            pointRadius: isMobile ? 1.5 : 2,
-            pointHoverRadius: 5,
+            tension: 0.38,
+            pointRadius: 0,
+            pointHoverRadius: 6,
+            pointHoverBackgroundColor: '#ea580c',
+            pointHoverBorderColor: '#ffffff',
+            pointHoverBorderWidth: 2,
             yAxisID: 'yTemp'
           },
           {
+            // 2: Çiğ Noktası (°C) - M3 Purple/Violet (Dotted)
             label: 'Çiğ Noktası',
             data: [],
-            borderColor: '#a855f7',
+            borderColor: '#7c3aed',
+            backgroundColor: 'transparent',
             borderWidth: isMobile ? 1.8 : 2.2,
-            borderDash: [2, 2],
+            borderDash: [2, 3],
             fill: false,
-            tension: 0.35,
-            pointRadius: isMobile ? 1.5 : 2,
-            pointHoverRadius: 5,
+            tension: 0.38,
+            pointRadius: 0,
+            pointHoverRadius: 6,
+            pointHoverBackgroundColor: '#7c3aed',
+            pointHoverBorderColor: '#ffffff',
+            pointHoverBorderWidth: 2,
             yAxisID: 'yTemp'
           },
           {
-            label: 'Bağıl Nem (%)',
+            // 3: Bağıl Nem (%) - Sky Cyan Blue
+            label: 'Bağıl Nem',
             data: [],
-            borderColor: '#06b6d4',
-            borderWidth: isMobile ? 2 : 2.5,
-            fill: false,
-            tension: 0.35,
-            pointRadius: isMobile ? 1.5 : 2,
-            pointHoverRadius: 5,
+            borderColor: '#0284c7',
+            backgroundColor: humGradient,
+            borderWidth: isMobile ? 2.2 : 2.8,
+            fill: true,
+            tension: 0.38,
+            pointRadius: 0,
+            pointHoverRadius: 6,
+            pointHoverBackgroundColor: '#0284c7',
+            pointHoverBorderColor: '#ffffff',
+            pointHoverBorderWidth: 2,
             yAxisID: 'yHum'
           },
           {
-            label: 'Buhar Basıncı (hPa)',
+            // 4: Buhar Basıncı (hPa) - M3 Deep Indigo Blue
+            label: 'Buhar Basıncı',
             data: [],
-            borderColor: '#ec4899',
-            borderWidth: isMobile ? 1.8 : 2.2,
-            fill: false,
-            tension: 0.35,
-            pointRadius: isMobile ? 1.5 : 2,
-            pointHoverRadius: 5,
+            borderColor: '#1e40af',
+            backgroundColor: pressGradient,
+            borderWidth: isMobile ? 2.0 : 2.4,
+            fill: true,
+            tension: 0.38,
+            pointRadius: 0,
+            pointHoverRadius: 6,
+            pointHoverBackgroundColor: '#1e40af',
+            pointHoverBorderColor: '#ffffff',
+            pointHoverBorderWidth: 2,
             yAxisID: 'yPress'
           }
         ]
@@ -1702,6 +1654,10 @@ class AppController {
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        animation: {
+          duration: 350,
+          easing: 'easeOutQuart'
+        },
         interaction: {
           mode: 'index',
           intersect: false
@@ -1709,55 +1665,75 @@ class AppController {
         plugins: {
           legend: {
             display: true,
+            position: 'top',
+            align: 'end',
             labels: {
               color: isDark ? '#94a3b8' : '#475569',
-              font: { family: 'Poppins', size: isMobile ? 10 : 12, weight: 600 },
+              font: { family: 'Poppins', size: isMobile ? 10 : 11, weight: 600 },
               usePointStyle: true,
-              boxWidth: 8
+              pointStyle: 'circle',
+              boxWidth: 7,
+              boxHeight: 7,
+              padding: isMobile ? 8 : 14
             }
           },
           tooltip: {
-            backgroundColor: isDark ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.97)',
-            borderColor: isDark ? 'rgba(51, 65, 85, 0.8)' : 'rgba(226, 232, 240, 0.95)',
-            borderWidth: 1,
-            titleColor: isDark ? '#f8fafc' : '#0f172a',
+            enabled: true,
+            backgroundColor: isDark ? 'rgba(12, 19, 28, 0.95)' : 'rgba(255, 255, 255, 0.97)',
+            borderColor: isDark ? 'rgba(168, 199, 250, 0.25)' : 'rgba(11, 87, 208, 0.2)',
+            borderWidth: 1.5,
+            titleColor: isDark ? '#f8fafd' : '#041e49',
             bodyColor: isDark ? '#cbd5e1' : '#334155',
-            footerColor: isDark ? '#94a3b8' : '#64748b',
+            footerColor: isDark ? '#a8c7fa' : '#0b57d0',
             padding: 12,
-            boxPadding: 4,
-            cornerRadius: 14,
+            boxPadding: 5,
+            cornerRadius: 16,
             bodyFont: { family: 'Poppins', size: 11 },
             titleFont: { family: 'Poppins', size: 12, weight: '700' },
-            footerFont: { family: 'Poppins', size: 10, weight: '500' },
+            footerFont: { family: 'Poppins', size: 11, weight: '600' },
             callbacks: {
               label: (context) => {
                 const label = context.dataset.label || '';
                 const val = context.parsed.y;
                 if (val == null) return null;
-                return ` ${label}: ${Number(val).toFixed(1)}`;
+                const unit = context.dataset.yAxisID === 'yTemp'
+                  ? `°${this.currentUnit}`
+                  : (context.dataset.yAxisID === 'yHum' ? '%' : ' hPa');
+                return ` ${label}: ${Number(val).toFixed(1)} ${unit}`;
               },
               footer: (items) => {
                 if (!items || items.length === 0) return '';
                 const tempItem = items.find(i => i.datasetIndex === 0 && !i.dataset.hidden);
                 const dewItem = items.find(i => i.datasetIndex === 2 && !i.dataset.hidden);
+                const appItem = items.find(i => i.datasetIndex === 1 && !i.dataset.hidden);
+                const notes = [];
                 if (tempItem && dewItem) {
                   const spread = tempItem.parsed.y - dewItem.parsed.y;
                   if (spread <= 2.5) {
-                    return '⚠️ Dikkat: Yoğuşma / Rutubet riski!';
+                    notes.push('⚠️ Yoğuşma / Rutubet Riski!');
                   } else if (spread >= 8) {
-                    return '✅ Ferah ve dengeli atmosfer';
+                    notes.push('💧 Düşük Yoğuşma Riski');
                   }
                 }
-                return '';
+                if (tempItem && appItem) {
+                  const diff = appItem.parsed.y - tempItem.parsed.y;
+                  if (Math.abs(diff) >= 1.0) {
+                    notes.push(`🌡️ Hissedilen Farkı: ${diff > 0 ? '+' : ''}${diff.toFixed(1)}°${this.currentUnit}`);
+                  }
+                }
+                return notes.join(' | ');
               }
             }
           }
         },
         scales: {
           x: {
-            grid: { color: isDark ? 'rgba(51, 65, 85, 0.3)' : 'rgba(203, 213, 225, 0.5)' },
+            grid: {
+              color: isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.04)',
+              drawBorder: false
+            },
             ticks: {
-              color: '#64748b',
+              color: isDark ? '#64748b' : '#94a3b8',
               font: { family: 'JetBrains Mono', size: isMobile ? 9 : 10 },
               maxTicksLimit: isMobile ? 4 : 7
             }
@@ -1768,30 +1744,35 @@ class AppController {
             position: 'left',
             title: {
               display: !isMobile,
-              text: 'Sıcaklık (°C)',
-              color: '#22c55e',
+              text: `Sıcaklık Grubu (°${this.currentUnit})`,
+              color: '#0b57d0',
               font: { family: 'Poppins', size: 11, weight: 600 }
             },
-            grid: { color: isDark ? 'rgba(51, 65, 85, 0.25)' : 'rgba(203, 213, 225, 0.4)' },
+            grid: {
+              color: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
+              drawBorder: false
+            },
             ticks: {
-              color: '#22c55e',
-              font: { family: 'JetBrains Mono', size: isMobile ? 10 : 11 }
+              color: isDark ? '#a8c7fa' : '#0b57d0',
+              font: { family: 'JetBrains Mono', size: isMobile ? 10 : 11 },
+              callback: (v) => `${v.toFixed(1)}°`
             }
           },
           yHum: {
             type: 'linear',
-            display: true,
+            display: false,
             position: 'right',
             title: {
               display: !isMobile,
-              text: 'Nem (%)',
-              color: '#06b6d4',
+              text: 'Bağıl Nem (%)',
+              color: '#0284c7',
               font: { family: 'Poppins', size: 11, weight: 600 }
             },
             grid: { drawOnChartArea: false },
             ticks: {
-              color: '#06b6d4',
-              font: { family: 'JetBrains Mono', size: isMobile ? 10 : 11 }
+              color: '#0284c7',
+              font: { family: 'JetBrains Mono', size: isMobile ? 10 : 11 },
+              callback: (v) => `%${v}`
             },
             min: 0,
             max: 100
@@ -1802,16 +1783,16 @@ class AppController {
             position: 'right',
             title: {
               display: !isMobile,
-              text: 'Buhar B. (hPa)',
-              color: '#ec4899',
+              text: 'Buhar Basıncı (hPa)',
+              color: '#1e40af',
               font: { family: 'Poppins', size: 11, weight: 600 }
             },
             grid: { drawOnChartArea: false },
             ticks: {
-              color: '#ec4899',
-              font: { family: 'JetBrains Mono', size: isMobile ? 9 : 10 }
-            },
-            min: 0
+              color: '#1e40af',
+              font: { family: 'JetBrains Mono', size: isMobile ? 9 : 10 },
+              callback: (v) => `${v.toFixed(1)} hPa`
+            }
           }
         }
       }
@@ -1823,14 +1804,14 @@ class AppController {
     const isDark = this.currentTheme === 'dark';
 
     this.chart.options.plugins.legend.labels.color = isDark ? '#94a3b8' : '#475569';
-    this.chart.options.plugins.tooltip.backgroundColor = isDark ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.97)';
-    this.chart.options.plugins.tooltip.borderColor = isDark ? 'rgba(51, 65, 85, 0.8)' : 'rgba(226, 232, 240, 0.95)';
-    this.chart.options.plugins.tooltip.titleColor = isDark ? '#f8fafc' : '#0f172a';
+    this.chart.options.plugins.tooltip.backgroundColor = isDark ? 'rgba(12, 19, 28, 0.95)' : 'rgba(255, 255, 255, 0.97)';
+    this.chart.options.plugins.tooltip.borderColor = isDark ? 'rgba(168, 199, 250, 0.25)' : 'rgba(11, 87, 208, 0.2)';
+    this.chart.options.plugins.tooltip.titleColor = isDark ? '#f8fafd' : '#041e49';
     this.chart.options.plugins.tooltip.bodyColor = isDark ? '#cbd5e1' : '#334155';
-    this.chart.options.plugins.tooltip.footerColor = isDark ? '#94a3b8' : '#64748b';
+    this.chart.options.plugins.tooltip.footerColor = isDark ? '#a8c7fa' : '#0b57d0';
 
-    this.chart.options.scales.x.grid.color = isDark ? 'rgba(51, 65, 85, 0.3)' : 'rgba(203, 213, 225, 0.5)';
-    this.chart.options.scales.yTemp.grid.color = isDark ? 'rgba(51, 65, 85, 0.25)' : 'rgba(203, 213, 225, 0.4)';
+    this.chart.options.scales.x.grid.color = isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.04)';
+    this.chart.options.scales.yTemp.grid.color = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
 
     this.chart.update('none');
   }
@@ -1847,6 +1828,33 @@ class AppController {
       records = records.filter(r => (now - r.timestamp) <= 24 * 3600 * 1000);
     } else if (this.chartRange === '7d') {
       records = records.filter(r => (now - r.timestamp) <= 7 * 24 * 3600 * 1000);
+    }
+
+    // Toggle Empty State Overlay
+    if (this.dom.chartEmptyOverlay) {
+      if (records.length === 0) {
+        this.dom.chartEmptyOverlay.classList.remove('hidden');
+        this.dom.chartEmptyOverlay.classList.add('flex');
+      } else {
+        this.dom.chartEmptyOverlay.classList.add('hidden');
+        this.dom.chartEmptyOverlay.classList.remove('flex');
+      }
+    }
+
+    if (records.length === 0) {
+      if (this.dom.chartKpiCurrent) this.dom.chartKpiCurrent.textContent = '--.-';
+      if (this.dom.chartKpiCurrentUnit) this.dom.chartKpiCurrentUnit.textContent = `°${this.currentUnit}`;
+      if (this.dom.chartKpiMin) this.dom.chartKpiMin.textContent = '--.-';
+      if (this.dom.chartKpiMinTime) this.dom.chartKpiMinTime.textContent = '--:--';
+      if (this.dom.chartKpiMax) this.dom.chartKpiMax.textContent = '--.-';
+      if (this.dom.chartKpiMaxTime) this.dom.chartKpiMaxTime.textContent = '--:--';
+      if (this.dom.chartKpiAvg) this.dom.chartKpiAvg.textContent = '--.-';
+      if (this.dom.chartKpiCount) this.dom.chartKpiCount.textContent = '0 nokta';
+
+      this.chart.data.labels = [];
+      this.chart.data.datasets.forEach(ds => { ds.data = []; });
+      this.chart.update('none');
+      return;
     }
 
     if (records.length > 300) {
@@ -1884,7 +1892,7 @@ class AppController {
 
     this.chart.data.labels = labels;
 
-    this.chart.data.datasets[0].label = `Sıcaklık (°${this.currentUnit})`;
+    this.chart.data.datasets[0].label = `Ortam Sıcaklığı (°${this.currentUnit})`;
     this.chart.data.datasets[0].data = tempData;
 
     this.chart.data.datasets[1].label = `Hissedilen (°${this.currentUnit})`;
@@ -1902,109 +1910,121 @@ class AppController {
     const ds = this.chart.data.datasets;
     const scales = this.chart.options.scales;
 
+    const formatClock = (ts) => {
+      const d = new Date(ts);
+      return d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+    };
+
+    // Helper to populate the 4 Material 3 Live KPI Cards
+    const setKpiCards = (arr, unit, isPercentage = false) => {
+      if (!arr || arr.length === 0) return;
+      const current = arr[arr.length - 1];
+      const minVal = Math.min(...arr);
+      const minIdx = arr.indexOf(minVal);
+      const minTime = formatClock(records[minIdx] ? records[minIdx].timestamp : Date.now());
+
+      const maxVal = Math.max(...arr);
+      const maxIdx = arr.lastIndexOf(maxVal);
+      const maxTime = formatClock(records[maxIdx] ? records[maxIdx].timestamp : Date.now());
+
+      const sum = arr.reduce((a, b) => a + b, 0);
+      const avg = isPercentage ? Math.round(sum / arr.length) : (sum / arr.length).toFixed(1);
+
+      if (this.dom.chartKpiCurrent) this.dom.chartKpiCurrent.textContent = isPercentage ? current : Number(current).toFixed(1);
+      if (this.dom.chartKpiCurrentUnit) this.dom.chartKpiCurrentUnit.textContent = unit;
+
+      if (this.dom.chartKpiMin) this.dom.chartKpiMin.textContent = isPercentage ? minVal : Number(minVal).toFixed(1);
+      if (this.dom.chartKpiMinTime) this.dom.chartKpiMinTime.textContent = minTime;
+
+      if (this.dom.chartKpiMax) this.dom.chartKpiMax.textContent = isPercentage ? maxVal : Number(maxVal).toFixed(1);
+      if (this.dom.chartKpiMaxTime) this.dom.chartKpiMaxTime.textContent = maxTime;
+
+      if (this.dom.chartKpiAvg) this.dom.chartKpiAvg.textContent = avg;
+      if (this.dom.chartKpiCount) this.dom.chartKpiCount.textContent = `${records.length} nokta`;
+    };
+
+    // Mode-Specific Dataset & Scale Visibility + Auto-scaling
     if (this.chartMode === 'temps') {
+      // Sıcaklık Grubu: Ortam, Hissedilen ve Çiğ Noktası aynı °C ekseninde
       ds[0].hidden = false;
       ds[1].hidden = false;
       ds[2].hidden = false;
       ds[3].hidden = true;
       ds[4].hidden = true;
+
       scales.yTemp.display = true;
       scales.yHum.display = false;
       scales.yPress.display = false;
-    } else if (this.chartMode === 'temp') {
-      ds[0].hidden = false;
-      ds[1].hidden = true;
-      ds[2].hidden = true;
-      ds[3].hidden = true;
-      ds[4].hidden = true;
-      scales.yTemp.display = true;
-      scales.yHum.display = false;
-      scales.yPress.display = false;
-    } else if (this.chartMode === 'apparent') {
-      ds[0].hidden = true;
-      ds[1].hidden = false;
-      ds[2].hidden = true;
-      ds[3].hidden = true;
-      ds[4].hidden = true;
-      scales.yTemp.display = true;
-      scales.yHum.display = false;
-      scales.yPress.display = false;
-    } else if (this.chartMode === 'dew') {
-      ds[0].hidden = true;
-      ds[1].hidden = true;
-      ds[2].hidden = false;
-      ds[3].hidden = true;
-      ds[4].hidden = true;
-      scales.yTemp.display = true;
-      scales.yHum.display = false;
-      scales.yPress.display = false;
+
+      const allTemps = [...tempData, ...apparentData, ...dewData];
+      const minT = Math.min(...allTemps);
+      const maxT = Math.max(...allTemps);
+      const pad = Math.max(0.8, (maxT - minT) * 0.12);
+      scales.yTemp.min = Math.floor((minT - pad) * 2) / 2;
+      scales.yTemp.max = Math.ceil((maxT + pad) * 2) / 2;
+
+      setKpiCards(tempData, `°${this.currentUnit}`);
     } else if (this.chartMode === 'hum') {
+      // Bağıl Nem %
       ds[0].hidden = true;
       ds[1].hidden = true;
       ds[2].hidden = true;
       ds[3].hidden = false;
       ds[4].hidden = true;
+
       scales.yTemp.display = false;
       scales.yHum.display = true;
       scales.yPress.display = false;
+
+      const minH = Math.min(...humData);
+      const maxH = Math.max(...humData);
+      scales.yHum.min = Math.max(0, Math.floor((minH - 5) / 5) * 5);
+      scales.yHum.max = Math.min(100, Math.ceil((maxH + 5) / 5) * 5);
+
+      setKpiCards(humData, '%', true);
     } else if (this.chartMode === 'press') {
+      // Buhar Basıncı hPa
       ds[0].hidden = true;
       ds[1].hidden = true;
       ds[2].hidden = true;
       ds[3].hidden = true;
       ds[4].hidden = false;
+
       scales.yTemp.display = false;
       scales.yHum.display = false;
       scales.yPress.display = true;
+
+      const minP = Math.min(...pressData);
+      const maxP = Math.max(...pressData);
+      const padP = Math.max(0.5, (maxP - minP) * 0.15);
+      scales.yPress.min = Math.max(0, Math.floor((minP - padP) * 2) / 2);
+      scales.yPress.max = Math.ceil((maxP + padP) * 2) / 2;
+
+      setKpiCards(pressData, 'hPa');
     } else {
+      // Tüm Parametreler
       ds[0].hidden = false;
       ds[1].hidden = false;
       ds[2].hidden = false;
       ds[3].hidden = false;
       ds[4].hidden = false;
+
       scales.yTemp.display = true;
       scales.yHum.display = true;
       scales.yPress.display = false;
-    }
 
-    scales.yTemp.title.text = `Sıcaklık (°${this.currentUnit})`;
-
-    // Calculate Live Statistics for the Summary Strip
-    if (records.length > 0) {
-      const avgT = (tempData.reduce((a, b) => a + b, 0) / tempData.length);
       const minT = Math.min(...tempData);
       const maxT = Math.max(...tempData);
+      const pad = Math.max(0.8, (maxT - minT) * 0.12);
+      scales.yTemp.min = Math.floor((minT - pad) * 2) / 2;
+      scales.yTemp.max = Math.ceil((maxT + pad) * 2) / 2;
+      scales.yHum.min = 0;
+      scales.yHum.max = 100;
 
-      const avgH = Math.round(humData.reduce((a, b) => a + b, 0) / humData.length);
-      const minH = Math.min(...humData);
-      const maxH = Math.max(...humData);
-
-      const avgD = (dewData.reduce((a, b) => a + b, 0) / dewData.length);
-
-      if (this.dom.chartStatAvgTemp) this.dom.chartStatAvgTemp.textContent = avgT.toFixed(1);
-      if (this.dom.chartStatTempUnit) this.dom.chartStatTempUnit.textContent = `°${this.currentUnit}`;
-      if (this.dom.chartStatTempMinMax) this.dom.chartStatTempMinMax.textContent = `(${minT.toFixed(1)} / ${maxT.toFixed(1)})`;
-
-      if (this.dom.chartStatAvgHum) this.dom.chartStatAvgHum.textContent = avgH;
-      if (this.dom.chartStatHumMinMax) this.dom.chartStatHumMinMax.textContent = `(%${minH} / %${maxH})`;
-
-      if (this.dom.chartStatAvgDew) this.dom.chartStatAvgDew.textContent = avgD.toFixed(1);
-      if (this.dom.chartStatDewUnit) this.dom.chartStatDewUnit.textContent = `°${this.currentUnit}`;
-
-      if (this.dom.chartStatPoints) this.dom.chartStatPoints.textContent = records.length;
-      if (this.dom.chartStatTimeSpan) {
-        const spanLabels = { '1h': 'Son 1 Saat', '24h': 'Son 24 Saat', '7d': 'Son 7 Gün', 'all': 'Tüm Arşiv' };
-        this.dom.chartStatTimeSpan.textContent = spanLabels[this.chartRange] || this.chartRange;
-      }
-    } else {
-      if (this.dom.chartStatAvgTemp) this.dom.chartStatAvgTemp.textContent = '--.-';
-      if (this.dom.chartStatTempMinMax) this.dom.chartStatTempMinMax.textContent = '(-- / --)';
-      if (this.dom.chartStatAvgHum) this.dom.chartStatAvgHum.textContent = '--';
-      if (this.dom.chartStatHumMinMax) this.dom.chartStatHumMinMax.textContent = '(-- / --)';
-      if (this.dom.chartStatAvgDew) this.dom.chartStatAvgDew.textContent = '--.-';
-      if (this.dom.chartStatPoints) this.dom.chartStatPoints.textContent = '0';
-      if (this.dom.chartStatTimeSpan) this.dom.chartStatTimeSpan.textContent = '--';
+      setKpiCards(tempData, `°${this.currentUnit}`);
     }
+
+    scales.yTemp.title.text = `Sıcaklık Grubu (°${this.currentUnit})`;
 
     this.chart.update('none');
   }
@@ -2024,13 +2044,13 @@ class AppController {
   showToast(message, type = 'info') {
     const toast = document.createElement('div');
     const colors = {
-      success: 'bg-emerald-600 text-white dark:bg-emerald-950/90 dark:border-emerald-500/50 dark:text-emerald-200 border border-emerald-500/30',
-      error: 'bg-rose-600 text-white dark:bg-rose-950/90 dark:border-rose-500/50 dark:text-rose-200 border border-rose-500/30',
-      info: 'bg-slate-900 text-white dark:bg-slate-900/90 dark:border-slate-700/60 dark:text-slate-200 border border-slate-700/60'
+      success: 'bg-[#0b57d0] text-white dark:bg-[#1b2b48] dark:border-[#a8c7fa]/30 dark:text-[#d3e3fd] border border-[#0b57d0]/20 shadow-[#0b57d0]/20',
+      error: 'bg-[#ba1a1a] text-white dark:bg-[#410002] dark:border-[#ffb4ab]/30 dark:text-[#ffdad6] border border-[#ba1a1a]/20 shadow-rose-500/20',
+      info: 'bg-[#041e49] text-white dark:bg-[#141d2b] dark:border-slate-700/60 dark:text-[#d3e3fd] border border-[#0b57d0]/20 shadow-blue-500/20'
     };
-    toast.className = `p-3 sm:p-3.5 rounded-2xl shadow-xl flex items-center gap-2.5 text-xs sm:text-sm font-medium toast-animate ${colors[type] || colors.info}`;
+    toast.className = `px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2.5 text-xs sm:text-sm font-semibold toast-animate ${colors[type] || colors.info}`;
     toast.innerHTML = `
-      <span class="w-2 h-2 rounded-full ${type === 'success' ? 'bg-white dark:bg-emerald-400' : type === 'error' ? 'bg-white dark:bg-rose-400' : 'bg-cyan-400'} flex-shrink-0"></span>
+      <span class="w-2 h-2 rounded-full ${type === 'success' ? 'bg-[#a8c7fa]' : type === 'error' ? 'bg-[#ffb4ab]' : 'bg-[#a8c7fa]'} flex-shrink-0"></span>
       <span>${message}</span>
     `;
     this.dom.toastContainer.appendChild(toast);
