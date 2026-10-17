@@ -1,16 +1,27 @@
-/* Xiaomi SmartTemp Pro — Poppins Typography & Dual Theme Styles */
+/* Xiaomi SmartTemp Pro — Mobile-First Flawless Styles */
 
-/* Base Typography */
+/* Base Typography & Mobile Rendering */
+*, *::before, *::after {
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  touch-action: manipulation;
+}
+
 body {
   font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  padding-bottom: max(2rem, env(safe-area-inset-bottom));
 }
 
 /* Custom Scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
@@ -33,6 +44,7 @@ body {
 .filter-btn {
   color: #64748b;
   font-weight: 500;
+  touch-action: manipulation;
 }
 .filter-btn:hover {
   color: #0f172a;
@@ -47,6 +59,7 @@ body {
 .mode-btn {
   color: #64748b;
   font-weight: 500;
+  touch-action: manipulation;
 }
 .mode-btn:hover {
   color: #0f172a;
@@ -83,12 +96,14 @@ body {
   font-weight: 700;
 }
 
-/* Metric Cards Hover Pulse */
+/* Metric Cards Hover & Active Touch */
 .metric-card {
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease, box-shadow 0.25s ease;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease, box-shadow 0.2s ease;
 }
-.metric-card:hover {
-  transform: translateY(-2px);
+@media (hover: hover) {
+  .metric-card:hover {
+    transform: translateY(-2px);
+  }
 }
 
 /* Pulsing Status Dot */
@@ -121,20 +136,24 @@ body {
   animation: slideInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* Mobile Optimizations */
+/* Mobile-Specific Tweaks */
 @media (max-width: 640px) {
-  /* Prevent horizontal screen bouncing */
   html, body {
     overflow-x: hidden;
+    width: 100%;
   }
 
-  /* Safe Area Inset Support for Notch Phones */
+  /* Safe Area Insets for iPhones */
+  header {
+    padding-top: max(0.625rem, env(safe-area-inset-top));
+  }
+  
   body {
-    padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+    padding-bottom: max(2.5rem, env(safe-area-inset-bottom));
   }
 
-  /* Compact table font on small screens */
-  table {
-    font-size: 0.75rem;
+  /* Larger touch targets for buttons */
+  button {
+    min-height: 38px;
   }
 }

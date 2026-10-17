@@ -1,8 +1,7 @@
 /**
  * Xiaomi SmartTemp Pro — Poppins Typography & Dual Theme (Light / Dark)
  * Device: Xiaomi Mijia LYWSD03MMC
- * Features: Live Streaming Digital Clock (HH:MM:SS), Web Bluetooth GATT Live Streaming,
- *           Internal Flash Memory History Sync, IndexedDB Persistent Storage, Chart.js Time Series.
+ * Mobile-First Responsive Design (Phone & Desktop Unified)
  */
 
 // ==========================================
@@ -451,14 +450,19 @@ class AppController {
       themeLabel: document.getElementById('themeLabel'),
       metaThemeColor: document.getElementById('metaThemeColor'),
 
+      // Desktop & Mobile Connect buttons
       btnConnect: document.getElementById('btnConnect'),
+      btnConnectMobile: document.getElementById('btnConnectMobile'),
       btnFetchHistory: document.getElementById('btnFetchHistory'),
+      btnFetchHistoryMobile: document.getElementById('btnFetchHistoryMobile'),
+
       btnHelp: document.getElementById('btnHelp'),
       btnCloseHelp: document.getElementById('btnCloseHelp'),
       btnGotIt: document.getElementById('btnGotIt'),
       helpModal: document.getElementById('helpModal'),
 
       connectionDot: document.getElementById('connectionDot'),
+      connectionDotMobile: document.getElementById('connectionDotMobile'),
       connectionStatusText: document.getElementById('connectionStatusText'),
       lastUpdatedAgo: document.getElementById('lastUpdatedAgo'),
 
@@ -487,7 +491,8 @@ class AppController {
       syncProgressPercent: document.getElementById('syncProgressPercent'),
       syncProgressBar: document.getElementById('syncProgressBar'),
 
-      // Table
+      // Dual History Views (Mobile Feed + Desktop Table)
+      mobileHistoryFeed: document.getElementById('mobileHistoryFeed'),
       historyTableBody: document.getElementById('historyTableBody'),
       tableSummaryText: document.getElementById('tableSummaryText'),
       pageIndicator: document.getElementById('pageIndicator'),
@@ -519,6 +524,14 @@ class AppController {
       this.renderTelemetryCards(last);
       this.updateChart();
     }
+
+    // Responsive orientation & resize handling
+    window.addEventListener('resize', () => {
+      if (this.chart) {
+        this.chart.options.scales.x.ticks.maxTicksLimit = window.innerWidth < 640 ? 4 : 7;
+        this.chart.resize();
+      }
+    });
   }
 
   // Live Digital Clock (Saat : Dakika : Saniye)
@@ -575,46 +588,63 @@ class AppController {
     this.showToast(`${nextTheme === 'dark' ? 'Koyu' : 'Açık'} tema aktif edildi.`, 'info');
   }
 
+  async triggerConnect() {
+    if (this.ble.isConnected) {
+      await this.ble.disconnect();
+    } else {
+      try {
+        await this.ble.connect();
+        this.showToast('Xiaomi sensörü başarıyla bağlandı!', 'success');
+      } catch (err) {
+        if (err.name !== 'NotFoundError') {
+          this.showToast('Bağlantı hatası: ' + err.message, 'error');
+        }
+      }
+    }
+  }
+
+  async triggerFetchHistory() {
+    try {
+      if (this.dom.btnFetchHistory) this.dom.btnFetchHistory.disabled = true;
+      if (this.dom.btnFetchHistoryMobile) this.dom.btnFetchHistoryMobile.disabled = true;
+
+      this.showToast('Cihaz hafızasındaki geçmiş kayıtlar indiriliyor...', 'info');
+      const historyRecords = await this.ble.fetchDeviceHistory();
+      if (historyRecords && historyRecords.length > 0) {
+        await this.storage.addBatch(historyRecords);
+        this.updateStatsAndTable();
+        this.updateChart();
+        this.showToast(`${historyRecords.length} geçmiş kayıt başarıyla arşive eklendi!`, 'success');
+      } else {
+        this.showToast('Yeni geçmiş kaydı bulunamadı veya saatlik log henüz oluşmadı.', 'info');
+      }
+    } catch (err) {
+      this.showToast('Geçmiş alınırken hata: ' + err.message, 'error');
+    } finally {
+      if (this.dom.btnFetchHistory) this.dom.btnFetchHistory.disabled = false;
+      if (this.dom.btnFetchHistoryMobile) this.dom.btnFetchHistoryMobile.disabled = false;
+    }
+  }
+
   setupEventListeners() {
     // Theme Switcher
     this.dom.btnThemeToggle.addEventListener('click', () => this.toggleTheme());
 
-    // Bluetooth Connect
-    this.dom.btnConnect.addEventListener('click', async () => {
-      if (this.ble.isConnected) {
-        await this.ble.disconnect();
-      } else {
-        try {
-          await this.ble.connect();
-          this.showToast('Xiaomi sensörü başarıyla bağlandı!', 'success');
-        } catch (err) {
-          if (err.name !== 'NotFoundError') {
-            this.showToast('Bağlantı hatası: ' + err.message, 'error');
-          }
-        }
-      }
-    });
+    // Connect (Both Desktop and Mobile buttons)
+    if (this.dom.btnConnect) {
+      this.dom.btnConnect.addEventListener('click', () => this.triggerConnect());
+    }
+    if (this.dom.btnConnectMobile) {
+      this.dom.btnConnectMobile.addEventListener('click', () => this.triggerConnect());
+    }
 
-    // Fetch History
-    this.dom.btnFetchHistory.addEventListener('click', async () => {
-      try {
-        this.dom.btnFetchHistory.disabled = true;
-        this.showToast('Cihaz hafızasındaki geçmiş kayıtlar indiriliyor...', 'info');
-        const historyRecords = await this.ble.fetchDeviceHistory();
-        if (historyRecords && historyRecords.length > 0) {
-          await this.storage.addBatch(historyRecords);
-          this.updateStatsAndTable();
-          this.updateChart();
-          this.showToast(`${historyRecords.length} geçmiş kayıt başarıyla arşive eklendi!`, 'success');
-        } else {
-          this.showToast('Yeni geçmiş kaydı bulunamadı veya saatlik log henüz oluşmadı.', 'info');
-        }
-      } catch (err) {
-        this.showToast('Geçmiş alınırken hata: ' + err.message, 'error');
-      } finally {
-        this.dom.btnFetchHistory.disabled = false;
-      }
-    });
+    // Fetch History (Both Desktop and Mobile buttons)
+    if (this.dom.btnFetchHistory) {
+      this.dom.btnFetchHistory.addEventListener('click', () => this.triggerFetchHistory());
+    }
+    if (this.dom.btnFetchHistoryMobile) {
+      this.dom.btnFetchHistoryMobile.addEventListener('click', () => this.triggerFetchHistory());
+    }
 
     // Unit Toggle
     this.dom.btnToggleUnit.addEventListener('click', () => {
@@ -631,8 +661,9 @@ class AppController {
     document.querySelectorAll('.filter-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-        e.target.classList.add('active');
-        this.chartRange = e.target.dataset.range;
+        const target = e.currentTarget;
+        target.classList.add('active');
+        this.chartRange = target.dataset.range;
         this.updateChart();
       });
     });
@@ -641,8 +672,9 @@ class AppController {
     document.querySelectorAll('.mode-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-        e.target.classList.add('active');
-        this.chartMode = e.target.dataset.mode;
+        const target = e.currentTarget;
+        target.classList.add('active');
+        this.chartMode = target.dataset.mode;
         this.updateChart();
       });
     });
@@ -705,23 +737,41 @@ class AppController {
 
   handleBleStatus(status, text) {
     if (this.dom.connectionStatusText) this.dom.connectionStatusText.textContent = text;
-    if (this.dom.connectionDot) this.dom.connectionDot.className = 'w-2 h-2 rounded-full inline-block flex-shrink-0';
+    
+    // Update dots
+    const updateDot = (el) => {
+      if (!el) return;
+      el.className = 'w-2.5 h-2.5 rounded-full inline-block flex-shrink-0';
+      if (status === 'connected') {
+        el.classList.add('bg-emerald-500', 'dot-live');
+      } else if (status === 'connecting' || status === 'scanning') {
+        el.classList.add('bg-amber-500', 'animate-ping');
+      } else {
+        el.classList.add('bg-slate-400', 'dark:bg-slate-500');
+      }
+    };
+    updateDot(this.dom.connectionDot);
+    updateDot(this.dom.connectionDotMobile);
 
-    if (status === 'connected') {
-      if (this.dom.connectionDot) this.dom.connectionDot.classList.add('bg-emerald-500', 'dot-live');
-      this.dom.btnConnect.innerHTML = `<i data-lucide="power" class="w-4 h-4"></i><span>Bağlantıyı Kes</span>`;
-      this.dom.btnConnect.className = 'px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 bg-rose-500 hover:bg-rose-600 text-white shadow-md shadow-rose-500/20 transition-all active:scale-95';
-      this.dom.btnFetchHistory.disabled = false;
-      if (this.dom.lastUpdatedAgo) this.dom.lastUpdatedAgo.classList.remove('hidden');
-    } else if (status === 'connecting' || status === 'scanning') {
-      if (this.dom.connectionDot) this.dom.connectionDot.classList.add('bg-amber-500', 'animate-ping');
-      this.dom.btnFetchHistory.disabled = true;
-    } else {
-      if (this.dom.connectionDot) this.dom.connectionDot.classList.add('bg-slate-400', 'dark:bg-slate-500');
-      this.dom.btnConnect.innerHTML = `<i data-lucide="bluetooth" class="w-4 h-4"></i><span>Cihaza Bağlan</span>`;
-      this.dom.btnConnect.className = 'px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 bg-emerald-500 hover:bg-emerald-600 dark:bg-gradient-to-r dark:from-emerald-500 dark:to-teal-500 dark:hover:from-emerald-400 dark:hover:to-teal-400 text-white dark:text-slate-950 shadow-md shadow-emerald-500/20 transition-all active:scale-95';
-      this.dom.btnFetchHistory.disabled = true;
-    }
+    // Update buttons
+    const updateBtn = (btn, isMobile = false) => {
+      if (!btn) return;
+      if (status === 'connected') {
+        btn.innerHTML = `<i data-lucide="power" class="w-4 h-4"></i><span>Bağlantıyı Kes</span>`;
+        btn.className = `${isMobile ? 'flex-1' : ''} py-2.5 px-3.5 sm:px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 sm:gap-2 bg-rose-500 hover:bg-rose-600 text-white shadow-md shadow-rose-500/20 transition-all active:scale-95`;
+      } else {
+        btn.innerHTML = `<i data-lucide="bluetooth" class="w-4 h-4"></i><span>Cihaza Bağlan</span>`;
+        btn.className = `${isMobile ? 'flex-1' : ''} py-2.5 px-3.5 sm:px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 sm:gap-2 bg-emerald-500 hover:bg-emerald-600 text-white shadow-md shadow-emerald-500/20 transition-all active:scale-95`;
+      }
+    };
+    updateBtn(this.dom.btnConnect, false);
+    updateBtn(this.dom.btnConnectMobile, true);
+
+    const isConnected = status === 'connected';
+    if (this.dom.btnFetchHistory) this.dom.btnFetchHistory.disabled = !isConnected;
+    if (this.dom.btnFetchHistoryMobile) this.dom.btnFetchHistoryMobile.disabled = !isConnected;
+    if (this.dom.lastUpdatedAgo) this.dom.lastUpdatedAgo.classList.toggle('hidden', !isConnected);
+
     lucide.createIcons();
   }
 
@@ -830,16 +880,24 @@ class AppController {
   renderTable() {
     const list = this.storage.records;
     const total = list.length;
-    this.dom.tableSummaryText.textContent = `${total} kayıt arşivde`;
+    this.dom.tableSummaryText.textContent = `${total} kayıt`;
 
     if (total === 0) {
-      this.dom.historyTableBody.innerHTML = `
-        <tr>
-          <td colspan="6" class="py-8 text-center text-slate-400 dark:text-slate-500 font-sans">
-            Henüz kayıt bulunmuyor. Cihazınıza bağlanarak ölçüm alabilirsiniz.
-          </td>
-        </tr>
+      const emptyHtml = `
+        <div class="py-8 text-center text-xs text-slate-400 dark:text-slate-500 font-sans">
+          Henüz kayıt bulunmuyor. Cihazınıza bağlanarak ölçüm alabilirsiniz.
+        </div>
       `;
+      if (this.dom.mobileHistoryFeed) this.dom.mobileHistoryFeed.innerHTML = emptyHtml;
+      if (this.dom.historyTableBody) {
+        this.dom.historyTableBody.innerHTML = `
+          <tr>
+            <td colspan="6" class="py-8 text-center text-slate-400 dark:text-slate-500 font-sans">
+              Henüz kayıt bulunmuyor. Cihazınıza bağlanarak ölçüm alabilirsiniz.
+            </td>
+          </tr>
+        `;
+      }
       this.dom.pageIndicator.textContent = '1 / 1';
       this.dom.btnPrevPage.disabled = true;
       this.dom.btnNextPage.disabled = true;
@@ -856,34 +914,77 @@ class AppController {
     const start = (this.currentPage - 1) * this.pageSize;
     const pageItems = reversed.slice(start, start + this.pageSize);
 
-    this.dom.historyTableBody.innerHTML = pageItems.map(item => {
-      const d = new Date(item.timestamp);
-      const timeStr = `${d.toLocaleDateString('tr-TR')} ${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
-      const typeBadge = item.type === 'history_hour'
-        ? '<span class="px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20 text-[10px] font-sans">Dahili Arşiv (1s)</span>'
-        : '<span class="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-sans">Canlı Veri</span>';
+    // 1. Render Mobile Feed (Cards for smartphones)
+    if (this.dom.mobileHistoryFeed) {
+      this.dom.mobileHistoryFeed.innerHTML = pageItems.map(item => {
+        const d = new Date(item.timestamp);
+        const timeStr = `${d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })} ${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
+        const typeBadge = item.type === 'history_hour'
+          ? '<span class="px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20 text-[10px] font-sans font-medium">Hafıza</span>'
+          : '<span class="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-sans font-medium">Canlı</span>';
 
-      let t = item.temperature;
-      if (this.currentUnit === 'F') t = (t * 9 / 5) + 32;
+        let t = item.temperature;
+        if (this.currentUnit === 'F') t = (t * 9 / 5) + 32;
 
-      return `
-        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-          <td class="py-2.5 sm:py-3 px-3 sm:px-4 text-slate-600 dark:text-slate-300 font-sans font-medium">${timeStr}</td>
-          <td class="py-2.5 sm:py-3 px-3 sm:px-4">${typeBadge}</td>
-          <td class="py-2.5 sm:py-3 px-3 sm:px-4 font-bold ${item.temperature > 26 ? 'text-amber-600 dark:text-amber-400' : item.temperature < 19 ? 'text-cyan-600 dark:text-cyan-400' : 'text-emerald-600 dark:text-emerald-400'}">
-            ${t.toFixed(1)} °${this.currentUnit}
-          </td>
-          <td class="py-2.5 sm:py-3 px-3 sm:px-4 text-cyan-600 dark:text-cyan-300 font-semibold">%${item.humidity}</td>
-          <td class="py-2.5 sm:py-3 px-3 sm:px-4 text-slate-500 dark:text-slate-400">${item.dewPoint != null ? `${item.dewPoint} °C` : '--'}</td>
-          <td class="py-2.5 sm:py-3 px-3 sm:px-4 text-slate-500 dark:text-slate-400">${item.battery != null ? `%${item.battery}` : (item.voltage ? `${item.voltage}V` : '--')}</td>
-        </tr>
-      `;
-    }).join('');
+        return `
+          <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/90 dark:border-slate-700/60 shadow-sm space-y-2">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-medium text-slate-500 dark:text-slate-400">${timeStr}</span>
+              ${typeBadge}
+            </div>
+            <div class="flex items-center justify-between pt-0.5">
+              <div class="flex items-baseline gap-1">
+                <span class="text-2xl font-extrabold font-mono ${item.temperature > 26 ? 'text-amber-600 dark:text-amber-400' : item.temperature < 19 ? 'text-cyan-600 dark:text-cyan-400' : 'text-emerald-600 dark:text-emerald-400'}">
+                  ${t.toFixed(1)}
+                </span>
+                <span class="text-xs font-bold text-emerald-600 dark:text-emerald-400">°${this.currentUnit}</span>
+              </div>
+              <div class="flex items-baseline gap-1">
+                <span class="text-2xl font-extrabold font-mono text-cyan-600 dark:text-cyan-400">%${item.humidity}</span>
+                <span class="text-xs text-slate-500 dark:text-slate-400">Nem</span>
+              </div>
+            </div>
+            <div class="flex items-center justify-between text-[11px] pt-2 border-t border-slate-200/80 dark:border-slate-700/60 text-slate-500 dark:text-slate-400">
+              <span>Çiğ Noktası: <strong class="text-slate-700 dark:text-slate-300 font-mono">${item.dewPoint != null ? `${item.dewPoint} °C` : '--'}</strong></span>
+              <span>Pil: <strong class="text-slate-700 dark:text-slate-300 font-mono">${item.battery != null ? `%${item.battery}` : (item.voltage ? `${item.voltage}V` : '--')}</strong></span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 2. Render Desktop Table (Spreadsheet rows for tablets/laptops)
+    if (this.dom.historyTableBody) {
+      this.dom.historyTableBody.innerHTML = pageItems.map(item => {
+        const d = new Date(item.timestamp);
+        const timeStr = `${d.toLocaleDateString('tr-TR')} ${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
+        const typeBadge = item.type === 'history_hour'
+          ? '<span class="px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20 text-[10px] font-sans">Dahili Arşiv (1s)</span>'
+          : '<span class="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-sans">Canlı Veri</span>';
+
+        let t = item.temperature;
+        if (this.currentUnit === 'F') t = (t * 9 / 5) + 32;
+
+        return `
+          <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+            <td class="py-2.5 sm:py-3 px-4 text-slate-600 dark:text-slate-300 font-sans font-medium">${timeStr}</td>
+            <td class="py-2.5 sm:py-3 px-4">${typeBadge}</td>
+            <td class="py-2.5 sm:py-3 px-4 font-bold ${item.temperature > 26 ? 'text-amber-600 dark:text-amber-400' : item.temperature < 19 ? 'text-cyan-600 dark:text-cyan-400' : 'text-emerald-600 dark:text-emerald-400'}">
+              ${t.toFixed(1)} °${this.currentUnit}
+            </td>
+            <td class="py-2.5 sm:py-3 px-4 text-cyan-600 dark:text-cyan-300 font-semibold">%${item.humidity}</td>
+            <td class="py-2.5 sm:py-3 px-4 text-slate-500 dark:text-slate-400">${item.dewPoint != null ? `${item.dewPoint} °C` : '--'}</td>
+            <td class="py-2.5 sm:py-3 px-4 text-slate-500 dark:text-slate-400">${item.battery != null ? `%${item.battery}` : (item.voltage ? `${item.voltage}V` : '--')}</td>
+          </tr>
+        `;
+      }).join('');
+    }
   }
 
   initChart() {
     const ctx = document.getElementById('telemetryChart').getContext('2d');
     const isDark = this.currentTheme === 'dark';
+    const isMobile = window.innerWidth < 640;
 
     const tempGradient = ctx.createLinearGradient(0, 0, 0, 320);
     tempGradient.addColorStop(0, isDark ? 'rgba(34, 197, 94, 0.4)' : 'rgba(34, 197, 94, 0.25)');
@@ -903,11 +1004,11 @@ class AppController {
             data: [],
             borderColor: '#22c55e',
             backgroundColor: tempGradient,
-            borderWidth: 2.5,
+            borderWidth: isMobile ? 2 : 2.5,
             fill: true,
             tension: 0.35,
-            pointRadius: 2,
-            pointHoverRadius: 6,
+            pointRadius: isMobile ? 1.5 : 2,
+            pointHoverRadius: 5,
             yAxisID: 'yTemp'
           },
           {
@@ -915,11 +1016,11 @@ class AppController {
             data: [],
             borderColor: '#06b6d4',
             backgroundColor: humGradient,
-            borderWidth: 2.5,
+            borderWidth: isMobile ? 2 : 2.5,
             fill: true,
             tension: 0.35,
-            pointRadius: 2,
-            pointHoverRadius: 6,
+            pointRadius: isMobile ? 1.5 : 2,
+            pointHoverRadius: 5,
             yAxisID: 'yHum'
           }
         ]
@@ -936,7 +1037,7 @@ class AppController {
             display: true,
             labels: {
               color: isDark ? '#94a3b8' : '#475569',
-              font: { family: 'Poppins', size: 12, weight: 600 }
+              font: { family: 'Poppins', size: isMobile ? 11 : 12, weight: 600 }
             }
           },
           tooltip: {
@@ -956,8 +1057,8 @@ class AppController {
             grid: { color: isDark ? 'rgba(51, 65, 85, 0.3)' : 'rgba(203, 213, 225, 0.5)' },
             ticks: {
               color: isDark ? '#64748b' : '#64748b',
-              font: { family: 'JetBrains Mono', size: 10 },
-              maxTicksLimit: 7
+              font: { family: 'JetBrains Mono', size: isMobile ? 9 : 10 },
+              maxTicksLimit: isMobile ? 4 : 7
             }
           },
           yTemp: {
@@ -967,7 +1068,7 @@ class AppController {
             grid: { color: isDark ? 'rgba(51, 65, 85, 0.25)' : 'rgba(203, 213, 225, 0.4)' },
             ticks: {
               color: '#22c55e',
-              font: { family: 'JetBrains Mono', size: 11 }
+              font: { family: 'JetBrains Mono', size: isMobile ? 10 : 11 }
             }
           },
           yHum: {
@@ -977,7 +1078,7 @@ class AppController {
             grid: { drawOnChartArea: false },
             ticks: {
               color: '#06b6d4',
-              font: { family: 'JetBrains Mono', size: 11 }
+              font: { family: 'JetBrains Mono', size: isMobile ? 10 : 11 }
             },
             min: 0,
             max: 100
@@ -1022,11 +1123,12 @@ class AppController {
       records = records.filter((_, idx) => idx % step === 0 || idx === records.length - 1);
     }
 
+    const isMobile = window.innerWidth < 640;
     const labels = records.map(r => {
       const d = new Date(r.timestamp);
       return this.chartRange === '1h'
         ? d.toLocaleTimeString('tr-TR', { minute: '2-digit', second: '2-digit' })
-        : `${d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })} ${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
+        : `${d.toLocaleDateString('tr-TR', { day: 'numeric', month: isMobile ? 'numeric' : 'short' })} ${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
     });
 
     const tempData = records.map(r => {

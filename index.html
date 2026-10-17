@@ -4,8 +4,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>Xiaomi SmartTemp Pro — Akıllı Sıcaklık & Nem İstasyonu</title>
-  <meta name="description" content="Xiaomi Mijia LYWSD03MMC Bluetooth Termometre ve Higrometre için anlık ve geçmiş verileri görselleştiren modern web uygulaması." />
+  <meta name="description" content="Xiaomi Mijia LYWSD03MMC Bluetooth Termometre ve Higrometre için anlık ve geçmiş verileri görselleştiren modern mobil ve web uygulaması." />
   <meta name="theme-color" content="#f8fafc" id="metaThemeColor" />
+
+  <!-- PWA & Mobile Web App Meta Tags -->
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="SmartTemp" />
+  <meta name="format-detection" content="telephone=no" />
 
   <!-- Google Fonts: Poppins & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -22,6 +30,9 @@
           fontFamily: {
             sans: ['Poppins', 'sans-serif'],
             mono: ['JetBrains Mono', 'monospace'],
+          },
+          screens: {
+            'xs': '380px',
           },
           colors: {
             brand: {
@@ -51,63 +62,64 @@
   <!-- Custom CSS -->
   <link rel="stylesheet" href="style.css" />
 </head>
-<body class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-screen flex flex-col font-sans selection:bg-brand-500 selection:text-white transition-colors duration-300 pb-8 sm:pb-0">
+<body class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-screen flex flex-col font-sans selection:bg-brand-500 selection:text-white transition-colors duration-300 pb-10 sm:pb-0">
 
   <!-- Glow Background Accents -->
   <div class="fixed inset-0 pointer-events-none overflow-hidden z-0">
-    <div class="absolute -top-32 -left-32 w-80 sm:w-96 h-80 sm:h-96 bg-emerald-500/15 dark:bg-emerald-500/10 rounded-full blur-3xl"></div>
-    <div class="absolute top-1/3 -right-32 w-80 sm:w-96 h-80 sm:h-96 bg-cyan-500/15 dark:bg-cyan-500/10 rounded-full blur-3xl"></div>
-    <div class="absolute -bottom-32 left-1/3 w-80 sm:w-96 h-80 sm:h-96 bg-purple-500/10 dark:bg-purple-500/10 rounded-full blur-3xl"></div>
+    <div class="absolute -top-32 -left-32 w-72 sm:w-96 h-72 sm:h-96 bg-emerald-500/15 dark:bg-emerald-500/10 rounded-full blur-3xl"></div>
+    <div class="absolute top-1/3 -right-32 w-72 sm:w-96 h-72 sm:h-96 bg-cyan-500/15 dark:bg-cyan-500/10 rounded-full blur-3xl"></div>
+    <div class="absolute -bottom-32 left-1/3 w-72 sm:w-96 h-72 sm:h-96 bg-purple-500/10 dark:bg-purple-500/10 rounded-full blur-3xl"></div>
   </div>
 
   <!-- Header -->
-  <header class="relative z-10 border-b border-slate-200/90 dark:border-slate-800/80 bg-white/85 dark:bg-slate-900/75 backdrop-blur-xl sticky top-0 px-3.5 sm:px-6 lg:px-8 py-3 transition-colors duration-300">
+  <header class="relative z-10 border-b border-slate-200/90 dark:border-slate-800/80 bg-white/85 dark:bg-slate-900/75 backdrop-blur-xl sticky top-0 px-3.5 sm:px-6 lg:px-8 py-2.5 sm:py-3 transition-colors duration-300">
     <div class="max-w-7xl mx-auto flex items-center justify-between gap-3">
       
       <!-- Left Side: Live Streaming Clock (Saat : Dakika : Saniye) -->
-      <div class="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
-        <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-500 flex items-center justify-center shadow-md shadow-emerald-500/20 text-white dark:text-slate-950 font-bold flex-shrink-0">
-          <i data-lucide="clock" class="w-5 h-5"></i>
+      <div class="flex items-center gap-2 sm:gap-3.5 min-w-0">
+        <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-500 flex items-center justify-center shadow-md shadow-emerald-500/20 text-white dark:text-slate-950 font-bold flex-shrink-0">
+          <i data-lucide="clock" class="w-4 h-4 sm:w-5 sm:h-5"></i>
         </div>
         <div class="min-w-0">
-          <div class="flex items-center gap-2">
-            <span id="liveClockTime" class="text-xl sm:text-2xl font-extrabold font-mono tracking-wider text-slate-900 dark:text-white tabular-nums">
+          <div class="flex items-center gap-1.5 sm:gap-2">
+            <span id="liveClockTime" class="text-lg sm:text-2xl font-extrabold font-mono tracking-wider text-slate-900 dark:text-white tabular-nums">
               00:00:00
             </span>
             <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0"></span>
           </div>
-          <p id="liveClockDate" class="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium capitalize truncate">
+          <p id="liveClockDate" class="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium capitalize truncate">
             -- -------- ----
           </p>
         </div>
       </div>
 
-      <!-- Right Side: Controls & Actions -->
+      <!-- Right Side Controls (Desktop & Mobile Unified) -->
       <div class="flex items-center gap-1.5 sm:gap-2.5 flex-shrink-0">
         
-        <!-- Connection Status Pill (Compact) -->
+        <!-- Connection Status Pill (Desktop only, mobile has it in action bar) -->
         <div class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 text-xs">
           <span id="connectionDot" class="w-2 h-2 rounded-full bg-slate-400 dark:bg-slate-500 flex-shrink-0"></span>
           <span id="connectionStatusText" class="font-medium text-slate-600 dark:text-slate-300">Cihaz bekleniyor</span>
           <span id="lastUpdatedAgo" class="text-slate-400 hidden">• Az önce</span>
         </div>
 
+        <!-- Desktop Action Buttons (Hidden on mobile, mobile has native full-width bar below) -->
+        <div class="hidden sm:flex items-center gap-2">
+          <button id="btnConnect" class="px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 bg-emerald-500 hover:bg-emerald-600 dark:bg-gradient-to-r dark:from-emerald-500 dark:to-teal-500 text-white dark:text-slate-950 shadow-md shadow-emerald-500/20 transition-all active:scale-95">
+            <i data-lucide="bluetooth" class="w-4 h-4"></i>
+            <span>Cihaza Bağlan</span>
+          </button>
+
+          <button id="btnFetchHistory" disabled title="Cihaz hafızasındaki geçmiş kayıtları çeker" class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700/80 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+            <i data-lucide="history" class="w-4 h-4 text-cyan-600 dark:text-cyan-400"></i>
+            <span>Geçmişi İndir</span>
+          </button>
+        </div>
+
         <!-- Theme Toggle Button (Light / Dark) -->
         <button id="btnThemeToggle" title="Temayı Değiştir (Açık / Koyu)" aria-label="Temayı Değiştir" class="p-2 sm:px-3 sm:py-2 rounded-xl text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700/80 transition-all active:scale-95 flex items-center gap-1.5">
           <i id="themeIcon" data-lucide="moon" class="w-4 h-4"></i>
           <span id="themeLabel" class="text-xs font-semibold hidden lg:inline">Koyu</span>
-        </button>
-
-        <!-- Bluetooth Connect Button -->
-        <button id="btnConnect" class="px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 bg-emerald-500 hover:bg-emerald-600 dark:bg-gradient-to-r dark:from-emerald-500 dark:to-teal-500 dark:hover:from-emerald-400 dark:hover:to-teal-400 text-white dark:text-slate-950 shadow-md shadow-emerald-500/20 transition-all active:scale-95">
-          <i data-lucide="bluetooth" class="w-4 h-4"></i>
-          <span>Cihaza Bağlan</span>
-        </button>
-
-        <!-- Fetch Device History Button -->
-        <button id="btnFetchHistory" disabled title="Cihaz hafızasındaki geçmiş kayıtları çeker" class="p-2 sm:px-3.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700/80 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
-          <i data-lucide="history" class="w-4 h-4 text-cyan-600 dark:text-cyan-400"></i>
-          <span class="hidden sm:inline">Geçmişi İndir</span>
         </button>
 
         <!-- Help / Info Modal Trigger -->
@@ -117,10 +129,28 @@
       </div>
 
     </div>
+
+    <!-- Mobile-Exclusive Action Bar (Visible only on screens < 640px) -->
+    <div class="sm:hidden pt-2.5 mt-2 border-t border-slate-200/80 dark:border-slate-800/60 flex items-center gap-2">
+      <button id="btnConnectMobile" class="flex-1 py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white shadow-md shadow-emerald-500/20 active:scale-95 transition-all">
+        <i data-lucide="bluetooth" class="w-4 h-4"></i>
+        <span>Cihaza Bağlan</span>
+      </button>
+
+      <button id="btnFetchHistoryMobile" disabled class="py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+        <i data-lucide="history" class="w-4 h-4 text-cyan-600 dark:text-cyan-400"></i>
+        <span>Geçmiş</span>
+      </button>
+
+      <!-- Mobile Connection Indicator Dot -->
+      <div class="px-2 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center" title="Bağlantı Durumu">
+        <span id="connectionDotMobile" class="w-2.5 h-2.5 rounded-full bg-slate-400 dark:bg-slate-500"></span>
+      </div>
+    </div>
   </header>
 
   <!-- Main Dashboard Container -->
-  <main class="relative z-10 flex-1 max-w-7xl w-full mx-auto p-3.5 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
+  <main class="relative z-10 flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 lg:p-8 space-y-3.5 sm:space-y-6">
 
     <!-- Progress Notification Banner (Hidden by default, shown during history sync) -->
     <div id="syncProgressBanner" class="hidden p-3.5 sm:p-4 rounded-2xl bg-cyan-50 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-800/50 backdrop-blur-md transition-all">
@@ -136,11 +166,11 @@
       </div>
     </div>
 
-    <!-- Live Telemetry Cards Grid (3 Cards Balanced) -->
+    <!-- Live Telemetry Cards Grid (3 Responsive Cards) -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-6">
       
       <!-- Card 1: Sıcaklık (Temperature) -->
-      <div class="metric-card group relative p-4 sm:p-5 rounded-3xl bg-white/90 dark:bg-slate-900/60 border border-slate-200/90 dark:border-slate-800/80 hover:border-emerald-500/40 backdrop-blur-xl shadow-sm dark:shadow-xl transition-all duration-300">
+      <div class="metric-card group relative p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-white/95 dark:bg-slate-900/60 border border-slate-200/90 dark:border-slate-800/80 hover:border-emerald-500/40 backdrop-blur-xl shadow-sm dark:shadow-xl transition-all duration-300">
         <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2 sm:mb-3">
           <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider">
             <span class="p-1.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
@@ -149,13 +179,13 @@
             <span class="text-slate-700 dark:text-slate-300 font-semibold">Sıcaklık</span>
           </div>
           <!-- Unit Switcher -->
-          <button id="btnToggleUnit" class="text-xs font-mono font-semibold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800/90 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-all">
+          <button id="btnToggleUnit" class="text-xs font-mono font-bold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800/90 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 active:scale-95 transition-all">
             °C / °F
           </button>
         </div>
 
         <div class="flex items-baseline gap-2 mb-2">
-          <span id="valTemp" class="text-4xl sm:text-5xl font-extrabold tracking-tight font-mono text-slate-900 dark:text-slate-100">--.-</span>
+          <span id="valTemp" class="text-4xl sm:text-5xl font-extrabold tracking-tight font-mono text-slate-900 dark:text-slate-100 tabular-nums">--.-</span>
           <span id="lblTempUnit" class="text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400">°C</span>
         </div>
 
@@ -178,7 +208,7 @@
       </div>
 
       <!-- Card 2: Bağıl Nem (Relative Humidity) -->
-      <div class="metric-card group relative p-4 sm:p-5 rounded-3xl bg-white/90 dark:bg-slate-900/60 border border-slate-200/90 dark:border-slate-800/80 hover:border-cyan-500/40 backdrop-blur-xl shadow-sm dark:shadow-xl transition-all duration-300">
+      <div class="metric-card group relative p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-white/95 dark:bg-slate-900/60 border border-slate-200/90 dark:border-slate-800/80 hover:border-cyan-500/40 backdrop-blur-xl shadow-sm dark:shadow-xl transition-all duration-300">
         <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2 sm:mb-3">
           <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider">
             <span class="p-1.5 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
@@ -192,7 +222,7 @@
         </div>
 
         <div class="flex items-baseline gap-2 mb-2">
-          <span id="valHum" class="text-4xl sm:text-5xl font-extrabold tracking-tight font-mono text-slate-900 dark:text-slate-100">--</span>
+          <span id="valHum" class="text-4xl sm:text-5xl font-extrabold tracking-tight font-mono text-slate-900 dark:text-slate-100 tabular-nums">--</span>
           <span class="text-xl sm:text-2xl font-bold text-cyan-600 dark:text-cyan-400">%</span>
         </div>
 
@@ -217,7 +247,7 @@
       </div>
 
       <!-- Card 3: Pil & Donanım Durumu (Battery & Hardware) -->
-      <div class="metric-card group relative p-4 sm:p-5 rounded-3xl bg-white/90 dark:bg-slate-900/60 border border-slate-200/90 dark:border-slate-800/80 hover:border-amber-500/40 backdrop-blur-xl shadow-sm dark:shadow-xl transition-all duration-300 md:col-span-2 lg:col-span-1">
+      <div class="metric-card group relative p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-white/95 dark:bg-slate-900/60 border border-slate-200/90 dark:border-slate-800/80 hover:border-amber-500/40 backdrop-blur-xl shadow-sm dark:shadow-xl transition-all duration-300 md:col-span-2 lg:col-span-1">
         <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2 sm:mb-3">
           <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider">
             <span class="p-1.5 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
@@ -231,7 +261,7 @@
         </div>
 
         <div class="flex items-baseline gap-2 mb-2">
-          <span id="valBattery" class="text-4xl sm:text-5xl font-extrabold tracking-tight font-mono text-slate-900 dark:text-slate-100">--</span>
+          <span id="valBattery" class="text-4xl sm:text-5xl font-extrabold tracking-tight font-mono text-slate-900 dark:text-slate-100 tabular-nums">--</span>
           <span class="text-xl sm:text-2xl font-bold text-amber-500 dark:text-amber-400">%</span>
         </div>
 
@@ -261,10 +291,10 @@
     </div>
 
     <!-- Interactive Charts Section -->
-    <div class="p-4 sm:p-6 rounded-3xl bg-white/90 dark:bg-slate-900/60 border border-slate-200/90 dark:border-slate-800/80 backdrop-blur-xl shadow-sm dark:shadow-2xl space-y-4 transition-colors duration-300">
+    <div class="p-3.5 sm:p-6 rounded-2xl sm:rounded-3xl bg-white/95 dark:bg-slate-900/60 border border-slate-200/90 dark:border-slate-800/80 backdrop-blur-xl shadow-sm dark:shadow-2xl space-y-3 sm:space-y-4 transition-colors duration-300">
       
-      <!-- Chart Controls Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800/80 pb-3.5">
+      <!-- Chart Controls Header (Mobile Optimized Flex Wrap) -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800/80 pb-3">
         <div>
           <h2 class="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <i data-lucide="line-chart" class="w-5 h-5 text-emerald-600 dark:text-emerald-400"></i>
@@ -273,14 +303,20 @@
           <p class="text-xs text-slate-500 dark:text-slate-400">Anlık ölçümler ve cihaz hafızasından aktarılan geçmiş kayıtlar</p>
         </div>
 
-        <div class="flex flex-wrap items-center gap-2">
+        <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
           
-          <!-- Range Filters -->
+          <!-- Range Filters (Touch-friendly Segmented Control) -->
           <div class="inline-flex rounded-xl bg-slate-100 dark:bg-slate-800/80 p-1 border border-slate-200 dark:border-slate-700/60 text-xs">
-            <button class="filter-btn active px-2.5 sm:px-3 py-1 rounded-lg font-medium transition-all" data-range="1h">1 Saat</button>
-            <button class="filter-btn px-2.5 sm:px-3 py-1 rounded-lg font-medium transition-all" data-range="24h">24 Saat</button>
-            <button class="filter-btn px-2.5 sm:px-3 py-1 rounded-lg font-medium transition-all" data-range="7d">7 Gün</button>
-            <button class="filter-btn px-2.5 sm:px-3 py-1 rounded-lg font-medium transition-all" data-range="all">Tümü</button>
+            <button class="filter-btn active px-2 sm:px-3 py-1 rounded-lg font-medium transition-all" data-range="1h">
+              <span class="sm:hidden">1S</span><span class="hidden sm:inline">1 Saat</span>
+            </button>
+            <button class="filter-btn px-2 sm:px-3 py-1 rounded-lg font-medium transition-all" data-range="24h">
+              <span class="sm:hidden">24S</span><span class="hidden sm:inline">24 Saat</span>
+            </button>
+            <button class="filter-btn px-2 sm:px-3 py-1 rounded-lg font-medium transition-all" data-range="7d">
+              <span class="sm:hidden">7G</span><span class="hidden sm:inline">7 Gün</span>
+            </button>
+            <button class="filter-btn px-2 sm:px-3 py-1 rounded-lg font-medium transition-all" data-range="all">Tümü</button>
           </div>
 
           <!-- Metric Display Toggle -->
@@ -293,17 +329,17 @@
         </div>
       </div>
 
-      <!-- Chart Canvas Container -->
-      <div class="relative w-full h-64 sm:h-80 lg:h-96">
+      <!-- Chart Canvas Container (Responsive Height for Phones) -->
+      <div class="relative w-full h-56 sm:h-80 lg:h-96">
         <canvas id="telemetryChart"></canvas>
       </div>
 
     </div>
 
-    <!-- Historical Archive & Records Table Section -->
-    <div class="p-4 sm:p-6 rounded-3xl bg-white/90 dark:bg-slate-900/60 border border-slate-200/90 dark:border-slate-800/80 backdrop-blur-xl shadow-sm dark:shadow-2xl space-y-4 transition-colors duration-300">
+    <!-- Historical Archive & Records Section -->
+    <div class="p-3.5 sm:p-6 rounded-2xl sm:rounded-3xl bg-white/95 dark:bg-slate-900/60 border border-slate-200/90 dark:border-slate-800/80 backdrop-blur-xl shadow-sm dark:shadow-2xl space-y-3.5 sm:space-y-4 transition-colors duration-300">
       
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800/80 pb-3.5">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800/80 pb-3">
         <div>
           <h2 class="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <i data-lucide="database" class="w-5 h-5 text-cyan-600 dark:text-cyan-400"></i>
@@ -315,19 +351,19 @@
         <div class="flex items-center flex-wrap gap-2">
           
           <!-- Export CSV Button -->
-          <button id="btnExportCsv" class="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition-all">
+          <button id="btnExportCsv" class="flex-1 sm:flex-none px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 active:scale-95 transition-all">
             <i data-lucide="download" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
-            <span>CSV İndir</span>
+            <span>CSV</span>
           </button>
 
           <!-- Export JSON Button -->
-          <button id="btnExportJson" class="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition-all">
+          <button id="btnExportJson" class="flex-1 sm:flex-none px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 active:scale-95 transition-all">
             <i data-lucide="file-code-2" class="w-4 h-4 text-cyan-600 dark:text-cyan-400"></i>
             <span>JSON</span>
           </button>
 
           <!-- Clear Database Button -->
-          <button id="btnClearData" class="px-3 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/20 transition-all">
+          <button id="btnClearData" class="px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/20 active:scale-95 transition-all">
             <i data-lucide="trash-2" class="w-4 h-4"></i>
             <span>Temizle</span>
           </button>
@@ -335,17 +371,24 @@
         </div>
       </div>
 
-      <!-- Table Container (Horizontal scroll on phones) -->
-      <div class="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
+      <!-- 1. Mobile Feed View (Shown ONLY on screens < 640px) -->
+      <div id="mobileHistoryFeed" class="sm:hidden space-y-2">
+        <div class="py-6 text-center text-xs text-slate-400 dark:text-slate-500 font-sans">
+          Henüz kayıt bulunmuyor. Cihazınıza bağlanarak ölçüm alabilirsiniz.
+        </div>
+      </div>
+
+      <!-- 2. Desktop Table View (Shown on screens >= 640px) -->
+      <div class="hidden sm:block overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
         <table class="w-full text-left text-xs sm:text-sm text-slate-700 dark:text-slate-300">
           <thead class="bg-slate-100/90 dark:bg-slate-800/80 uppercase font-mono text-[11px] text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700/60">
             <tr>
-              <th scope="col" class="py-3 px-3 sm:px-4">Tarih / Saat</th>
-              <th scope="col" class="py-3 px-3 sm:px-4">Tür</th>
-              <th scope="col" class="py-3 px-3 sm:px-4">Sıcaklık</th>
-              <th scope="col" class="py-3 px-3 sm:px-4">Nem</th>
-              <th scope="col" class="py-3 px-3 sm:px-4">Çiğ Noktası</th>
-              <th scope="col" class="py-3 px-3 sm:px-4">Pil / Voltaj</th>
+              <th scope="col" class="py-3 px-4">Tarih / Saat</th>
+              <th scope="col" class="py-3 px-4">Tür</th>
+              <th scope="col" class="py-3 px-4">Sıcaklık</th>
+              <th scope="col" class="py-3 px-4">Nem</th>
+              <th scope="col" class="py-3 px-4">Çiğ Noktası</th>
+              <th scope="col" class="py-3 px-4">Pil / Voltaj</th>
             </tr>
           </thead>
           <tbody id="historyTableBody" class="divide-y divide-slate-200/80 dark:divide-slate-800/60 font-mono">
@@ -358,12 +401,12 @@
         </table>
       </div>
 
-      <!-- Table Pagination Footer -->
+      <!-- Pagination Controls (Both Mobile & Desktop) -->
       <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-1">
-        <span id="tableSummaryText">0 kayıt listeleniyor</span>
-        <div class="flex items-center gap-2">
+        <span id="tableSummaryText">0 kayıt</span>
+        <div class="flex items-center gap-1.5 sm:gap-2">
           <button id="btnPrevPage" disabled class="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 disabled:opacity-40 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-all">Önceki</button>
-          <span id="pageIndicator" class="font-mono text-slate-700 dark:text-slate-300">1 / 1</span>
+          <span id="pageIndicator" class="font-mono text-slate-700 dark:text-slate-300 font-semibold px-1">1 / 1</span>
           <button id="btnNextPage" disabled class="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 disabled:opacity-40 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-all">Sonraki</button>
         </div>
       </div>
@@ -374,32 +417,32 @@
 
   <!-- Help / Info Modal -->
   <div id="helpModal" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-md hidden opacity-0 transition-opacity duration-300">
-    <div class="relative w-full max-w-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 sm:p-8 shadow-2xl max-h-[90vh] overflow-y-auto space-y-5 sm:space-y-6">
+    <div class="relative w-full max-w-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 sm:p-8 shadow-2xl max-h-[90vh] overflow-y-auto space-y-4 sm:space-y-6">
       
-      <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3.5">
+      <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
         <div class="flex items-center gap-2.5">
           <div class="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
             <i data-lucide="info" class="w-5 h-5"></i>
           </div>
-          <h3 class="text-base sm:text-lg font-bold text-slate-900 dark:text-white">Xiaomi LYWSD03MMC Kullanım Kılavuzu</h3>
+          <h3 class="text-base sm:text-lg font-bold text-slate-900 dark:text-white">Xiaomi LYWSD03MMC Kullanım Rehberi</h3>
         </div>
         <button id="btnCloseHelp" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
 
-      <div class="space-y-3.5 text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+      <div class="space-y-3 text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
         
         <div class="p-3.5 sm:p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 space-y-1.5">
           <h4 class="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
             <i data-lucide="bluetooth" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
-            Web Bluetooth ile Nasıl Bağlanılır?
+            Bluetooth ile Nasıl Bağlanılır?
           </h4>
           <ol class="list-decimal list-inside space-y-1 text-slate-500 dark:text-slate-400">
-            <li>Cihazınızda (bilgisayar veya Android telefon) Bluetooth'un açık olduğundan emin olun.</li>
+            <li>Cihazınızda (telefon veya bilgisayar) Bluetooth'un açık olduğundan emin olun.</li>
             <li>Google Chrome, Microsoft Edge veya Opera tarayıcısı ile açın.</li>
-            <li><strong>"Cihaza Bağlan"</strong> butonuna tıklayın.</li>
-            <li>Açılan pencerede <code>LYWSD03MMC</code> cihazınızı seçip <strong>"Eşle / Bağlan"</strong> butonuna basın.</li>
+            <li><strong>"Cihaza Bağlan"</strong> butonuna basın.</li>
+            <li>Açılan listeden <code>LYWSD03MMC</code> cihazınızı seçip <strong>"Eşle"</strong> deyin.</li>
           </ol>
         </div>
 
@@ -409,24 +452,24 @@
             Cihazın Dahili Flaş Belleğindeki Geçmiş Arşivi
           </h4>
           <p class="text-slate-500 dark:text-slate-400">
-            Xiaomi termometreniz telefon veya bilgisayara bağlı değilken de saatlik min/maks sıcaklık ve nem kayıtlarını hafızasında depolar. Cihaza bağlandıktan sonra <strong>"Geçmişi İndir"</strong> butonuna basarak bu kayıtları çekebilirsiniz.
+            Xiaomi termometreniz telefonunuza bağlı değilken de saatlik min/maks ölçümleri hafızasında saklar. Bağlandıktan sonra <strong>"Geçmişi İndir"</strong> butonuna basarak tüm geçmiş saatlik kayıtları çekebilirsiniz.
           </p>
         </div>
 
         <div class="p-3.5 sm:p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 space-y-1.5">
           <h4 class="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
             <i data-lucide="smartphone" class="w-4 h-4 text-purple-600 dark:text-purple-400"></i>
-            Telefonda Kullanım & PWA
+            Telefonda Mobil Uygulama Olarak Kullanma (PWA)
           </h4>
           <p class="text-slate-500 dark:text-slate-400">
-            Bu uygulama tamamen mobil uyumludur. Android telefonunuzda Chrome ile açıp "Ana Ekrana Ekle" diyerek bir mobil uygulama gibi de kullanabilirsiniz.
+            Bu site Progressive Web App (PWA) standartlarına göre hazırlanmıştır. Android'de Chrome ile açıp menüden <strong>"Ana Ekrana Ekle"</strong> diyerek tıpkı bir mobil uygulama gibi kullanabilirsiniz.
           </p>
         </div>
 
       </div>
 
       <div class="pt-3.5 border-t border-slate-200 dark:border-slate-800 flex justify-end">
-        <button id="btnGotIt" class="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-slate-950 font-semibold text-sm transition-all shadow-md shadow-emerald-500/20">
+        <button id="btnGotIt" class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white dark:text-slate-950 font-semibold text-sm transition-all shadow-md shadow-emerald-500/20">
           Anladım
         </button>
       </div>
@@ -435,10 +478,10 @@
   </div>
 
   <!-- Toast Container -->
-  <div id="toastContainer" class="fixed bottom-4 sm:bottom-6 right-4 sm:right-6 z-50 flex flex-col gap-2 pointer-events-none max-w-[calc(100vw-2rem)]"></div>
+  <div id="toastContainer" class="fixed bottom-4 left-3 right-3 sm:left-auto sm:right-6 z-50 flex flex-col gap-2 pointer-events-none max-w-sm sm:max-w-md mx-auto sm:mx-0"></div>
 
   <!-- Footer -->
-  <footer class="relative z-10 border-t border-slate-200 dark:border-slate-900 bg-white/60 dark:bg-slate-950/80 px-4 py-3.5 text-center text-xs text-slate-500 dark:text-slate-500 transition-colors duration-300">
+  <footer class="relative z-10 border-t border-slate-200 dark:border-slate-900 bg-white/60 dark:bg-slate-950/80 px-4 py-3.5 text-center text-[11px] sm:text-xs text-slate-500 dark:text-slate-500 transition-colors duration-300">
     <p>Xiaomi SmartTemp Pro — Poppins Typography & Dual Theme • Berat Torun</p>
   </footer>
 
