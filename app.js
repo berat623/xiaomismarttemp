@@ -49,12 +49,12 @@ class AtmosphericMetrics {
    * Formül: Alduchov & Eskridge (1996) Magnus yaklaşımı (WMO Standardı)
    */
   static calculateDewPoint(temperature, humidity) {
-    if (humidity <= 0) return temperature;
+    if (humidity <= 0) return Number(temperature.toFixed(2));
     const a = 17.625;
     const b = 243.04;
     const alpha = ((a * temperature) / (b + temperature)) + Math.log(humidity / 100.0);
     const dewPoint = (b * alpha) / (a - alpha);
-    return Number(dewPoint.toFixed(1));
+    return Number(dewPoint.toFixed(2));
   }
 
   /**
@@ -66,8 +66,8 @@ class AtmosphericMetrics {
     const vpAct = vpSat * (Math.max(0, Math.min(100, humidity)) / 100.0);
     const vpd = (vpSat - vpAct) / 10.0; // kPa cinsine çevrim
     return {
-      vpSat: Number(vpSat.toFixed(1)),
-      vpAct: Number(vpAct.toFixed(1)),
+      vpSat: Number(vpSat.toFixed(2)),
+      vpAct: Number(vpAct.toFixed(2)),
       vpd: Number(vpd.toFixed(2))
     };
   }
@@ -92,16 +92,16 @@ class AtmosphericMetrics {
         (0.00000199 * tf * tf * humidity * humidity);
 
       const tc = (hi - 32.0) / 1.8;
-      return Number(tc.toFixed(1));
+      return Number(tc.toFixed(2));
     }
 
     const at = temperature + (0.33 * e) - 4.0;
-    return Number(at.toFixed(1));
+    return Number(at.toFixed(2));
   }
 
   static enrich(record) {
-    const t = record.temperature;
-    const h = record.humidity;
+    const t = typeof record.temperature === 'number' ? Number(record.temperature.toFixed(2)) : parseFloat(record.temperature);
+    const h = typeof record.humidity === 'number' ? Number(record.humidity.toFixed(2)) : parseFloat(record.humidity);
 
     const dewPoint = this.calculateDewPoint(t, h);
     const vp = this.calculateVaporPressure(t, h);
@@ -109,6 +109,8 @@ class AtmosphericMetrics {
 
     return {
       ...record,
+      temperature: t,
+      humidity: h,
       dewPoint,
       apparentTemp,
       vaporPressure: vp.vpAct,
@@ -163,7 +165,15 @@ class TelemetryStorage {
       const req = store.getAll();
       req.onsuccess = () => {
         const raw = req.result || [];
-        this.records = raw.map(r => AtmosphericMetrics.enrich(r));
+        this.records = raw.map(r => {
+          if (typeof r.humidity === 'number') {
+            r.humidity = Number(r.humidity.toFixed(2));
+          }
+          if (typeof r.temperature === 'number') {
+            r.temperature = Number(r.temperature.toFixed(2));
+          }
+          return AtmosphericMetrics.enrich(r);
+        });
         this.records.sort((a, b) => a.timestamp - b.timestamp);
         resolve(this.records);
       };
@@ -184,12 +194,20 @@ class TelemetryStorage {
   }
 
   async addBatch(recordsList) {
-    if (!recordsList || recordsList.length === 0) return;
+    if (!recordsList || recordsList.length === 0) return 0;
+    let addedCount = 0;
+    const existingTimestamps = new Set(this.records.map(r => r.timestamp));
+
     for (const r of recordsList) {
       const enriched = AtmosphericMetrics.enrich(r);
-      const exists = this.records.some(ex => Math.abs(ex.timestamp - enriched.timestamp) < 5000 && ex.type === enriched.type);
+      // Çift kayıtları engelle (zaman farkı < 1500ms)
+      const exists = existingTimestamps.has(enriched.timestamp) ||
+        this.records.some(ex => Math.abs(ex.timestamp - enriched.timestamp) < 1500 && Math.abs(ex.temperature - enriched.temperature) < 0.05);
+
       if (!exists) {
         this.records.push(enriched);
+        existingTimestamps.add(enriched.timestamp);
+        addedCount++;
         if (this.db) {
           const tx = this.db.transaction(this.storeName, 'readwrite');
           tx.objectStore(this.storeName).add(enriched);
@@ -197,6 +215,7 @@ class TelemetryStorage {
       }
     }
     this.records.sort((a, b) => a.timestamp - b.timestamp);
+    return addedCount;
   }
 
   async clearAll() {
@@ -227,17 +246,18 @@ class TelemetryStorage {
     ];
     const rows = this.records.map((r, i) => {
       const d = new Date(r.timestamp);
+      const humVal = typeof r.humidity === 'number' ? r.humidity.toFixed(2) : parseFloat(r.humidity).toFixed(2);
       return [
         i + 1,
         d.toLocaleDateString('tr-TR'),
         d.toLocaleTimeString('tr-TR'),
         r.type === 'history_hour' ? 'Cihaz Geçmişi' : (r.source === 'ble_adv' ? 'BLE Sinyal Yayını' : 'GATT Canlı'),
         r.temperature.toFixed(2),
-        r.apparentTemp != null ? r.apparentTemp.toFixed(1) : '',
-        r.humidity,
-        r.dewPoint != null ? r.dewPoint.toFixed(1) : '',
-        r.vaporPressure != null ? r.vaporPressure.toFixed(1) : '',
-        r.vpSat != null ? r.vpSat.toFixed(1) : '',
+        r.apparentTemp != null ? r.apparentTemp.toFixed(2) : '',
+        !isNaN(parseFloat(humVal)) ? humVal : r.humidity,
+        r.dewPoint != null ? r.dewPoint.toFixed(2) : '',
+        r.vaporPressure != null ? r.vaporPressure.toFixed(2) : '',
+        r.vpSat != null ? r.vpSat.toFixed(2) : '',
         r.vpd != null ? r.vpd.toFixed(2) : '',
         r.battery != null ? r.battery : '',
         r.voltage != null ? r.voltage.toFixed(2) : '',
@@ -463,7 +483,7 @@ class UniversalBleManager {
           const vbat = b.getUint16(10, true) / 1000.0;
           const bat = b.getUint8(12);
 
-          this.emitTelemetry(temp, Math.round(hum), vbat, bat, 'ble_adv', 'atc');
+          this.emitTelemetry(temp, hum, vbat, bat, 'ble_adv', 'atc');
           return;
         } else if (len >= 13) {
           // ATC1441 Format (Big Endian, 0.1 hassasiyet)
@@ -502,7 +522,7 @@ class UniversalBleManager {
           }
         }
         if (t !== null && h !== null) {
-          this.emitTelemetry(t, Math.round(h), v, bPct, 'ble_adv', 'atc');
+          this.emitTelemetry(t, h, v, bPct, 'ble_adv', 'atc');
           return;
         }
       }
@@ -516,7 +536,7 @@ class UniversalBleManager {
           if (objId === 0x100d && objLen === 4 && p + 7 <= len) {
             const temp = b.getInt16(p + 3, true) / 10.0;
             const hum = b.getInt16(p + 5, true) / 10.0;
-            this.emitTelemetry(temp, Math.round(hum), 3.0, 95, 'ble_adv', 'stock_xiaomi');
+            this.emitTelemetry(temp, hum, 3.0, 95, 'ble_adv', 'stock_xiaomi');
             return;
           }
         }
@@ -646,13 +666,13 @@ class UniversalBleManager {
       if (humChar) {
         const val = await humChar.readValue().catch(() => null);
         if (val && val.byteLength >= 2) {
-          this.cachedHum = Math.round(val.getUint16(0, true) / 100.0);
+          this.cachedHum = val.getUint16(0, true) / 100.0;
         } else if (val && val.byteLength === 1) {
           this.cachedHum = val.getUint8(0);
         }
         humChar.addEventListener('characteristicvaluechanged', (e) => {
           const v = e.target.value;
-          this.cachedHum = v.byteLength >= 2 ? Math.round(v.getUint16(0, true) / 100.0) : v.getUint8(0);
+          this.cachedHum = v.byteLength >= 2 ? (v.getUint16(0, true) / 100.0) : v.getUint8(0);
           this.emitCachedTelemetry();
         });
         await humChar.startNotifications().catch(() => {});
@@ -732,14 +752,20 @@ class UniversalBleManager {
     if (!value || value.byteLength < 1) return;
     const cmdId = value.getUint8(0);
 
+    // Eğer dahili flaş hafıza okuyucusu aktifse ve 0x35 paketi geldiyse geçmiş işleyicisine yönlendir
+    if (cmdId === 0x35 && this._atcHistoryHandler) {
+      this._atcHistoryHandler(value);
+      return;
+    }
+
     // Canlı telemetri akışı (0x33 veya standart telemetri baytları)
-    if (cmdId === 0x33 || (value.byteLength >= 5 && cmdId !== 0x55 && cmdId !== 0x20 && cmdId !== 0x25 && cmdId !== 0x44 && cmdId !== 0x01 && cmdId !== 0x10 && cmdId !== 0x24 && cmdId !== 0x22)) {
+    if (cmdId === 0x33 || (value.byteLength >= 5 && cmdId !== 0x55 && cmdId !== 0x20 && cmdId !== 0x25 && cmdId !== 0x44 && cmdId !== 0x01 && cmdId !== 0x10 && cmdId !== 0x24 && cmdId !== 0x22 && cmdId !== 0x35)) {
       this.parseAtc1f1fPacket(value);
     }
 
     // Geliştirici konsolu ve seçenekleri için gelen paket
     if (this.onDevPacket) {
-      this.onDevPacket(cmdId, value);
+      this.onDevPacket(value);
     }
   }
 
@@ -753,7 +779,7 @@ class UniversalBleManager {
     }
     if (b.byteLength >= offset + 4) {
       const temp = b.getInt16(offset, true) / 100.0;
-      const hum = Math.round(b.getUint16(offset + 2, true) / 100.0);
+      const hum = b.getUint16(offset + 2, true) / 100.0;
       let vbat = 3.0;
       let bat = 100;
       if (b.byteLength >= offset + 6) {
@@ -780,7 +806,7 @@ class UniversalBleManager {
   }
 
   emitTelemetry(temp, hum, volt, bat, source, profile) {
-    // 500ms throttling to avoid rapid DOM repaints
+    // 400ms throttling to avoid rapid DOM repaints
     const now = Date.now();
     if (now - this.lastEmitTime < 400 && source === 'ble_adv') {
       return;
@@ -789,7 +815,7 @@ class UniversalBleManager {
 
     this.onData({
       temperature: Number(temp.toFixed(2)),
-      humidity: Math.round(hum),
+      humidity: Number(hum.toFixed(2)),
       voltage: Number(volt.toFixed(2)),
       battery: Math.max(0, Math.min(100, bat)),
       rssi: this.lastRssi,
@@ -810,15 +836,24 @@ class UniversalBleManager {
     }
 
     this.isFetchingHistory = true;
-    this.onHistoryProgress({ active: true, percent: 10, message: 'Cihaz hafıza modu denetleniyor...' });
+    this.onHistoryProgress({ active: true, percent: 5, message: 'Cihaz bellek modu denetleniyor...' });
 
     try {
-      // 1. Stock Xiaomi cihazında ebe0ccbc stream'i kontrol et
+      // 1. ATC / PVVX Modlu Firmware (0x1F1F Karakteristiği Üzerinden Flaş Bellek İndirme - Komut 0x35)
+      if (this.atcChar) {
+        this.onHistoryProgress({ active: true, percent: 10, message: 'Sensör flaş belleği (0x35) sorgulanıyor...' });
+        const fetchedRecords = await this.fetchAtcHistoryFromFlash();
+        this.isFetchingHistory = false;
+        this.onHistoryProgress({ active: false, percent: 100, message: 'Tamamlandı' });
+        return fetchedRecords;
+      }
+
+      // 2. Stock Xiaomi cihazında ebe0ccbc stream'i kontrol et
       if (this.primaryService) {
         try {
           const historyChar = await this.primaryService.getCharacteristic(BLE_PROFILES.CHAR_HISTORY_STREAM);
           if (historyChar) {
-            this.onHistoryProgress({ active: true, percent: 30, message: 'Dahili flaş hafıza kayıtları akıtılıyor...' });
+            this.onHistoryProgress({ active: true, percent: 20, message: 'Orijinal Xiaomi hafıza akışı başlatılıyor...' });
             await historyChar.startNotifications();
 
             const fetchedRecords = [];
@@ -830,7 +865,7 @@ class UniversalBleManager {
                 if (item) {
                   fetchedRecords.push(item);
                   const count = fetchedRecords.length;
-                  const pct = Math.min(95, 30 + (count * 3));
+                  const pct = Math.min(95, 20 + (count * 2));
                   this.onHistoryProgress({
                     active: true,
                     percent: pct,
@@ -861,8 +896,7 @@ class UniversalBleManager {
         }
       }
 
-      // 2. ATC / Modlu Firmware: Canlı akış verileri zaten kalıcı IndexedDB'ye kaydedilmiştir
-      this.onHistoryProgress({ active: false, percent: 100, message: 'ATC Canlı Yayın Arşivi Güncel' });
+      this.onHistoryProgress({ active: false, percent: 100, message: 'Geçmiş kayıt servisi bulunamadı' });
       this.isFetchingHistory = false;
       return [];
     } catch (err) {
@@ -870,6 +904,141 @@ class UniversalBleManager {
       this.onHistoryProgress({ active: false, percent: 0, message: 'Hata' });
       throw err;
     }
+  }
+
+  async fetchAtcHistoryFromFlash() {
+    return new Promise(async (resolve, reject) => {
+      const rawSamples = [];
+      let expectedTotal = null;
+      let timeoutTimer = null;
+      let hasCompleted = false;
+
+      const finishDownload = async () => {
+        if (hasCompleted) return;
+        hasCompleted = true;
+        if (timeoutTimer) clearTimeout(timeoutTimer);
+        this._atcHistoryHandler = null;
+
+        if (rawSamples.length === 0) {
+          resolve([]);
+          return;
+        }
+
+        try {
+          // Örnek zaman damgalarını doğrula ve çöz
+          // tc > 1577836800 (2020+) ise geçerli Unix epoch saniyesidir
+          const validEpochSamples = rawSamples.filter(s => s.tc > 1577836800);
+          const isEpochValid = validEpochSamples.length > 0;
+          const maxTc = Math.max(...rawSamples.map(s => s.tc));
+          const nowMs = Date.now();
+
+          const records = rawSamples.map(s => {
+            let ts;
+            if (isEpochValid && s.tc > 1577836800) {
+              ts = s.tc * 1000;
+            } else {
+              // Göreceli zaman damgası: En son kayıt anına göre geçmişe doğru yerleştir
+              const diffSec = maxTc - s.tc;
+              ts = nowMs - (diffSec * 1000);
+            }
+
+            const volt = Number((s.vb / 1000.0).toFixed(2));
+            const bat = Math.max(0, Math.min(100, Math.round(((volt - 2.1) / 1.0) * 100)));
+
+            const baseRecord = {
+              timestamp: ts,
+              temperature: Number(s.tm.toFixed(2)),
+              humidity: Number(s.hm.toFixed(2)),
+              voltage: volt,
+              battery: bat,
+              source: 'device_flash',
+              type: 'history_hour'
+            };
+            return AtmosphericMetrics.enrich(baseRecord);
+          });
+
+          // Kronolojik sıraya diz (eskiden yeniye)
+          records.sort((a, b) => a.timestamp - b.timestamp);
+
+          // Cihaz saatini senkronize et (Cmd 0x23)
+          try {
+            const timeNowSec = Math.floor(Date.now() / 1000);
+            const timePkt = new Uint8Array([
+              0x23,
+              timeNowSec & 0xff,
+              (timeNowSec >> 8) & 0xff,
+              (timeNowSec >> 16) & 0xff,
+              (timeNowSec >> 24) & 0xff
+            ]);
+            await this.sendAtcCommand(timePkt).catch(() => {});
+          } catch (e) {}
+
+          resolve(records);
+        } catch (err) {
+          reject(err);
+        }
+      };
+
+      const resetTimeout = (delay = 3000) => {
+        if (timeoutTimer) clearTimeout(timeoutTimer);
+        timeoutTimer = setTimeout(() => {
+          finishDownload();
+        }, delay);
+      };
+
+      this._atcHistoryHandler = (val) => {
+        const len = val.byteLength;
+        if (len === 2) {
+          // Toplam bellek kayıt sayısı paketi
+          expectedTotal = val.getUint16(1, true);
+          this.onHistoryProgress({
+            active: true,
+            percent: 15,
+            message: `Sensör flaşında ${expectedTotal} kayıt bulundu, aktarılıyor...`
+          });
+          resetTimeout(4000);
+        } else if (len >= 13) {
+          // Veri paketi: [0x35 (1), cnt (2), tc (4), tm (2), hm (2), vb (2)]
+          const cnt = val.getUint16(1, true);
+          const tc = val.getUint32(3, true);
+          const tm = val.getInt16(7, true) / 100.0;
+          const hm = val.getUint16(9, true) / 100.0;
+          const vb = val.getUint16(11, true);
+
+          rawSamples.push({ cnt, tc, tm, hm, vb });
+
+          let pct;
+          if (expectedTotal && expectedTotal > 0) {
+            pct = Math.min(95, Math.round((rawSamples.length / expectedTotal) * 80) + 15);
+          } else {
+            pct = Math.min(92, 15 + Math.floor(rawSamples.length / 5));
+          }
+
+          this.onHistoryProgress({
+            active: true,
+            percent: pct,
+            message: `${rawSamples.length} kayıt aktarıldı...`
+          });
+
+          resetTimeout(2500);
+        } else if (len >= 3 && len < 13) {
+          // Aktarım sonu bildirim paketi
+          finishDownload();
+        }
+      };
+
+      try {
+        // PVVX 0x35 Protokolü: Tüm bellek kayıtlarını talep et (65535 örnek, ofset 0)
+        // [0x35, cnt_lo, cnt_hi, offset_lo, offset_hi]
+        const cmd = new Uint8Array([0x35, 0xff, 0xff, 0x00, 0x00]);
+        await this.sendAtcCommand(cmd);
+        resetTimeout(6000);
+      } catch (err) {
+        if (timeoutTimer) clearTimeout(timeoutTimer);
+        this._atcHistoryHandler = null;
+        reject(err);
+      }
+    });
   }
 
   parseHistoryChunk(value) {
@@ -884,8 +1053,8 @@ class UniversalBleManager {
 
     const tempMax = tempRawMax / 10.0;
     const tempMin = tempRawMin / 10.0;
-    const avgTemp = Number(((tempMax + tempMin) / 2).toFixed(1));
-    const avgHum = Math.round((humMax + humMin) / 2);
+    const avgTemp = Number(((tempMax + tempMin) / 2).toFixed(2));
+    const avgHum = Number(((humMax + humMin) / 2).toFixed(2));
 
     const validTs = timestampSec > 1600000000 ? timestampSec * 1000 : Date.now() - (idxNum * 3600 * 1000);
 
@@ -898,6 +1067,7 @@ class UniversalBleManager {
       tempMin,
       humMax,
       humMin,
+      source: 'device_flash',
       type: 'history_hour'
     };
 
@@ -1048,6 +1218,7 @@ class AppController {
       btnNextPage: document.getElementById('btnNextPage'),
 
       // Data Actions
+      btnFetchHistory: document.getElementById('btnFetchHistory'),
       btnExportCsv: document.getElementById('btnExportCsv'),
       btnExportJson: document.getElementById('btnExportJson'),
       btnClearData: document.getElementById('btnClearData'),
@@ -1266,6 +1437,10 @@ class AppController {
       });
     });
 
+    if (this.dom.btnFetchHistory) {
+      this.dom.btnFetchHistory.addEventListener('click', () => this.syncDeviceHistory(false));
+    }
+
     this.dom.btnExportCsv.addEventListener('click', () => {
       const csv = this.storage.exportCSV();
       if (!csv) return this.showToast('Dışa aktarılacak veri bulunmuyor.', 'info');
@@ -1305,6 +1480,37 @@ class AppController {
     });
   }
 
+  async syncDeviceHistory(isAuto = false) {
+    if (!this.ble.isConnected) {
+      if (!isAuto) {
+        this.showToast('Cihaz belleğindeki verileri aktarmak için önce Bluetooth bağlantısı kurmalısınız.', 'info');
+      }
+      return;
+    }
+
+    try {
+      if (!isAuto) {
+        this.showToast('Cihazın dahili flaş belleğindeki ölçümler taranıyor...', 'info');
+      }
+      const records = await this.ble.fetchDeviceHistory();
+      if (records && records.length > 0) {
+        const addedCount = await this.storage.addBatch(records);
+        this.updateStatsAndTable();
+        this.updateChart();
+        this.showToast(`Cihaz belleğinden ${records.length} ölçüm başarıyla aktarıldı (${addedCount} yeni).`, 'success');
+      } else {
+        if (!isAuto) {
+          this.showToast('Cihaz belleğinde yeni kayıt bulunamadı veya bellek boş.', 'info');
+        }
+      }
+    } catch (err) {
+      console.warn('Cihaz bellek geçmişi okuma hatası:', err);
+      if (!isAuto) {
+        this.showToast(`Bellek okuma hatası: ${err.message}`, 'error');
+      }
+    }
+  }
+
   handleBleStatus(status, text) {
     if (this.dom.connectionStatusText) this.dom.connectionStatusText.textContent = text;
 
@@ -1317,6 +1523,11 @@ class AppController {
         setTimeout(() => {
           this.devReadConfigFromDevice();
         }, 600);
+        setTimeout(() => {
+          if (this.ble.isConnected) {
+            this.syncDeviceHistory(true);
+          }
+        }, 1800);
       } else if (status === 'connecting' || status === 'scanning') {
         this.dom.devBleStatusBadge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-200 dark:border-amber-800';
         this.dom.devBleStatusBadge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span><span>Bağlanılıyor...</span>';
@@ -1445,32 +1656,36 @@ class AppController {
     if (this.currentUnit === 'F') {
       displayTemp = (data.temperature * 9 / 5) + 32;
     }
-    this.dom.valTemp.textContent = displayTemp.toFixed(1);
+    this.dom.valTemp.textContent = displayTemp.toFixed(2);
     this.dom.lblTempUnit.textContent = `°${this.currentUnit}`;
 
-    // Grafik KPI Son Okunan Değerini de anında canlı güncelle (Asla --.- kalmaz)
+    // Bağıl Nem Sayısal Değeri (2 ondalık hassasiyet: 81.36)
+    const humNum = Number(data.humidity);
+    const humFormatted = !isNaN(humNum) ? humNum.toFixed(2) : data.humidity;
+
+    // Grafik KPI Son Okunan Değerini de anında canlı güncelle (Asla --.-- kalmaz)
     if (this.dom.chartKpiCurrent) {
       if (this.chartMode === 'hum') {
-        this.dom.chartKpiCurrent.textContent = `%${data.humidity}`;
+        this.dom.chartKpiCurrent.textContent = `%${humFormatted}`;
         if (this.dom.chartKpiCurrentUnit) this.dom.chartKpiCurrentUnit.textContent = '%';
       } else if (this.chartMode === 'press') {
         const vp = data.vaporPressure != null ? data.vaporPressure : AtmosphericMetrics.calculateVaporPressure(data.temperature, data.humidity).vpAct;
-        this.dom.chartKpiCurrent.textContent = vp.toFixed(1);
+        this.dom.chartKpiCurrent.textContent = vp.toFixed(2);
         if (this.dom.chartKpiCurrentUnit) this.dom.chartKpiCurrentUnit.textContent = 'hPa';
       } else {
-        this.dom.chartKpiCurrent.textContent = displayTemp.toFixed(1);
+        this.dom.chartKpiCurrent.textContent = displayTemp.toFixed(2);
         if (this.dom.chartKpiCurrentUnit) this.dom.chartKpiCurrentUnit.textContent = `°${this.currentUnit}`;
       }
     }
 
-    // 2. Bağıl Nem Kartı
-    this.dom.valHum.textContent = data.humidity;
-    this.dom.humProgressBar.style.width = `${Math.min(100, Math.max(0, data.humidity))}%`;
+    // 2. Bağıl Nem Kartı (12.07 ve 81.36 formatında 2 basamak)
+    this.dom.valHum.textContent = humFormatted;
+    this.dom.humProgressBar.style.width = `${Math.min(100, Math.max(0, humNum))}%`;
 
-    if (data.humidity < 30) {
+    if (humNum < 30) {
       this.dom.humidityStatusBadge.textContent = 'Kuru';
       this.dom.humidityStatusBadge.className = 'text-xs px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 font-medium';
-    } else if (data.humidity > 60) {
+    } else if (humNum > 60) {
       this.dom.humidityStatusBadge.textContent = 'Yüksek Nem';
       this.dom.humidityStatusBadge.className = 'text-xs px-2.5 py-0.5 rounded-full bg-[#0b57d0]/10 text-[#0b57d0] dark:text-[#a8c7fa] border border-[#0b57d0]/20 font-medium';
     } else {
@@ -1484,12 +1699,12 @@ class AppController {
       if (this.currentUnit === 'F') {
         displayApparent = (data.apparentTemp * 9 / 5) + 32;
       }
-      this.dom.valApparentTemp.textContent = displayApparent.toFixed(1);
+      this.dom.valApparentTemp.textContent = displayApparent.toFixed(2);
       this.dom.lblApparentUnit.textContent = `°${this.currentUnit}`;
 
       const diff = data.apparentTemp - data.temperature;
       const sign = diff >= 0 ? '+' : '';
-      this.dom.apparentDiffBadge.textContent = `Fark: ${sign}${diff.toFixed(1)}°C`;
+      this.dom.apparentDiffBadge.textContent = `Fark: ${sign}${diff.toFixed(2)}°C`;
       if (Math.abs(diff) < 0.5) {
         this.dom.apparentDiffBadge.className = 'text-xs px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 font-mono font-semibold';
       } else if (diff > 0) {
@@ -1505,7 +1720,7 @@ class AppController {
       if (this.currentUnit === 'F') {
         displayDew = (data.dewPoint * 9 / 5) + 32;
       }
-      this.dom.valDewPointCard.textContent = displayDew.toFixed(1);
+      this.dom.valDewPointCard.textContent = displayDew.toFixed(2);
       this.dom.lblDewPointUnit.textContent = `°${this.currentUnit}`;
 
       const spread = data.temperature - data.dewPoint;
@@ -1529,9 +1744,9 @@ class AppController {
 
     // 5. TÜRETİLMİŞ PARAMETRE: Buhar Basıncı & VPD Kartı
     if (data.vaporPressure != null) {
-      this.dom.valVaporPressure.textContent = data.vaporPressure.toFixed(1);
+      this.dom.valVaporPressure.textContent = data.vaporPressure.toFixed(2);
       this.dom.vpdBadge.textContent = `VPD: ${data.vpd != null ? data.vpd.toFixed(2) : '--'} kPa`;
-      this.dom.valVpSat.textContent = `${data.vpSat != null ? data.vpSat.toFixed(1) : '--'} hPa`;
+      this.dom.valVpSat.textContent = `${data.vpSat != null ? data.vpSat.toFixed(2) : '--'} hPa`;
     }
 
     // 6. Pil & Donanım Kartı
@@ -1566,13 +1781,13 @@ class AppController {
     this.dom.totalPointsCount.textContent = list.length;
 
     if (list.length > 0) {
-      const conv = (t) => this.currentUnit === 'F' ? (t * 9 / 5 + 32).toFixed(1) : t.toFixed(1);
+      const conv = (t) => this.currentUnit === 'F' ? ((t * 9 / 5) + 32).toFixed(2) : t.toFixed(2);
 
       const temps = list.map(r => r.temperature);
       this.dom.tempMinMax.textContent = `${conv(Math.min(...temps))} / ${conv(Math.max(...temps))}`;
 
       const hums = list.map(r => r.humidity);
-      this.dom.humMinMax.textContent = `%${Math.min(...hums)} / %${Math.max(...hums)}`;
+      this.dom.humMinMax.textContent = `%${Math.min(...hums).toFixed(2)} / %${Math.max(...hums).toFixed(2)}`;
 
       const apps = list.map(r => r.apparentTemp != null ? r.apparentTemp : r.temperature);
       this.dom.apparentMinMax.textContent = `${conv(Math.min(...apps))} / ${conv(Math.max(...apps))}`;
@@ -1655,6 +1870,7 @@ class AppController {
         }
 
         const vp = item.vaporPressure != null ? item.vaporPressure : AtmosphericMetrics.calculateVaporPressure(item.temperature, item.humidity).vpAct;
+        const humNum = Number(item.humidity);
 
         return `
           <div class="p-3.5 rounded-2xl bg-white dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700/80 shadow-sm space-y-2.5 transition-all">
@@ -1668,14 +1884,14 @@ class AppController {
               <div>
                 <span class="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-sans">Sıcaklık</span>
                 <div class="flex items-baseline gap-1">
-                  <span class="text-xl font-extrabold font-mono text-emerald-600 dark:text-emerald-400">${t.toFixed(1)}</span>
+                  <span class="text-xl font-extrabold font-mono text-emerald-600 dark:text-emerald-400">${t.toFixed(2)}</span>
                   <span class="text-xs font-bold text-emerald-600 dark:text-emerald-400">°${this.currentUnit}</span>
                 </div>
               </div>
               <div>
                 <span class="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-sans">Hissedilen</span>
                 <div class="flex items-baseline gap-1">
-                  <span class="text-xl font-extrabold font-mono text-amber-500 dark:text-amber-400">${at.toFixed(1)}</span>
+                  <span class="text-xl font-extrabold font-mono text-amber-500 dark:text-amber-400">${at.toFixed(2)}</span>
                   <span class="text-xs font-bold text-amber-500 dark:text-amber-400">°${this.currentUnit}</span>
                 </div>
               </div>
@@ -1686,13 +1902,13 @@ class AppController {
               <div>
                 <span class="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-sans">Bağıl Nem</span>
                 <div class="flex items-baseline gap-1">
-                  <span class="text-xl font-extrabold font-mono text-cyan-600 dark:text-cyan-400">%${item.humidity}</span>
+                  <span class="text-xl font-extrabold font-mono text-cyan-600 dark:text-cyan-400">%${humNum.toFixed(2)}</span>
                 </div>
               </div>
               <div>
                 <span class="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-sans">Buhar Basıncı</span>
                 <div class="flex items-baseline gap-1">
-                  <span class="text-xl font-extrabold font-mono text-indigo-600 dark:text-indigo-400">${vp.toFixed(1)}</span>
+                  <span class="text-xl font-extrabold font-mono text-indigo-600 dark:text-indigo-400">${vp.toFixed(2)}</span>
                   <span class="text-xs font-semibold text-indigo-600 dark:text-indigo-400">hPa</span>
                 </div>
               </div>
@@ -1700,8 +1916,8 @@ class AppController {
 
             <!-- Alt Detay Çubuğu: Çiğ Noktası ve Pil -->
             <div class="flex items-center justify-between text-[11px] pt-1.5 border-t border-slate-200/80 dark:border-slate-700/60 text-slate-500 dark:text-slate-400">
-              <span>Çiğ Noktası: <strong class="text-purple-600 dark:text-purple-400 font-mono">${dp.toFixed(1)} °${this.currentUnit}</strong></span>
-              <span>Pil: <strong class="text-slate-700 dark:text-slate-300 font-mono">${item.battery != null ? `%${item.battery}` : (item.voltage ? `${item.voltage}V` : '--')}</strong></span>
+              <span>Çiğ Noktası: <strong class="text-purple-600 dark:text-purple-400 font-mono">${dp.toFixed(2)} °${this.currentUnit}</strong></span>
+              <span>Pil: <strong class="text-slate-700 dark:text-slate-300 font-mono">${item.battery != null ? `%${item.battery}` : (item.voltage ? `${item.voltage.toFixed(2)}V` : '--')}</strong></span>
             </div>
           </div>
         `;
@@ -1729,26 +1945,27 @@ class AppController {
         }
 
         const vp = item.vaporPressure != null ? item.vaporPressure : AtmosphericMetrics.calculateVaporPressure(item.temperature, item.humidity).vpAct;
+        const humNum = Number(item.humidity);
 
         return `
           <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
             <td class="py-2.5 sm:py-3 px-3 text-slate-600 dark:text-slate-300 font-sans font-medium">${timeStr}</td>
             <td class="py-2.5 sm:py-3 px-3">${typeBadge}</td>
             <td class="py-2.5 sm:py-3 px-3 font-bold text-[#0b57d0] dark:text-[#a8c7fa]">
-              ${t.toFixed(1)} °${this.currentUnit}
+              ${t.toFixed(2)} °${this.currentUnit}
             </td>
             <td class="py-2.5 sm:py-3 px-3 font-semibold text-amber-500 dark:text-amber-400">
-              ${at.toFixed(1)} °${this.currentUnit}
+              ${at.toFixed(2)} °${this.currentUnit}
             </td>
-            <td class="py-2.5 sm:py-3 px-3 text-cyan-600 dark:text-cyan-400 font-semibold">%${item.humidity}</td>
+            <td class="py-2.5 sm:py-3 px-3 text-cyan-600 dark:text-cyan-400 font-semibold">%${humNum.toFixed(2)}</td>
             <td class="py-2.5 sm:py-3 px-3 text-purple-600 dark:text-purple-400 font-medium">
-              ${dp.toFixed(1)} °${this.currentUnit}
+              ${dp.toFixed(2)} °${this.currentUnit}
             </td>
             <td class="py-2.5 sm:py-3 px-3 text-indigo-600 dark:text-indigo-400 font-medium">
-              ${vp.toFixed(1)} hPa
+              ${vp.toFixed(2)} hPa
             </td>
             <td class="py-2.5 sm:py-3 px-3 text-slate-500 dark:text-slate-400">
-              ${item.battery != null ? `%${item.battery}` : (item.voltage ? `${item.voltage}V` : '--')}
+              ${item.battery != null ? `%${item.battery}` : (item.voltage ? `${item.voltage.toFixed(2)}V` : '--')}
             </td>
           </tr>
         `;
@@ -1913,7 +2130,7 @@ class AppController {
                 const unit = context.dataset.yAxisID === 'yTemp'
                   ? `°${this.currentUnit}`
                   : (context.dataset.yAxisID === 'yHum' ? '%' : ' hPa');
-                return ` ${label}: ${Number(val).toFixed(1)} ${unit}`;
+                return ` ${label}: ${Number(val).toFixed(2)} ${unit}`;
               },
               footer: (items) => {
                 if (!items || items.length === 0) return '';
@@ -1931,8 +2148,8 @@ class AppController {
                 }
                 if (tempItem && appItem) {
                   const diff = appItem.parsed.y - tempItem.parsed.y;
-                  if (Math.abs(diff) >= 1.0) {
-                    notes.push(`🌡️ Hissedilen Farkı: ${diff > 0 ? '+' : ''}${diff.toFixed(1)}°${this.currentUnit}`);
+                  if (Math.abs(diff) >= 0.1) {
+                    notes.push(`🌡️ Hissedilen Farkı: ${diff > 0 ? '+' : ''}${diff.toFixed(2)}°${this.currentUnit}`);
                   }
                 }
                 return notes.join(' | ');
@@ -2066,13 +2283,13 @@ class AppController {
     }
 
     if (records.length === 0) {
-      if (this.dom.chartKpiCurrent) this.dom.chartKpiCurrent.textContent = '--.-';
+      if (this.dom.chartKpiCurrent) this.dom.chartKpiCurrent.textContent = '--.--';
       if (this.dom.chartKpiCurrentUnit) this.dom.chartKpiCurrentUnit.textContent = `°${this.currentUnit}`;
-      if (this.dom.chartKpiMin) this.dom.chartKpiMin.textContent = '--.-';
+      if (this.dom.chartKpiMin) this.dom.chartKpiMin.textContent = '--.--';
       if (this.dom.chartKpiMinTime) this.dom.chartKpiMinTime.textContent = '--:--';
-      if (this.dom.chartKpiMax) this.dom.chartKpiMax.textContent = '--.-';
+      if (this.dom.chartKpiMax) this.dom.chartKpiMax.textContent = '--.--';
       if (this.dom.chartKpiMaxTime) this.dom.chartKpiMaxTime.textContent = '--:--';
-      if (this.dom.chartKpiAvg) this.dom.chartKpiAvg.textContent = '--.-';
+      if (this.dom.chartKpiAvg) this.dom.chartKpiAvg.textContent = '--.--';
       if (this.dom.chartKpiCount) this.dom.chartKpiCount.textContent = '0 nokta';
 
       this.chart.data.labels = [];
@@ -2158,15 +2375,15 @@ class AppController {
       const maxTime = formatClock(records[maxIdx] ? records[maxIdx].timestamp : Date.now());
 
       const sum = arr.reduce((a, b) => a + b, 0);
-      const avg = isPercentage ? Math.round(sum / arr.length) : (sum / arr.length).toFixed(1);
+      const avg = (sum / arr.length).toFixed(2);
 
-      if (this.dom.chartKpiCurrent) this.dom.chartKpiCurrent.textContent = isPercentage ? current : Number(current).toFixed(1);
+      if (this.dom.chartKpiCurrent) this.dom.chartKpiCurrent.textContent = Number(current).toFixed(2);
       if (this.dom.chartKpiCurrentUnit) this.dom.chartKpiCurrentUnit.textContent = unit;
 
-      if (this.dom.chartKpiMin) this.dom.chartKpiMin.textContent = isPercentage ? minVal : Number(minVal).toFixed(1);
+      if (this.dom.chartKpiMin) this.dom.chartKpiMin.textContent = Number(minVal).toFixed(2);
       if (this.dom.chartKpiMinTime) this.dom.chartKpiMinTime.textContent = minTime;
 
-      if (this.dom.chartKpiMax) this.dom.chartKpiMax.textContent = isPercentage ? maxVal : Number(maxVal).toFixed(1);
+      if (this.dom.chartKpiMax) this.dom.chartKpiMax.textContent = Number(maxVal).toFixed(2);
       if (this.dom.chartKpiMaxTime) this.dom.chartKpiMaxTime.textContent = maxTime;
 
       if (this.dom.chartKpiAvg) this.dom.chartKpiAvg.textContent = avg;
@@ -2800,6 +3017,10 @@ class AppController {
       if (confirm('Sensörü fabrika varsayılan yapılandırmasına sıfırlamak istediğinize emin misiniz?')) {
         this.sendDevPacket(new Uint8Array([0x56]), 'Varsayılan Yapılandırma (0x56)');
       }
+    });
+
+    document.getElementById('btnDevReadMemo')?.addEventListener('click', () => {
+      this.syncDeviceHistory(false);
     });
 
     document.getElementById('btnDevDeleteRecords')?.addEventListener('click', () => {

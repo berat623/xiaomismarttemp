@@ -59,7 +59,7 @@ def calc_dew_point(temp: float, hum: float) -> float:
     b = 243.04
     alpha = ((a * temp) / (b + temp)) + math.log(hum / 100.0)
     dew_point = (b * alpha) / (a - alpha)
-    return round(dew_point, 1)
+    return round(dew_point, 2)
 
 
 def calc_vapor_pressure(temp: float, hum: float) -> Tuple[float, float, float]:
@@ -67,7 +67,7 @@ def calc_vapor_pressure(temp: float, hum: float) -> Tuple[float, float, float]:
     vp_sat = 6.1121 * math.exp((17.502 * temp) / (240.97 + temp))
     vp_act = vp_sat * (max(0.0, min(100.0, float(hum))) / 100.0)
     vpd = (vp_sat - vp_act) / 10.0
-    return round(vp_act, 1), round(vp_sat, 1), round(vpd, 2)
+    return round(vp_act, 2), round(vp_sat, 2), round(vpd, 2)
 
 
 def calc_apparent_temp(temp: float, hum: float) -> float:
@@ -86,10 +86,10 @@ def calc_apparent_temp(temp: float, hum: float) -> float:
               + 0.00085282 * tf * (hum ** 2)
               - 0.00000199 * (tf ** 2) * (hum ** 2))
         tc = (hi - 32.0) / 1.8
-        return round(tc, 1)
+        return round(tc, 2)
 
     at = temp + (0.33 * e) - 4.0
-    return round(at, 1)
+    return round(at, 2)
 
 
 class DatabaseManager:
@@ -106,7 +106,7 @@ class DatabaseManager:
                     record_type TEXT NOT NULL,
                     temperature REAL NOT NULL,
                     apparent_temp REAL,
-                    humidity INTEGER NOT NULL,
+                    humidity REAL NOT NULL,
                     battery INTEGER,
                     voltage REAL,
                     dew_point REAL,
@@ -124,7 +124,7 @@ class DatabaseManager:
                     except Exception:
                         pass
 
-    def insert(self, record_type: str, temp: float, hum: int, bat: Optional[int], volt: Optional[float], rssi: Optional[int] = None, ts: Optional[datetime.datetime] = None):
+    def insert(self, record_type: str, temp: float, hum: float, bat: Optional[int], volt: Optional[float], rssi: Optional[int] = None, ts: Optional[datetime.datetime] = None):
         if ts is None:
             ts = datetime.datetime.now()
         dew = calc_dew_point(temp, hum)
@@ -143,7 +143,7 @@ class DatabaseManager:
         with open(CSV_FILE, "a", encoding="utf-8") as f:
             if not file_exists:
                 f.write("Tarih_Saat;Tur;Sicaklik_C;Hissedilen_Sicaklik_C;Nem_Yuzde;Cig_Noktasi_C;Buhar_Basinci_hPa;VPD_kPa;Pil_Yuzde;Voltaj_V;RSSI_dBm\n")
-            f.write(f"{ts_str};{record_type};{temp:.2f};{at:.1f};{hum};{dew:.1f};{vp_act:.1f};{vpd:.2f};{bat or ''};{volt or ''};{rssi or ''}\n")
+            f.write(f"{ts_str};{record_type};{temp:.2f};{at:.2f};{hum:.2f};{dew:.2f};{vp_act:.2f};{vpd:.2f};{bat or ''};{volt or ''};{rssi or ''}\n")
 
 
 async def scan_devices():
@@ -177,24 +177,24 @@ async def scan_devices():
     return [item[0] for item in matched] or [item[0] for item in all_devices]
 
 
-def parse_atc_advertisement(data: bytes) -> Optional[Tuple[float, int, float, int]]:
+def parse_atc_advertisement(data: bytes) -> Optional[Tuple[float, float, float, int]]:
     """ATC1441 veya PVVX BLE sinyal yayın paketini çözümler"""
     if len(data) >= 15:
         # PVVX Format (Little-Endian)
         # Byte 6-7: temp (int16 / 100), Byte 8-9: hum (int16 / 100), Byte 10-11: volt (mV), Byte 12: bat %
         temp = struct.unpack_from("<h", data, 6)[0] / 100.0
-        hum = round(struct.unpack_from("<h", data, 8)[0] / 100.0)
+        hum = struct.unpack_from("<h", data, 8)[0] / 100.0
         volt = struct.unpack_from("<H", data, 10)[0] / 1000.0
         bat = data[12]
-        return round(temp, 2), hum, round(volt, 2), bat
+        return round(temp, 2), round(hum, 2), round(volt, 2), bat
     elif len(data) >= 13:
         # ATC1441 Format (Big-Endian)
         # Byte 6-7: temp (int16 / 10), Byte 8: hum (uint8), Byte 9: bat (uint8), Byte 10-11: volt (mV)
         temp = struct.unpack_from(">h", data, 6)[0] / 10.0
-        hum = data[8]
+        hum = float(data[8])
         bat = data[9]
         volt = struct.unpack_from(">H", data, 10)[0] / 1000.0
-        return round(temp, 2), hum, round(volt, 2), bat
+        return round(temp, 2), round(hum, 2), round(volt, 2), bat
     return None
 
 
@@ -222,7 +222,7 @@ async def run_passive_listener(mac_address: Optional[str], db: DatabaseManager):
                     now_str = datetime.datetime.now().strftime("%H:%M:%S")
 
                     print(f"[{now_str}] 📶 [{advertisement_data.rssi} dBm] {device.address} ({name}) -> "
-                          f"🌡️ {temp}°C | ☀️ His: {at}°C | 💧 %{hum} | 🌧️ Çiğ: {dew}°C | 💨 {vp_act} hPa | 🔋 %{bat} ({volt}V)")
+                          f"🌡️ {temp:.2f}°C | ☀️ His: {at:.2f}°C | 💧 %{hum:.2f} | 🌧️ Çiğ: {dew:.2f}°C | 💨 {vp_act:.2f} hPa | 🔋 %{bat} ({volt:.2f}V)")
 
                     db.insert("ble_adv", temp, hum, bat, volt, rssi=advertisement_data.rssi)
 
@@ -258,7 +258,7 @@ async def run_live_gatt(mac_address: str, db: DatabaseManager):
                 if len(data) >= 5:
                     temp_raw = struct.unpack_from("<h", data, 0)[0]
                     temp = round(temp_raw / 100.0, 2)
-                    hum = data[2]
+                    hum = float(data[2])
                     volt_raw = struct.unpack_from("<h", data, 3)[0]
                     volt = round(volt_raw / 1000.0, 2)
                     bat = min(100, max(0, int(round((volt - 2.1) / 1.0 * 100))))
@@ -268,7 +268,7 @@ async def run_live_gatt(mac_address: str, db: DatabaseManager):
                     vp_act, _, vpd = calc_vapor_pressure(temp, hum)
 
                     now_str = datetime.datetime.now().strftime("%H:%M:%S")
-                    print(f"[{now_str}] 🌡️ {temp}°C | ☀️ His: {at}°C | 💧 %{hum} | 🌧️ Çiğ: {dew}°C | 💨 {vp_act} hPa | 🔋 %{bat} ({volt}V)")
+                    print(f"[{now_str}] 🌡️ {temp:.2f}°C | ☀️ His: {at:.2f}°C | 💧 %{hum:.2f} | 🌧️ Çiğ: {dew:.2f}°C | 💨 {vp_act:.2f} hPa | 🔋 %{bat} ({volt:.2f}V)")
                     db.insert("live_stock", temp, hum, bat, volt)
 
             await client.start_notify(CHAR_STOCK_LIVE, stock_handler)
@@ -283,7 +283,7 @@ async def run_live_gatt(mac_address: str, db: DatabaseManager):
                     at = calc_apparent_temp(cached_temp, cached_hum)
                     vp_act, _, vpd = calc_vapor_pressure(cached_temp, cached_hum)
                     now_str = datetime.datetime.now().strftime("%H:%M:%S")
-                    print(f"[{now_str}] 🌡️ {cached_temp}°C | ☀️ His: {at}°C | 💧 %{cached_hum} | 🌧️ Çiğ: {dew}°C | 💨 {vp_act} hPa | 🔋 %{cached_bat} ({cached_volt}V)")
+                    print(f"[{now_str}] 🌡️ {cached_temp:.2f}°C | ☀️ His: {at:.2f}°C | 💧 %{cached_hum:.2f} | 🌧️ Çiğ: {dew:.2f}°C | 💨 {vp_act:.2f} hPa | 🔋 %{cached_bat} ({cached_volt:.2f}V)")
                     db.insert("live_atc", cached_temp, cached_hum, cached_bat, cached_volt)
 
             def temp_handler(sender: BleakGATTCharacteristic, data: bytearray):
@@ -295,9 +295,9 @@ async def run_live_gatt(mac_address: str, db: DatabaseManager):
             def hum_handler(sender: BleakGATTCharacteristic, data: bytearray):
                 nonlocal cached_hum
                 if len(data) >= 2:
-                    cached_hum = round(struct.unpack_from("<H", data, 0)[0] / 100.0)
+                    cached_hum = round(struct.unpack_from("<H", data, 0)[0] / 100.0, 2)
                 elif len(data) == 1:
-                    cached_hum = data[0]
+                    cached_hum = float(data[0])
                 emit_atc()
 
             if CHAR_TEMP_HIGH_RES.lower() in char_uuids:

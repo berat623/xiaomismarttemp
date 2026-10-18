@@ -215,7 +215,7 @@
         </div>
 
         <div class="flex items-baseline gap-2 mb-2">
-          <span id="valTemp" class="text-4xl sm:text-5xl font-extrabold tracking-tight font-mono text-slate-900 dark:text-slate-100 tabular-nums">--.-</span>
+          <span id="valTemp" class="text-4xl sm:text-5xl font-extrabold tracking-tight font-mono text-slate-900 dark:text-slate-100 tabular-nums">--.--</span>
           <span id="lblTempUnit" class="text-xl sm:text-2xl font-bold text-[#0b57d0] dark:text-[#a8c7fa]">°C</span>
         </div>
 
@@ -246,7 +246,7 @@
         </div>
 
         <div class="flex items-baseline gap-2 mb-2">
-          <span id="valHum" class="text-4xl sm:text-5xl font-extrabold tracking-tight font-mono text-slate-900 dark:text-slate-100 tabular-nums">--</span>
+          <span id="valHum" class="text-4xl sm:text-5xl font-extrabold tracking-tight font-mono text-slate-900 dark:text-slate-100 tabular-nums">--.--</span>
           <span class="text-xl sm:text-2xl font-bold text-[#0284c7] dark:text-sky-400">%</span>
         </div>
 
@@ -279,7 +279,7 @@
         </div>
 
         <div class="flex items-baseline gap-2 mb-2">
-          <span id="valApparentTemp" class="text-4xl sm:text-5xl font-extrabold tracking-tight font-mono text-slate-900 dark:text-slate-100 tabular-nums">--.-</span>
+          <span id="valApparentTemp" class="text-4xl sm:text-5xl font-extrabold tracking-tight font-mono text-slate-900 dark:text-slate-100 tabular-nums">--.--</span>
           <span id="lblApparentUnit" class="text-xl sm:text-2xl font-bold text-amber-600 dark:text-amber-400">°C</span>
         </div>
 
@@ -307,7 +307,7 @@
         </div>
 
         <div class="flex items-baseline gap-2 mb-2">
-          <span id="valDewPointCard" class="text-4xl sm:text-5xl font-extrabold tracking-tight font-mono text-slate-900 dark:text-slate-100 tabular-nums">--.-</span>
+          <span id="valDewPointCard" class="text-4xl sm:text-5xl font-extrabold tracking-tight font-mono text-slate-900 dark:text-slate-100 tabular-nums">--.--</span>
           <span id="lblDewPointUnit" class="text-xl sm:text-2xl font-bold text-purple-600 dark:text-purple-400">°C</span>
         </div>
 
@@ -335,7 +335,7 @@
         </div>
 
         <div class="flex items-baseline gap-2 mb-2">
-          <span id="valVaporPressure" class="text-4xl sm:text-5xl font-extrabold tracking-tight font-mono text-slate-900 dark:text-slate-100 tabular-nums">--.-</span>
+          <span id="valVaporPressure" class="text-4xl sm:text-5xl font-extrabold tracking-tight font-mono text-slate-900 dark:text-slate-100 tabular-nums">--.--</span>
           <span class="text-xl sm:text-2xl font-bold text-[#0b57d0] dark:text-blue-400">hPa</span>
         </div>
 
@@ -452,7 +452,7 @@
             Son Okunan Değer
           </span>
           <div class="flex items-baseline gap-1 mt-0.5">
-            <span id="chartKpiCurrent" class="font-mono font-bold text-base sm:text-lg text-[#0b57d0] dark:text-[#a8c7fa]">--.-</span>
+            <span id="chartKpiCurrent" class="font-mono font-bold text-base sm:text-lg text-[#0b57d0] dark:text-[#a8c7fa]">--.--</span>
             <span id="chartKpiCurrentUnit" class="text-xs font-bold text-[#0b57d0] dark:text-[#a8c7fa]">°C</span>
           </div>
         </div>
@@ -463,7 +463,7 @@
             Periyot Minimum
           </span>
           <div class="flex items-baseline gap-1 mt-0.5">
-            <span id="chartKpiMin" class="font-mono font-bold text-base sm:text-lg text-cyan-600 dark:text-cyan-400">--.-</span>
+            <span id="chartKpiMin" class="font-mono font-bold text-base sm:text-lg text-cyan-600 dark:text-cyan-400">--.--</span>
             <span id="chartKpiMinTime" class="text-[10px] font-mono text-slate-400 dark:text-slate-500 ml-auto">--:--</span>
           </div>
         </div>
@@ -474,7 +474,7 @@
             Periyot Maksimum
           </span>
           <div class="flex items-baseline gap-1 mt-0.5">
-            <span id="chartKpiMax" class="font-mono font-bold text-base sm:text-lg text-amber-600 dark:text-amber-400">--.-</span>
+            <span id="chartKpiMax" class="font-mono font-bold text-base sm:text-lg text-amber-600 dark:text-amber-400">--.--</span>
             <span id="chartKpiMaxTime" class="text-[10px] font-mono text-slate-400 dark:text-slate-500 ml-auto">--:--</span>
           </div>
         </div>
@@ -485,7 +485,7 @@
             Ortalama / Ölçüm
           </span>
           <div class="flex items-baseline gap-1 mt-0.5">
-            <span id="chartKpiAvg" class="font-mono font-bold text-base sm:text-lg text-slate-800 dark:text-slate-200">--.-</span>
+            <span id="chartKpiAvg" class="font-mono font-bold text-base sm:text-lg text-slate-800 dark:text-slate-200">--.--</span>
             <span id="chartKpiCount" class="text-[10px] font-mono text-slate-400 dark:text-slate-500 ml-auto">0 nokta</span>
           </div>
         </div>
@@ -519,6 +519,12 @@
 
         <div class="flex items-center flex-wrap gap-2">
           
+          <!-- Sync Device History Button -->
+          <button id="btnFetchHistory" class="flex-1 sm:flex-none px-4 py-2 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 bg-[#d3e3fd] hover:bg-[#c2d7fb] text-[#041e49] dark:bg-[#0842a0] dark:hover:bg-[#0b57d0] dark:text-[#d3e3fd] border border-[#0b57d0]/20 active:scale-95 transition-all shadow-sm" title="Ölçüm yapan cihazın kendi dahili flash belleğinde saklanan geçmiş verileri aktar">
+            <i data-lucide="history" class="w-4 h-4"></i>
+            <span>Cihaz Belleğinden Aktar</span>
+          </button>
+
           <!-- Export CSV Button -->
           <button id="btnExportCsv" class="flex-1 sm:flex-none px-4 py-2 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 bg-[#edf2f9] dark:bg-[#1e2938] hover:bg-[#e0e8f4] dark:hover:bg-[#253346] text-[#0b57d0] dark:text-[#a8c7fa] border border-[#d8e2ee] dark:border-[#2e3b4e] active:scale-95 transition-all">
             <i data-lucide="download" class="w-4 h-4"></i>
@@ -632,6 +638,10 @@
         <button id="btnDevSetDefault" class="px-3 py-1.5 rounded-full font-semibold bg-[#edf2f9] hover:bg-[#e0e8f4] dark:bg-[#1e2938] dark:hover:bg-[#253346] text-slate-700 dark:text-slate-300 border border-[#d8e2ee] dark:border-[#2e3b4e] flex items-center gap-1.5 transition-all flex-shrink-0 active:scale-95">
           <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
           <span>Varsayılan Yapılandırma</span>
+        </button>
+        <button id="btnDevReadMemo" class="px-3 py-1.5 rounded-full font-semibold bg-[#d3e3fd] hover:bg-[#c2d7fb] text-[#041e49] dark:bg-[#0842a0] dark:hover:bg-[#0b57d0] dark:text-[#d3e3fd] flex items-center gap-1.5 transition-all flex-shrink-0 active:scale-95" title="Sensör flaş belleğindeki tüm kayıtları çek (0x35)">
+          <i data-lucide="history" class="w-3.5 h-3.5"></i>
+          <span>Bellek Kayıtlarını İndir (0x35)</span>
         </button>
         <button id="btnDevDeleteRecords" class="px-3 py-1.5 rounded-full font-semibold bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/20 flex items-center gap-1.5 transition-all flex-shrink-0 active:scale-95">
           <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
