@@ -4,7 +4,7 @@
  * Bluetooth BLE sensor telemetry operates locally via Web Bluetooth API.
  */
 
-const CACHE_NAME = 'xiaomi-smarttemp-v2.2';
+const CACHE_NAME = 'xiaomi-smarttemp-v3.0';
 
 const PRECACHE_ASSETS = [
   './',
