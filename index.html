@@ -104,16 +104,11 @@
           <span id="lastUpdatedAgo" class="text-slate-400 hidden">• Az önce</span>
         </div>
 
-        <!-- Live Signal / RSSI Pill (Desktop) with 4-Bar Signal Meter -->
-        <div id="signalPill" class="hidden md:flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#edf2f9] dark:bg-[#1e2938] border border-[#d8e2ee] dark:border-[#2e3b4e] text-xs font-mono font-semibold text-[#0b57d0] dark:text-[#a8c7fa]" title="Bluetooth Sinyal Gücü (RSSI)">
-          <div class="signal-bars" id="signalBarsHeader">
-            <span class="signal-bar"></span>
-            <span class="signal-bar"></span>
-            <span class="signal-bar"></span>
-            <span class="signal-bar"></span>
-          </div>
-          <span id="signalRssiText">-- dBm</span>
-        </div>
+        <!-- Desktop Fetch Records Button -->
+        <button id="btnFetchHistoryHeader" class="hidden md:flex px-4 py-2 rounded-full text-xs font-semibold items-center gap-1.5 bg-[#d3e3fd] hover:bg-[#c2d7fb] text-[#041e49] dark:bg-[#0842a0] dark:hover:bg-[#0b57d0] dark:text-[#d3e3fd] border border-[#0b57d0]/20 shadow-sm" title="Sensör flaş belleğindeki tüm kayıtları çek">
+          <i data-lucide="download-cloud" class="w-4 h-4"></i>
+          <span>Ölçümleri Çek</span>
+        </button>
 
         <!-- Desktop Connect Button (M3 Filled Button) -->
         <div class="hidden sm:flex items-center">
@@ -134,25 +129,19 @@
 
     <!-- Mobile-Exclusive Action Bar -->
     <div class="sm:hidden pt-2.5 mt-2 border-t border-[#d8e2ee] dark:border-[#263445] flex items-center gap-2">
-      <button id="btnConnectMobile" class="flex-1 py-2.5 px-4 rounded-full text-xs font-bold flex items-center justify-center gap-2 bg-[#0b57d0] hover:bg-[#0842a0] text-white shadow-sm">
+      <button id="btnConnectMobile" class="flex-1 py-2.5 px-3 rounded-full text-xs font-bold flex items-center justify-center gap-1.5 bg-[#0b57d0] hover:bg-[#0842a0] text-white shadow-sm">
         <i data-lucide="bluetooth" class="w-4 h-4"></i>
-        <span>Cihaza Bağlan</span>
+        <span>Bağlan</span>
+      </button>
+
+      <button id="btnFetchHistoryMobile" class="flex-1 py-2.5 px-3 rounded-full text-xs font-bold flex items-center justify-center gap-1.5 bg-[#d3e3fd] dark:bg-[#0842a0] text-[#041e49] dark:text-[#d3e3fd] border border-[#0b57d0]/20 shadow-sm">
+        <i data-lucide="download-cloud" class="w-4 h-4"></i>
+        <span>Ölçümleri Çek</span>
       </button>
 
       <!-- Mobile Offline Indicator -->
       <div id="offlineBadgeMobile" class="hidden px-2.5 py-2 rounded-full bg-amber-500/10 dark:bg-amber-400/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 items-center justify-center" title="Çevrimdışı Mod">
         <i data-lucide="wifi-off" class="w-3.5 h-3.5"></i>
-      </div>
-
-      <!-- Live Signal on Mobile with 4-Bar Signal Meter -->
-      <div id="signalPillMobile" class="hidden px-3 py-2 rounded-full bg-[#edf2f9] dark:bg-[#1e2938] border border-[#d8e2ee] dark:border-[#2e3b4e] items-center gap-1.5 font-mono text-[11px] font-bold text-[#0b57d0] dark:text-[#a8c7fa]" title="Bluetooth Sinyal Gücü">
-        <div class="signal-bars" id="signalBarsMobile">
-          <span class="signal-bar"></span>
-          <span class="signal-bar"></span>
-          <span class="signal-bar"></span>
-          <span class="signal-bar"></span>
-        </div>
-        <span id="signalRssiTextMobile">-- dBm</span>
       </div>
 
       <div class="px-3 py-2.5 rounded-full bg-[#edf2f9] dark:bg-[#1e2938] border border-[#d8e2ee] dark:border-[#2e3b4e] flex items-center justify-center" title="Bağlantı Durumu">
@@ -178,113 +167,52 @@
       </div>
     </div>
 
-    <!-- 3 PRIMARY TELEMETRY CARDS (Fluid, High-Contrast Responsive Grid) -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-3.5 sm:gap-5">
+    <!-- 2 PRIMARY TELEMETRY CARDS (Clean, Fluid, Zero-Clutter Grid) -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-6">
       
       <!-- Card 1: Sıcaklık (Temperature) -->
-      <div class="m3-card group relative p-4 sm:p-5">
-        <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2 sm:mb-3">
+      <div class="m3-card group relative p-5 sm:p-6">
+        <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-3 sm:mb-4">
           <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider">
-            <span class="p-2 rounded-2xl bg-[#d3e3fd] text-[#041e49] dark:bg-[#0842a0] dark:text-[#d3e3fd]">
-              <i data-lucide="thermometer" class="w-4 h-4"></i>
+            <span class="p-2.5 rounded-2xl bg-[#d3e3fd] text-[#041e49] dark:bg-[#0842a0] dark:text-[#d3e3fd]">
+              <i data-lucide="thermometer" class="w-5 h-5"></i>
             </span>
-            <span class="text-slate-700 dark:text-slate-300 font-semibold">Sıcaklık</span>
+            <span class="text-slate-700 dark:text-slate-300 font-bold text-sm">Sıcaklık</span>
           </div>
           <!-- Unit Switcher -->
-          <button id="btnToggleUnit" class="text-xs font-mono font-bold px-3 py-1 rounded-full bg-[#edf2f9] dark:bg-[#1e2938] text-[#0b57d0] dark:text-[#a8c7fa] hover:bg-[#e0e8f4] dark:hover:bg-[#253346] border border-[#d8e2ee] dark:border-[#2e3b4e]">
+          <button id="btnToggleUnit" class="text-xs font-mono font-bold px-3.5 py-1.5 rounded-full bg-[#edf2f9] dark:bg-[#1e2938] text-[#0b57d0] dark:text-[#a8c7fa] hover:bg-[#e0e8f4] dark:hover:bg-[#253346] border border-[#d8e2ee] dark:border-[#2e3b4e]">
             °C / °F
           </button>
         </div>
 
-        <div class="flex items-baseline gap-2 mb-2">
-          <span id="valTemp" class="text-4xl sm:text-5xl font-extrabold tracking-tight font-mono text-slate-900 dark:text-slate-100 tabular-nums">--.--</span>
-          <span id="lblTempUnit" class="text-xl sm:text-2xl font-bold text-[#0b57d0] dark:text-[#a8c7fa]">°C</span>
-        </div>
-
-        <div class="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800/80 text-xs text-slate-500 dark:text-slate-400">
-          <div class="flex items-center gap-1">
-            <span class="text-slate-400 dark:text-slate-500">Min/Maks:</span>
-            <span id="tempMinMax" class="font-mono font-medium text-slate-700 dark:text-slate-300">-- / --</span>
-          </div>
-          <div id="tempTrendBadge" class="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#edf2f9] dark:bg-[#1e2938] text-slate-600 dark:text-slate-300 font-medium text-[11px]">
-            <i data-lucide="minus" class="w-3 h-3"></i>
-            <span>Dengeli</span>
-          </div>
+        <div class="flex items-baseline gap-2 py-2">
+          <span id="valTemp" class="text-5xl sm:text-6xl font-extrabold tracking-tight font-mono text-slate-900 dark:text-slate-100 tabular-nums">--.--</span>
+          <span id="lblTempUnit" class="text-2xl sm:text-3xl font-bold text-[#0b57d0] dark:text-[#a8c7fa]">°C</span>
         </div>
       </div>
 
       <!-- Card 2: Bağıl Nem (Relative Humidity) -->
-      <div class="m3-card group relative p-4 sm:p-5">
-        <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2 sm:mb-3">
+      <div class="m3-card group relative p-5 sm:p-6">
+        <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-3 sm:mb-4">
           <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider">
-            <span class="p-2 rounded-2xl bg-sky-100 text-[#0284c7] dark:bg-sky-950/70 dark:text-sky-300">
-              <i data-lucide="droplets" class="w-4 h-4"></i>
+            <span class="p-2.5 rounded-2xl bg-sky-100 text-[#0284c7] dark:bg-sky-950/70 dark:text-sky-300">
+              <i data-lucide="droplets" class="w-5 h-5"></i>
             </span>
-            <span class="text-slate-700 dark:text-slate-300 font-semibold">Bağıl Nem</span>
+            <span class="text-slate-700 dark:text-slate-300 font-bold text-sm">Bağıl Nem</span>
           </div>
-          <span id="humidityStatusBadge" class="text-xs px-2.5 py-0.5 rounded-full bg-sky-100 text-[#0284c7] dark:bg-sky-950/80 dark:text-sky-300 border border-sky-200 dark:border-sky-800 font-medium">
+          <span id="humidityStatusBadge" class="text-xs px-3 py-1 rounded-full bg-sky-100 text-[#0284c7] dark:bg-sky-950/80 dark:text-sky-300 border border-sky-200 dark:border-sky-800 font-semibold">
             Bekleniyor
           </span>
         </div>
 
-        <div class="flex items-baseline gap-2 mb-2">
-          <span id="valHum" class="text-4xl sm:text-5xl font-extrabold tracking-tight font-mono text-slate-900 dark:text-slate-100 tabular-nums">--.--</span>
-          <span class="text-xl sm:text-2xl font-bold text-[#0284c7] dark:text-sky-400">%</span>
+        <div class="flex items-baseline gap-2 py-2">
+          <span id="valHum" class="text-5xl sm:text-6xl font-extrabold tracking-tight font-mono text-slate-900 dark:text-slate-100 tabular-nums">--.--</span>
+          <span class="text-2xl sm:text-3xl font-bold text-[#0284c7] dark:text-sky-400">%</span>
         </div>
 
         <!-- Humidity Bar -->
-        <div class="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden mb-2.5">
+        <div class="w-full h-2.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden mt-2">
           <div id="humProgressBar" class="h-full bg-gradient-to-r from-sky-400 to-[#0b57d0] rounded-full" style="width: 0%"></div>
-        </div>
-
-        <div class="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800/80 text-xs text-slate-500 dark:text-slate-400">
-          <div class="flex items-center gap-1">
-            <span class="text-slate-400 dark:text-slate-500">Min/Maks:</span>
-            <span id="humMinMax" class="font-mono font-medium text-slate-700 dark:text-slate-300">-- / --</span>
-          </div>
-          <span class="text-slate-500 dark:text-slate-400 text-[11px]">İdeal: %40-60</span>
-        </div>
-      </div>
-
-      <!-- Card 3: Pil & Donanım Durumu (Battery & Hardware) -->
-      <div class="m3-card group relative p-4 sm:p-5">
-        <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2 sm:mb-3">
-          <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider">
-            <span class="p-2 rounded-2xl bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-              <i data-lucide="battery-charging" class="w-4 h-4"></i>
-            </span>
-            <span class="text-slate-700 dark:text-slate-300 font-semibold">Pil & Sinyal</span>
-          </div>
-          <span class="text-[10px] uppercase font-mono px-2.5 py-0.5 rounded-full bg-[#edf2f9] dark:bg-[#1e2938] text-slate-600 dark:text-slate-300 border border-[#d8e2ee] dark:border-[#2e3b4e]">
-            BLE GATT
-          </span>
-        </div>
-
-        <div class="flex items-baseline gap-2 mb-2">
-          <span id="valBattery" class="text-4xl sm:text-5xl font-extrabold tracking-tight font-mono text-slate-900 dark:text-slate-100 tabular-nums">--</span>
-          <span class="text-xl sm:text-2xl font-bold text-slate-600 dark:text-slate-300">%</span>
-        </div>
-
-        <!-- Battery Bar -->
-        <div class="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden mb-2.5">
-          <div id="batteryProgressBar" class="h-full bg-[#0b57d0] dark:bg-[#a8c7fa] rounded-full" style="width: 0%"></div>
-        </div>
-
-        <div class="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800/80 text-xs text-slate-500 dark:text-slate-400">
-          <div class="flex items-center gap-1">
-            <span class="text-slate-400 dark:text-slate-500">Kayıt:</span>
-            <span id="totalPointsCount" class="font-mono font-medium text-slate-700 dark:text-slate-300">0</span>
-          </div>
-          <div class="flex items-center gap-2">
-            <span class="text-slate-400 dark:text-slate-500">Sinyal:</span>
-            <div class="signal-bars" id="signalBarsCard">
-              <span class="signal-bar"></span>
-              <span class="signal-bar"></span>
-              <span class="signal-bar"></span>
-              <span class="signal-bar"></span>
-            </div>
-            <span id="valRssi" class="font-mono font-bold text-[#0b57d0] dark:text-[#a8c7fa]">-- dBm</span>
-          </div>
         </div>
       </div>
 
@@ -300,7 +228,7 @@
             <i data-lucide="line-chart" class="w-5 h-5 text-[#0b57d0] dark:text-[#a8c7fa]"></i>
             <span>Analitik Telemetri & Zaman Serisi</span>
           </h2>
-          <p class="text-xs text-slate-500 dark:text-slate-400">Sıcaklık ve bağıl nem dinamikleri grafiği</p>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Sıcaklık ve bağıl nem ölçüm grafiği</p>
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
@@ -385,7 +313,7 @@
             <i data-lucide="radio" class="w-6 h-6"></i>
           </div>
           <h3 class="text-sm sm:text-base font-bold text-slate-800 dark:text-slate-200 mb-1">Ölçüm Akışı Bekleniyor</h3>
-          <p class="text-xs text-slate-500 dark:text-slate-400 max-w-sm">Grafiklerin çizilmesi için lütfen yukarıdaki <strong>"Cihaza Bağlan"</strong> butonuna tıklayarak cihazınızdan canlı telemetri akışını başlatın.</p>
+          <p class="text-xs text-slate-500 dark:text-slate-400 max-w-sm">Grafiklerin çizilmesi için lütfen yukarıdaki <strong>"Cihaza Bağlan"</strong> veya <strong>"Ölçümleri Çek"</strong> butonuna tıklayarak telemetriyi başlatın.</p>
         </div>
         <canvas id="telemetryChart"></canvas>
       </div>
@@ -401,15 +329,15 @@
             <i data-lucide="database" class="w-5 h-5 text-[#0b57d0] dark:text-[#a8c7fa]"></i>
             <span>Veri Kayıt Defteri & Ölçümler</span>
           </h2>
-          <p class="text-xs text-slate-500 dark:text-slate-400">Toplanan sıcaklık ve bağıl nem ölçümleri</p>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Sensörden toplanan sıcaklık ve bağıl nem ölçümleri</p>
         </div>
 
         <div class="flex items-center flex-wrap gap-2">
           
-          <!-- Sync Device History Button -->
-          <button id="btnFetchHistory" class="flex-1 sm:flex-none px-4 py-2 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 bg-[#d3e3fd] hover:bg-[#c2d7fb] text-[#041e49] dark:bg-[#0842a0] dark:hover:bg-[#0b57d0] dark:text-[#d3e3fd] border border-[#0b57d0]/20 shadow-sm" title="Ölçüm yapan cihazın kendi dahili flash belleğinde saklanan geçmiş verileri aktar">
-            <i data-lucide="history" class="w-4 h-4"></i>
-            <span>Cihaz Belleğinden Aktar</span>
+          <!-- Prominent Sync Device History Button -->
+          <button id="btnFetchHistory" class="flex-1 sm:flex-none px-5 py-2.5 rounded-full text-xs sm:text-sm font-bold flex items-center justify-center gap-2 bg-[#0b57d0] hover:bg-[#0842a0] text-white shadow-sm" title="Ölçüm yapan cihazın kendi dahili flash belleğinde saklanan tüm geçmiş verileri aktar">
+            <i data-lucide="download-cloud" class="w-4 h-4"></i>
+            <span>Cihazdaki Tüm Kayıtları Çek</span>
           </button>
 
           <!-- Export CSV Button -->
@@ -433,7 +361,7 @@
         </div>
       </div>
 
-      <!-- 1. Mobile Feed View (Vertical Cards with temperature, humidity, battery) -->
+      <!-- 1. Mobile Feed View (Vertical Cards with temperature and humidity only) -->
       <div id="mobileHistoryFeed" class="sm:hidden space-y-2.5">
         <div class="py-8 text-center text-xs text-slate-400 dark:text-slate-500 font-sans">
           Henüz kayıt bulunmuyor. Cihazınıza bağlanarak ölçüm alabilirsiniz.
@@ -449,12 +377,11 @@
               <th scope="col" class="py-3 px-3">Tür</th>
               <th scope="col" class="py-3 px-3">Sıcaklık</th>
               <th scope="col" class="py-3 px-3">Nem</th>
-              <th scope="col" class="py-3 px-3">Pil</th>
             </tr>
           </thead>
           <tbody id="historyTableBody" class="divide-y divide-[#d8e2ee]/60 dark:divide-[#263445]/60 font-mono">
             <tr>
-              <td colspan="5" class="py-8 text-center text-slate-400 dark:text-slate-500 font-sans">
+              <td colspan="4" class="py-8 text-center text-slate-400 dark:text-slate-500 font-sans">
                 Henüz kayıt bulunmuyor. Cihazınıza bağlanarak ölçüm alabilirsiniz.
               </td>
             </tr>

@@ -32,7 +32,7 @@ const BLE_PROFILES = {
 };
 
 // ==========================================
-// 2. TELEMETRY RECORD FORMATTER
+// 2. TELEMETRY RECORD FORMATTER & SANITIZER
 // ==========================================
 class TelemetryProcessor {
   static format(record) {
@@ -42,16 +42,18 @@ class TelemetryProcessor {
     const h = typeof record.humidity === 'number'
       ? Number(record.humidity.toFixed(2))
       : parseFloat(record.humidity);
-    const b = record.battery != null ? Math.round(Number(record.battery)) : null;
+
+    // Gerçekçi sensör aralığı kontrolü
+    if (isNaN(t) || isNaN(h) || t < -40 || t > 85 || h < 0 || h > 100) {
+      return null;
+    }
 
     return {
       timestamp: record.timestamp || Date.now(),
       temperature: t,
       humidity: h,
-      battery: b,
       source: record.source || 'gatt_live',
-      type: record.type || 'live',
-      rssi: record.rssi != null ? record.rssi : null
+      type: record.type || 'live'
     };
   }
 }
@@ -93,11 +95,23 @@ class TelemetryStorage {
   async loadAllRecords() {
     if (!this.db) return [];
     return new Promise((resolve) => {
-      const tx = this.db.transaction(this.storeName, 'readonly');
+      const tx = this.db.transaction(this.storeName, 'readwrite');
       const store = tx.objectStore(this.storeName);
       const req = store.getAll();
       req.onsuccess = () => {
-        this.records = (req.result || []).map(r => TelemetryProcessor.format(r));
+        const raw = req.result || [];
+        const clean = [];
+        for (let i = 0; i < raw.length; i++) {
+          const r = raw[i];
+          const formatted = TelemetryProcessor.format(r);
+          // Hatalı/bozuk kayıtları (örn: 279°C veya %548 nem) otomatik olarak temizle
+          if (formatted) {
+            clean.push(formatted);
+          } else if (r.id) {
+            store.delete(r.id);
+          }
+        }
+        this.records = clean;
         this.records.sort((a, b) => a.timestamp - b.timestamp);
         resolve(this.records);
       };
@@ -107,6 +121,8 @@ class TelemetryStorage {
 
   async addRecord(record) {
     const formatted = TelemetryProcessor.format(record);
+    if (!formatted) return null;
+
     this.records.push(formatted);
     this.records.sort((a, b) => a.timestamp - b.timestamp);
 
@@ -124,7 +140,7 @@ class TelemetryStorage {
 
     for (let i = 0; i < recordsList.length; i++) {
       const formatted = TelemetryProcessor.format(recordsList[i]);
-      if (!existingTimestamps.has(formatted.timestamp)) {
+      if (formatted && !existingTimestamps.has(formatted.timestamp)) {
         existingTimestamps.add(formatted.timestamp);
         this.records.push(formatted);
         toInsert.push(formatted);
@@ -132,7 +148,6 @@ class TelemetryStorage {
     }
 
     if (toInsert.length > 0 && this.db) {
-      // Tek bir atomik IndexedDB transaction - Sıfır donma, anında yazım
       const tx = this.db.transaction(this.storeName, 'readwrite');
       const store = tx.objectStore(this.storeName);
       for (let i = 0; i < toInsert.length; i++) {
@@ -160,9 +175,7 @@ class TelemetryStorage {
       'Saat',
       'Tur',
       'Sicaklik_C',
-      'Nem_Yuzde',
-      'Pil_Yuzde',
-      'Sinyal_RSSI'
+      'Nem_Yuzde'
     ];
     const rows = this.records.map((r, i) => {
       const d = new Date(r.timestamp);
@@ -173,9 +186,7 @@ class TelemetryStorage {
         d.toLocaleTimeString('tr-TR'),
         r.type === 'history_hour' ? 'Cihaz Geçmişi' : (r.source === 'ble_adv' ? 'BLE Sinyal Yayını' : 'GATT Canlı'),
         r.temperature.toFixed(2),
-        !isNaN(parseFloat(humVal)) ? humVal : r.humidity,
-        r.battery != null ? r.battery : '',
-        r.rssi != null ? `${r.rssi} dBm` : ''
+        !isNaN(parseFloat(humVal)) ? humVal : r.humidity
       ].join(';');
     });
     return [headers.join(';'), ...rows].join('\r\n');
@@ -190,11 +201,10 @@ class TelemetryStorage {
 // 4. UNIVERSAL BLE MANAGER (Light-Speed Engine)
 // ==========================================
 class UniversalBleManager {
-  constructor(onDataCallback, onStatusCallback, onHistoryProgressCallback, onSignalCallback) {
+  constructor(onDataCallback, onStatusCallback, onHistoryProgressCallback) {
     this.onData = onDataCallback;
     this.onStatus = onStatusCallback;
     this.onHistoryProgress = onHistoryProgressCallback;
-    this.onSignal = onSignalCallback;
 
     this.device = null;
     this.server = null;
@@ -206,15 +216,11 @@ class UniversalBleManager {
     this.primaryService = null;
     this.atcChar = null;
     this.isWatchingAdvertisements = false;
-    this.packetCount = 0;
-    this.lastRssi = null;
 
     this.cachedTemp = null;
     this.cachedHum = null;
-    this.cachedBat = 100;
   }
 
-  // Hafızada kayıtlı ATC_597941 veya diğer LYWSD03MMC cihazına anında bağlan
   async tryAutoConnect() {
     if (!navigator.bluetooth || !navigator.bluetooth.getDevices) return false;
     try {
@@ -225,7 +231,7 @@ class UniversalBleManager {
                        devices.find(d => d.name && (d.name.includes('LYWSD') || d.name.includes('MHO') || d.name.includes('Thermo'))) ||
                        devices[0];
         if (target) {
-          console.log(`⚡ ${target.name} bulundu, kamikaze ışık hızında bağlanılıyor...`);
+          console.log(`⚡ ${target.name} bulundu, doğrudan otomatik bağlanılıyor...`);
           return await this.connectToDevice(target);
         }
       }
@@ -313,10 +319,10 @@ class UniversalBleManager {
     this._boundDisconnect = () => this.handleDisconnect();
     this.device.addEventListener('gattserverdisconnected', this._boundDisconnect);
 
-    // 1. Reklam Paket Yakalayıcı (Pasif Veri)
+    // 1. Reklam Paket Yakalayıcı
     this.startAdvertisementWatcher();
 
-    // 2. GATT Bağlantısı (Aktif Çift Yönlü İletişim)
+    // 2. GATT Bağlantısı
     try {
       this.server = await this.device.gatt.connect();
     } catch (connErr) {
@@ -324,14 +330,14 @@ class UniversalBleManager {
       if (this.isWatchingAdvertisements) {
         this.isConnected = true;
         this.isConnecting = false;
-        this.onStatus('connected', `${devName} (BLE Sinyal Yayını Aktif)`);
+        this.onStatus('connected', `${devName} (BLE Yayın Aktif)`);
         return true;
       }
       this.isConnecting = false;
       throw connErr;
     }
 
-    // 3. GATT Profillerine abone ol
+    // 3. GATT Servislerini Keşfet
     await this.setupGattProfiles();
 
     this.isConnected = true;
@@ -354,18 +360,6 @@ class UniversalBleManager {
   }
 
   handleAdvertisementPacket(event) {
-    this.packetCount++;
-    this.lastRssi = event.rssi;
-
-    if (this.onSignal) {
-      this.onSignal({
-        rssi: event.rssi,
-        packetCount: this.packetCount,
-        deviceName: event.device ? event.device.name : (this.device ? this.device.name : 'ATC Cihazı'),
-        profile: this.deviceProfile
-      });
-    }
-
     if (!event.serviceData) return;
 
     for (const [key, dataView] of event.serviceData.entries()) {
@@ -379,14 +373,12 @@ class UniversalBleManager {
         if (len >= 15) {
           const temp = b.getInt16(6, true) / 100.0;
           const hum = b.getInt16(8, true) / 100.0;
-          const bat = b.getUint8(12);
-          this.emitTelemetry(temp, hum, bat, 'ble_adv', 'atc');
+          this.emitTelemetry(temp, hum, 'ble_adv', 'atc');
           return;
         } else if (len >= 13) {
           const temp = b.getInt16(6, false) / 10.0;
           const hum = b.getUint8(8);
-          const bat = b.getUint8(9);
-          this.emitTelemetry(temp, hum, bat, 'ble_adv', 'atc');
+          this.emitTelemetry(temp, hum, 'ble_adv', 'atc');
           return;
         }
       }
@@ -395,7 +387,7 @@ class UniversalBleManager {
       if (lowerKey.includes('fcd2') && len > 1) {
         this.deviceProfile = 'atc';
         let ptr = 1;
-        let t = null, h = null, bPct = 100;
+        let t = null, h = null;
         while (ptr < len) {
           const id = b.getUint8(ptr);
           if (id === 0x02 && ptr + 2 < len) {
@@ -404,17 +396,12 @@ class UniversalBleManager {
           } else if (id === 0x03 && ptr + 2 < len) {
             h = b.getUint16(ptr + 1, true) * 0.01;
             ptr += 3;
-          } else if (id === 0x01 && ptr + 1 < len) {
-            bPct = b.getUint8(ptr + 1);
-            ptr += 2;
-          } else if (id === 0x0c && ptr + 2 < len) {
-            ptr += 3;
           } else {
             ptr++;
           }
         }
         if (t !== null && h !== null) {
-          this.emitTelemetry(t, h, bPct, 'ble_adv', 'atc');
+          this.emitTelemetry(t, h, 'ble_adv', 'atc');
           return;
         }
       }
@@ -428,7 +415,7 @@ class UniversalBleManager {
           if (objId === 0x100d && objLen === 4 && p + 7 <= len) {
             const temp = b.getInt16(p + 3, true) / 10.0;
             const hum = b.getInt16(p + 5, true) / 10.0;
-            this.emitTelemetry(temp, hum, 95, 'ble_adv', 'stock_xiaomi');
+            this.emitTelemetry(temp, hum, 'ble_adv', 'stock_xiaomi');
             return;
           }
         }
@@ -467,37 +454,14 @@ class UniversalBleManager {
             this.handleAtcNotification(e.target.value);
           });
           await atcChar.startNotifications().catch(() => {});
+          // 0x33 telemetri akışını başlat komutu
+          await this.sendAtcCommand(new Uint8Array([0x33, 0x01])).catch(() => {});
           bound = true;
         }
       }
     } catch (e) {}
 
-    // 3. Standart Pil Servisi (0x180F)
-    try {
-      const batService = await this.server.getPrimaryService(BLE_PROFILES.BATTERY_SERVICE)
-        .catch(() => this.server.getPrimaryService(0x180f));
-      if (batService) {
-        const batChar = await batService.getCharacteristic(BLE_PROFILES.CHAR_BATTERY)
-          .catch(() => batService.getCharacteristic(0x2a19));
-        if (batChar) {
-          const val = await batChar.readValue().catch(() => null);
-          if (val && val.byteLength > 0) {
-            this.cachedBat = val.getUint8(0);
-          }
-          batChar.addEventListener('characteristicvaluechanged', (e) => {
-            if (e.target.value && e.target.value.byteLength > 0) {
-              this.cachedBat = e.target.value.getUint8(0);
-              if (this.cachedTemp !== null && this.cachedHum !== null) {
-                this.emitTelemetry(this.cachedTemp, this.cachedHum, this.cachedBat, 'gatt_live', this.deviceProfile);
-              }
-            }
-          });
-          await batChar.startNotifications().catch(() => {});
-        }
-      }
-    } catch (e) {}
-
-    // 4. Orijinal Xiaomi Servisi
+    // 3. Orijinal Xiaomi Servisi
     if (!bound) {
       try {
         const xiaomiService = await this.server.getPrimaryService(BLE_PROFILES.XIAOMI_SERVICE);
@@ -528,7 +492,7 @@ class UniversalBleManager {
           if (v && v.byteLength >= 2) {
             this.cachedTemp = v.getInt16(0, true) / 100.0;
             if (this.cachedHum !== null) {
-              this.emitTelemetry(this.cachedTemp, this.cachedHum, this.cachedBat, 'gatt_live', 'atc');
+              this.emitTelemetry(this.cachedTemp, this.cachedHum, 'gatt_live', 'atc');
             }
           }
         });
@@ -554,7 +518,7 @@ class UniversalBleManager {
               ? v.getUint16(0, true) / 100.0
               : v.getUint8(0);
             if (this.cachedTemp !== null) {
-              this.emitTelemetry(this.cachedTemp, this.cachedHum, this.cachedBat, 'gatt_live', 'atc');
+              this.emitTelemetry(this.cachedTemp, this.cachedHum, 'gatt_live', 'atc');
             }
           }
         });
@@ -571,12 +535,9 @@ class UniversalBleManager {
     if (initialVal && initialVal.byteLength >= 5) {
       const temp = initialVal.getInt16(0, true) / 100.0;
       const hum = initialVal.getUint8(2);
-      const volt = initialVal.getInt16(3, true) / 1000.0;
-      const bat = Math.min(100, Math.max(0, Math.round(((volt - 2.1) / 1.0) * 100)));
       this.cachedTemp = temp;
       this.cachedHum = hum;
-      this.cachedBat = bat;
-      this.emitTelemetry(temp, hum, bat, 'gatt_live', 'stock_xiaomi');
+      this.emitTelemetry(temp, hum, 'gatt_live', 'stock_xiaomi');
     }
 
     liveChar.addEventListener('characteristicvaluechanged', (e) => {
@@ -584,12 +545,9 @@ class UniversalBleManager {
       if (val && val.byteLength >= 5) {
         const temp = val.getInt16(0, true) / 100.0;
         const hum = val.getUint8(2);
-        const volt = val.getInt16(3, true) / 1000.0;
-        const bat = Math.min(100, Math.max(0, Math.round(((volt - 2.1) / 1.0) * 100)));
         this.cachedTemp = temp;
         this.cachedHum = hum;
-        this.cachedBat = bat;
-        this.emitTelemetry(temp, hum, bat, 'gatt_live', 'stock_xiaomi');
+        this.emitTelemetry(temp, hum, 'gatt_live', 'stock_xiaomi');
       }
     });
 
@@ -600,21 +558,25 @@ class UniversalBleManager {
     if (!value || value.byteLength < 1) return;
     const cmdId = value.getUint8(0);
 
-    // 0x35: Flash Geçmiş Ölçüm Kayıtları
+    // 0x35: Flaş Geçmiş Kayıtları
     if (cmdId === 0x35 && this._atcHistoryHandler) {
       this._atcHistoryHandler(value);
       return;
     }
 
-    // 0x33: Canlı Ölçüm Paketi [0x33, tm_lo, tm_hi, hm_lo, hm_hi, vb_lo, vb_hi, bat]
-    if (cmdId === 0x33 && value.byteLength >= 8) {
-      const temp = value.getInt16(1, true) / 100.0;
-      const hum = value.getUint16(3, true) / 100.0;
-      const bat = value.getUint8(7);
-      this.cachedTemp = temp;
-      this.cachedHum = hum;
-      this.cachedBat = bat;
-      this.emitTelemetry(temp, hum, bat, 'gatt_live', 'atc');
+    // Canlı Telemetri Paketi (0x33 veya standart telemetri baytları)
+    if (cmdId === 0x33 || (value.byteLength >= 5 && cmdId !== 0x35)) {
+      const b = value;
+      const offset = b.getUint8(0) === 0x33 ? 1 : 0;
+      if (b.byteLength >= offset + 4) {
+        const t = b.getInt16(offset, true) / 100.0;
+        const h = b.getUint16(offset + 2, true) / 100.0;
+        if (t >= -40 && t <= 85 && h >= 0 && h <= 100) {
+          this.cachedTemp = t;
+          this.cachedHum = h;
+          this.emitTelemetry(t, h, 'gatt_live', 'atc');
+        }
+      }
     }
   }
 
@@ -628,14 +590,13 @@ class UniversalBleManager {
     }
   }
 
-  emitTelemetry(temperature, humidity, battery, source = 'gatt_live', profile = 'atc') {
+  emitTelemetry(temperature, humidity, source = 'gatt_live', profile = 'atc') {
+    if (temperature < -40 || temperature > 85 || humidity < 0 || humidity > 100) return;
     if (this.onData) {
       this.onData({
         timestamp: Date.now(),
         temperature: Number(temperature.toFixed(2)),
         humidity: Number(humidity.toFixed(2)),
-        battery: battery != null ? battery : this.cachedBat,
-        rssi: this.lastRssi,
         source: source,
         type: 'live',
         profile: profile
@@ -643,10 +604,10 @@ class UniversalBleManager {
     }
   }
 
-  // Cihazın dahili flaş belleğindeki geçmişi ışık hızında aktarma
+  // Cihazın dahili flaş belleğindeki TÜM geçmişi eksiksiz çekme
   async fetchDeviceHistory() {
     if (!this.isConnected) {
-      throw new Error('Cihaz bağlı değil.');
+      throw new Error('Önce cihaza bağlanmalısınız.');
     }
     if (this.isFetchingHistory) {
       return [];
@@ -656,6 +617,7 @@ class UniversalBleManager {
     this.onHistoryProgress({ active: true, percent: 5, message: 'Flaş bellek taranıyor...' });
 
     try {
+      // 1. ATC / PVVX Modlu Cihaz
       if (this.atcChar) {
         const fetchedRecords = await this.fetchAtcHistoryFromFlash();
         this.isFetchingHistory = false;
@@ -663,8 +625,9 @@ class UniversalBleManager {
         return fetchedRecords;
       }
 
-      if (this.deviceProfile === 'stock_xiaomi' && this.primaryService) {
-        const historyChar = await this.primaryService.getCharacteristic(BLE_PROFILES.CHAR_HISTORY_STREAM);
+      // 2. Orijinal Xiaomi Cihazı
+      if (this.primaryService) {
+        const historyChar = await this.primaryService.getCharacteristic(BLE_PROFILES.CHAR_HISTORY_STREAM).catch(() => null);
         if (historyChar) {
           await historyChar.startNotifications();
           const records = [];
@@ -676,7 +639,7 @@ class UniversalBleManager {
             }
           };
           historyChar.addEventListener('characteristicvaluechanged', handler);
-          await new Promise(r => setTimeout(r, 1200));
+          await new Promise(r => setTimeout(r, 2500));
           historyChar.removeEventListener('characteristicvaluechanged', handler);
           await historyChar.stopNotifications().catch(() => {});
           this.isFetchingHistory = false;
@@ -719,7 +682,9 @@ class UniversalBleManager {
           const maxTc = Math.max(...rawSamples.map(s => s.tc));
           const nowMs = Date.now();
 
-          const records = rawSamples.map(s => {
+          const records = [];
+          for (let i = 0; i < rawSamples.length; i++) {
+            const s = rawSamples[i];
             let ts;
             if (isEpochValid && s.tc > 1577836800) {
               ts = s.tc * 1000;
@@ -728,22 +693,20 @@ class UniversalBleManager {
               ts = nowMs - (diffSec * 1000);
             }
 
-            const volt = Number((s.vb / 1000.0).toFixed(2));
-            const bat = Math.max(0, Math.min(100, Math.round(((volt - 2.1) / 1.0) * 100)));
-
-            return TelemetryProcessor.format({
-              timestamp: ts,
-              temperature: Number(s.tm.toFixed(2)),
-              humidity: Number(s.hm.toFixed(2)),
-              battery: bat,
-              source: 'device_flash',
-              type: 'history_hour'
-            });
-          });
+            if (s.tm >= -40 && s.tm <= 85 && s.hm >= 0 && s.hm <= 100) {
+              records.push(TelemetryProcessor.format({
+                timestamp: ts,
+                temperature: Number(s.tm.toFixed(2)),
+                humidity: Number(s.hm.toFixed(2)),
+                source: 'device_flash',
+                type: 'history_hour'
+              }));
+            }
+          }
 
           records.sort((a, b) => a.timestamp - b.timestamp);
 
-          // Cihaz saatini eşitle (Cmd 0x23)
+          // Cihaz saatini senkronize et
           try {
             const timeNowSec = Math.floor(Date.now() / 1000);
             const timePkt = new Uint8Array([
@@ -762,7 +725,7 @@ class UniversalBleManager {
         }
       };
 
-      const resetTimeout = (delay = 600) => {
+      const resetTimeout = (delay = 3500) => {
         if (timeoutTimer) clearTimeout(timeoutTimer);
         timeoutTimer = setTimeout(() => {
           finishDownload();
@@ -771,27 +734,42 @@ class UniversalBleManager {
 
       this._atcHistoryHandler = (val) => {
         const len = val.byteLength;
+        if (len < 1) return;
+        const cmdId = val.getUint8(0);
+        if (cmdId !== 0x35) return;
+
+        // 1. Toplam kayıt sayısı bildirimi paketi
         if (len === 2) {
+          expectedTotal = val.getUint8(1);
+          this.onHistoryProgress({
+            active: true,
+            percent: 10,
+            message: `${expectedTotal} bellek kaydı taranıyor...`
+          });
+          resetTimeout(3500);
+        } else if (len >= 3 && len < 13) {
           expectedTotal = val.getUint16(1, true);
           this.onHistoryProgress({
             active: true,
-            percent: 15,
-            message: `${expectedTotal} kayıt aktarılıyor...`
+            percent: 10,
+            message: `${expectedTotal} bellek kaydı aktarılıyor...`
           });
-          resetTimeout(1500);
+          resetTimeout(3500);
         } else if (len >= 13) {
-          const cnt = val.getUint16(1, true);
-          const tc = val.getUint32(3, true);
-          const tm = val.getInt16(7, true) / 100.0;
-          const hm = val.getUint16(9, true) / 100.0;
-          const vb = val.getUint16(11, true);
+          // 2. Ölçüm verileri paketi (1 pakette birden çok 12 baytlık kayıt gelebilir)
+          let offset = 1;
+          while (offset + 12 <= len) {
+            const cnt = val.getUint16(offset, true);
+            const tc = val.getUint32(offset + 2, true);
+            const tm = val.getInt16(offset + 6, true) / 100.0;
+            const hm = val.getUint16(offset + 8, true) / 100.0;
+            const vb = val.getUint16(offset + 10, true);
+            offset += 12;
 
-          rawSamples.push({ cnt, tc, tm, hm, vb });
-
-          // Beklenen sayıya ulaşıldıysa anında bitir!
-          if (expectedTotal && rawSamples.length >= expectedTotal) {
-            finishDownload();
-            return;
+            // Sensör sınırları dışındaki bozuk/boş flaş kayıtlarını ele
+            if (tm >= -40 && tm <= 85 && hm >= 0 && hm <= 100) {
+              rawSamples.push({ cnt, tc, tm, hm, vb });
+            }
           }
 
           let pct;
@@ -807,16 +785,21 @@ class UniversalBleManager {
             message: `${rawSamples.length} kayıt aktarıldı...`
           });
 
-          resetTimeout(600);
-        } else if (len >= 3 && len < 13) {
-          finishDownload();
+          // Beklenen sayıya tam ulaşıldığında hemen bitir
+          if (expectedTotal && rawSamples.length >= expectedTotal) {
+            finishDownload();
+            return;
+          }
+
+          resetTimeout(3500);
         }
       };
 
       try {
+        // PVVX 0x35: Tüm bellek kayıtlarını talep et
         const cmd = new Uint8Array([0x35, 0xff, 0xff, 0x00, 0x00]);
         await this.sendAtcCommand(cmd);
-        resetTimeout(2000);
+        resetTimeout(5000);
       } catch (err) {
         if (timeoutTimer) clearTimeout(timeoutTimer);
         this._atcHistoryHandler = null;
@@ -835,7 +818,6 @@ class UniversalBleManager {
       timestamp: timestampSec * 1000,
       temperature: tempRawMax / 10.0,
       humidity: humMax,
-      battery: this.cachedBat,
       source: 'device_flash',
       type: 'history_hour'
     });
@@ -866,8 +848,7 @@ class AppController {
     this.ble = new UniversalBleManager(
       (data) => this.handleNewData(data),
       (status, text) => this.handleBleStatus(status, text),
-      (prog) => this.handleHistoryProgress(prog),
-      (sig) => this.handleSignalUpdate(sig)
+      (prog) => this.handleHistoryProgress(prog)
     );
 
     this.currentTheme = localStorage.getItem('smarttemp_theme') || 'light';
@@ -893,15 +874,10 @@ class AppController {
       connectionDotMobile: document.getElementById('connectionDotMobile'),
       connectionStatusText: document.getElementById('connectionStatusText'),
       lastUpdatedAgo: document.getElementById('lastUpdatedAgo'),
-      signalPill: document.getElementById('signalPill'),
-      signalPillMobile: document.getElementById('signalPillMobile'),
-      signalRssiText: document.getElementById('signalRssiText'),
-      signalRssiTextMobile: document.getElementById('signalRssiTextMobile'),
-      signalBarsHeader: document.getElementById('signalBarsHeader'),
-      signalBarsMobile: document.getElementById('signalBarsMobile'),
-      signalBarsCard: document.getElementById('signalBarsCard'),
       btnConnect: document.getElementById('btnConnect'),
       btnConnectMobile: document.getElementById('btnConnectMobile'),
+      btnFetchHistoryHeader: document.getElementById('btnFetchHistoryHeader'),
+      btnFetchHistoryMobile: document.getElementById('btnFetchHistoryMobile'),
       btnThemeToggle: document.getElementById('btnThemeToggle'),
       themeIcon: document.getElementById('themeIcon'),
       themeLabel: document.getElementById('themeLabel'),
@@ -916,18 +892,10 @@ class AppController {
       valTemp: document.getElementById('valTemp'),
       lblTempUnit: document.getElementById('lblTempUnit'),
       btnToggleUnit: document.getElementById('btnToggleUnit'),
-      tempMinMax: document.getElementById('tempMinMax'),
-      tempTrendBadge: document.getElementById('tempTrendBadge'),
 
       valHum: document.getElementById('valHum'),
       humidityStatusBadge: document.getElementById('humidityStatusBadge'),
       humProgressBar: document.getElementById('humProgressBar'),
-      humMinMax: document.getElementById('humMinMax'),
-
-      valBattery: document.getElementById('valBattery'),
-      batteryProgressBar: document.getElementById('batteryProgressBar'),
-      totalPointsCount: document.getElementById('totalPointsCount'),
-      valRssi: document.getElementById('valRssi'),
 
       // Chart & Analytics
       chartStatsStrip: document.getElementById('chartStatsStrip'),
@@ -977,10 +945,10 @@ class AppController {
       this.updateChart();
     }
 
-    // KAMIKAZE HIZI: Sayfa açılır açılmaz doğrudan cihaza bağlanmayı dene
+    // Doğrudan otomatik bağlanmayı dene
     this.ble.tryAutoConnect().catch(() => {});
 
-    // Kullanıcı ekranda nereye dokunursa dokunsun anında bağlanmayı tetikle (User Gesture)
+    // İlk kullanıcı dokunuşunda anında bağlan
     const fastConnectGesture = async () => {
       if (!this.ble.isConnected && !this.ble.isConnecting) {
         try {
@@ -1065,6 +1033,12 @@ class AppController {
     if (this.dom.btnConnect) this.dom.btnConnect.addEventListener('click', handleConnect);
     if (this.dom.btnConnectMobile) this.dom.btnConnectMobile.addEventListener('click', handleConnect);
 
+    // Fetch History Buttons (Header, Mobile & Body)
+    const handleFetchAll = () => this.syncDeviceHistory(false);
+    if (this.dom.btnFetchHistory) this.dom.btnFetchHistory.addEventListener('click', handleFetchAll);
+    if (this.dom.btnFetchHistoryHeader) this.dom.btnFetchHistoryHeader.addEventListener('click', handleFetchAll);
+    if (this.dom.btnFetchHistoryMobile) this.dom.btnFetchHistoryMobile.addEventListener('click', handleFetchAll);
+
     // Theme Toggle
     if (this.dom.btnThemeToggle) {
       this.dom.btnThemeToggle.addEventListener('click', () => {
@@ -1106,11 +1080,6 @@ class AppController {
       });
     });
 
-    // Device History Fetch
-    if (this.dom.btnFetchHistory) {
-      this.dom.btnFetchHistory.addEventListener('click', () => this.syncDeviceHistory(false));
-    }
-
     // CSV & JSON Exports
     if (this.dom.btnExportCsv) {
       this.dom.btnExportCsv.addEventListener('click', () => {
@@ -1135,7 +1104,7 @@ class AppController {
     // Clear Database
     if (this.dom.btnClearData) {
       this.dom.btnClearData.addEventListener('click', async () => {
-        if (confirm('Tüm kayıtlar silinecek. Emin misiniz?')) {
+        if (confirm('Tüm kayıtlar silinecektir. Emin misiniz?')) {
           await this.storage.clearAll();
           this.latestTelemetry = null;
           this.updateStatsAndTable();
@@ -1180,14 +1149,14 @@ class AppController {
   async syncDeviceHistory(isAuto = false) {
     if (!this.ble.isConnected) {
       if (!isAuto) {
-        this.showToast('Önce Bluetooth bağlantısı kurmalısınız.', 'info');
+        this.showToast('Ölçülen verileri çekmek için önce cihaza bağlanmalısınız.', 'info');
       }
       return;
     }
 
     try {
       if (!isAuto) {
-        this.showToast('Cihaz belleğindeki ölçümler taranıyor...', 'info');
+        this.showToast('Sensör flaş belleğindeki tüm kayıtlar taranıyor...', 'info');
       }
       const records = await this.ble.fetchDeviceHistory();
       if (records && records.length > 0) {
@@ -1212,7 +1181,7 @@ class AppController {
     if (this.dom.connectionStatusText) this.dom.connectionStatusText.textContent = text;
 
     if (status === 'connected') {
-      // ANINDA VERİ AKTARIMI: Hiç beklemeden bellek aktarımını başlat
+      // Bağlantı kurulduğu an tüm ölçümleri otomatik çek
       this.syncDeviceHistory(true);
     }
 
@@ -1234,10 +1203,10 @@ class AppController {
       if (!btn) return;
       if (status === 'connected') {
         btn.innerHTML = `<i data-lucide="power" class="w-4 h-4"></i><span>Bağlantıyı Kes</span>`;
-        btn.className = `${isMobile ? 'flex-1' : ''} py-2.5 px-4 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 bg-[#ba1a1a] hover:bg-[#93000a] text-white shadow-sm`;
+        btn.className = `${isMobile ? 'flex-1' : ''} py-2.5 px-3 rounded-full text-xs font-semibold flex items-center justify-center gap-1.5 bg-[#ba1a1a] hover:bg-[#93000a] text-white shadow-sm`;
       } else {
-        btn.innerHTML = `<i data-lucide="bluetooth" class="w-4 h-4"></i><span>Cihaza Bağlan</span>`;
-        btn.className = `${isMobile ? 'flex-1' : ''} py-2.5 px-4 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 bg-[#0b57d0] hover:bg-[#0842a0] text-white shadow-sm`;
+        btn.innerHTML = `<i data-lucide="bluetooth" class="w-4 h-4"></i><span>${isMobile ? 'Bağlan' : 'Cihaza Bağlan'}</span>`;
+        btn.className = `${isMobile ? 'flex-1' : ''} py-2.5 px-3 rounded-full text-xs font-semibold flex items-center justify-center gap-1.5 bg-[#0b57d0] hover:bg-[#0842a0] text-white shadow-sm`;
       }
     };
     updateBtn(this.dom.btnConnect, false);
@@ -1247,42 +1216,6 @@ class AppController {
     if (this.dom.lastUpdatedAgo) this.dom.lastUpdatedAgo.classList.toggle('hidden', !isConnected);
 
     lucide.createIcons();
-  }
-
-  handleSignalUpdate({ rssi }) {
-    if (rssi == null) return;
-    if (this.dom.valRssi) this.dom.valRssi.textContent = `${rssi} dBm`;
-    if (this.dom.signalRssiText) this.dom.signalRssiText.textContent = `${rssi} dBm`;
-    if (this.dom.signalRssiTextMobile) this.dom.signalRssiTextMobile.textContent = `${rssi} dBm`;
-
-    if (this.dom.signalPill) {
-      this.dom.signalPill.classList.remove('hidden');
-      this.dom.signalPill.classList.add('md:flex');
-    }
-    if (this.dom.signalPillMobile) {
-      this.dom.signalPillMobile.classList.remove('hidden');
-      this.dom.signalPillMobile.classList.add('flex');
-    }
-
-    this.updateSignalBars(rssi);
-  }
-
-  updateSignalBars(rssi) {
-    let activeCount = 1;
-    if (rssi >= -65) activeCount = 4;
-    else if (rssi >= -78) activeCount = 3;
-    else if (rssi >= -88) activeCount = 2;
-
-    const setBars = (container) => {
-      if (!container) return;
-      const bars = container.querySelectorAll('.signal-bar');
-      bars.forEach((b, idx) => {
-        b.classList.toggle('active', idx < activeCount);
-      });
-    };
-    setBars(this.dom.signalBarsHeader);
-    setBars(this.dom.signalBarsMobile);
-    setBars(this.dom.signalBarsCard);
   }
 
   handleHistoryProgress({ active, percent, message }) {
@@ -1300,6 +1233,7 @@ class AppController {
 
   async handleNewData(data) {
     const enriched = await this.storage.addRecord(data);
+    if (!enriched) return;
     this.latestTelemetry = enriched;
 
     this.renderTelemetryCards(enriched);
@@ -1320,7 +1254,7 @@ class AppController {
     const humNum = Number(data.humidity);
     const humFormatted = !isNaN(humNum) ? humNum.toFixed(2) : data.humidity;
 
-    // Grafik KPI Son Okunan Değer
+    // Grafik KPI
     if (this.dom.chartKpiCurrent) {
       if (this.chartMode === 'hum') {
         this.dom.chartKpiCurrent.textContent = `%${humFormatted}`;
@@ -1337,32 +1271,13 @@ class AppController {
 
     if (humNum < 30) {
       this.dom.humidityStatusBadge.textContent = 'Kuru';
-      this.dom.humidityStatusBadge.className = 'text-xs px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 font-medium';
+      this.dom.humidityStatusBadge.className = 'text-xs px-3 py-1 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 font-semibold';
     } else if (humNum > 60) {
       this.dom.humidityStatusBadge.textContent = 'Yüksek Nem';
-      this.dom.humidityStatusBadge.className = 'text-xs px-2.5 py-0.5 rounded-full bg-[#0b57d0]/10 text-[#0b57d0] dark:text-[#a8c7fa] border border-[#0b57d0]/20 font-medium';
+      this.dom.humidityStatusBadge.className = 'text-xs px-3 py-1 rounded-full bg-[#0b57d0]/10 text-[#0b57d0] dark:text-[#a8c7fa] border border-[#0b57d0]/20 font-semibold';
     } else {
       this.dom.humidityStatusBadge.textContent = 'İdeal';
-      this.dom.humidityStatusBadge.className = 'text-xs px-2.5 py-0.5 rounded-full bg-[#0b57d0]/10 text-[#0b57d0] dark:text-[#a8c7fa] border border-[#0b57d0]/20 font-medium';
-    }
-
-    // 3. Pil & Donanım Kartı
-    if (data.battery != null) {
-      this.dom.valBattery.textContent = data.battery;
-      this.dom.batteryProgressBar.style.width = `${Math.min(100, Math.max(0, data.battery))}%`;
-      if (data.battery < 20) {
-        this.dom.batteryProgressBar.className = 'h-full bg-rose-500 rounded-full';
-      } else if (data.battery < 50) {
-        this.dom.batteryProgressBar.className = 'h-full bg-amber-500 rounded-full';
-      } else {
-        this.dom.batteryProgressBar.className = 'h-full bg-[#0b57d0] dark:bg-[#a8c7fa] rounded-full';
-      }
-    }
-    if (data.rssi != null) {
-      if (this.dom.valRssi) this.dom.valRssi.textContent = `${data.rssi} dBm`;
-      if (this.dom.signalRssiText) this.dom.signalRssiText.textContent = `${data.rssi} dBm`;
-      if (this.dom.signalRssiTextMobile) this.dom.signalRssiTextMobile.textContent = `${data.rssi} dBm`;
-      this.updateSignalBars(data.rssi);
+      this.dom.humidityStatusBadge.className = 'text-xs px-3 py-1 rounded-full bg-[#0b57d0]/10 text-[#0b57d0] dark:text-[#a8c7fa] border border-[#0b57d0]/20 font-semibold';
     }
 
     if (this.dom.lastUpdatedAgo) {
@@ -1371,32 +1286,6 @@ class AppController {
   }
 
   updateStatsAndTable() {
-    const list = this.storage.records;
-    if (this.dom.totalPointsCount) this.dom.totalPointsCount.textContent = list.length;
-
-    if (list.length > 0) {
-      const conv = (t) => this.currentUnit === 'F' ? ((t * 9 / 5) + 32).toFixed(2) : t.toFixed(2);
-
-      const temps = list.map(r => r.temperature);
-      this.dom.tempMinMax.textContent = `${conv(Math.min(...temps))} / ${conv(Math.max(...temps))}`;
-
-      const hums = list.map(r => r.humidity);
-      this.dom.humMinMax.textContent = `%${Math.min(...hums).toFixed(2)} / %${Math.max(...hums).toFixed(2)}`;
-
-      if (list.length >= 3) {
-        const last3 = list.slice(-3);
-        const diff = last3[2].temperature - last3[0].temperature;
-        if (diff > 0.2) {
-          this.dom.tempTrendBadge.innerHTML = `<i data-lucide="trending-up" class="w-3 h-3 text-rose-500"></i><span class="text-rose-600 dark:text-rose-400">Yükseliyor</span>`;
-        } else if (diff < -0.2) {
-          this.dom.tempTrendBadge.innerHTML = `<i data-lucide="trending-down" class="w-3 h-3 text-cyan-500"></i><span class="text-cyan-600 dark:text-cyan-400">Düşüyor</span>`;
-        } else {
-          this.dom.tempTrendBadge.innerHTML = `<i data-lucide="minus" class="w-3 h-3 text-slate-400"></i><span>Dengeli</span>`;
-        }
-        lucide.createIcons();
-      }
-    }
-
     this.renderTable();
   }
 
@@ -1415,7 +1304,7 @@ class AppController {
       if (this.dom.historyTableBody) {
         this.dom.historyTableBody.innerHTML = `
           <tr>
-            <td colspan="5" class="py-8 text-center text-slate-400 dark:text-slate-500 font-sans">
+            <td colspan="4" class="py-8 text-center text-slate-400 dark:text-slate-500 font-sans">
               Henüz kayıt bulunmuyor. Cihazınıza bağlanarak ölçüm alabilirsiniz.
             </td>
           </tr>
@@ -1445,8 +1334,8 @@ class AppController {
         const typeBadge = item.type === 'history_hour'
           ? '<span class="px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20 text-[10px] font-sans font-medium">Hafıza</span>'
           : (item.source === 'ble_adv'
-            ? '<span class="px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border border-cyan-500/20 text-[10px] font-sans font-medium">BLE Sinyal</span>'
-            : '<span class="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-sans font-medium">GATT Canlı</span>');
+            ? '<span class="px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border border-cyan-500/20 text-[10px] font-sans font-medium">BLE Yayın</span>'
+            : '<span class="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-sans font-medium">Canlı</span>');
 
         let t = item.temperature;
         if (this.currentUnit === 'F') {
@@ -1476,17 +1365,12 @@ class AppController {
                 </div>
               </div>
             </div>
-
-            <div class="flex items-center justify-between text-[11px] pt-1.5 border-t border-slate-200/80 dark:border-slate-700/60 text-slate-500 dark:text-slate-400">
-              <span>Pil Durumu: <strong class="text-slate-700 dark:text-slate-300 font-mono">${item.battery != null ? `%${item.battery}` : '--'}</strong></span>
-              <span>${item.rssi != null ? `${item.rssi} dBm` : ''}</span>
-            </div>
           </div>
         `;
       }).join('');
     }
 
-    // 2. Masaüstü Tablosu (5 Sütunlu Hızlı Tablo)
+    // 2. Masaüstü Tablosu (4 Sütunlu)
     if (this.dom.historyTableBody) {
       this.dom.historyTableBody.innerHTML = pageItems.map(item => {
         const d = new Date(item.timestamp);
@@ -1494,8 +1378,8 @@ class AppController {
         const typeBadge = item.type === 'history_hour'
           ? '<span class="px-2.5 py-0.5 rounded-full bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20 text-[10px] font-sans font-medium">Hafıza</span>'
           : (item.source === 'ble_adv'
-            ? '<span class="px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border border-cyan-500/20 text-[10px] font-sans font-medium">BLE Sinyal</span>'
-            : '<span class="px-2.5 py-0.5 rounded-full bg-[#0b57d0]/10 text-[#0b57d0] dark:text-[#a8c7fa] border border-[#0b57d0]/20 text-[10px] font-sans font-medium">GATT Canlı</span>');
+            ? '<span class="px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border border-cyan-500/20 text-[10px] font-sans font-medium">BLE Yayın</span>'
+            : '<span class="px-2.5 py-0.5 rounded-full bg-[#0b57d0]/10 text-[#0b57d0] dark:text-[#a8c7fa] border border-[#0b57d0]/20 text-[10px] font-sans font-medium">Canlı</span>');
 
         let t = item.temperature;
         if (this.currentUnit === 'F') {
@@ -1511,9 +1395,6 @@ class AppController {
               ${t.toFixed(2)} °${this.currentUnit}
             </td>
             <td class="py-2.5 sm:py-3 px-3 text-cyan-600 dark:text-cyan-400 font-semibold">%${humNum.toFixed(2)}</td>
-            <td class="py-2.5 sm:py-3 px-3 text-slate-600 dark:text-slate-300 font-semibold">
-              ${item.battery != null ? `%${item.battery}` : '--'}
-            </td>
           </tr>
         `;
       }).join('');
@@ -1575,7 +1456,7 @@ class AppController {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        animation: false, // SIFIR ANIMASYON: Işık hızında çizim
+        animation: false,
         transitions: {
           active: { animation: { duration: 0 } }
         },
@@ -1829,7 +1710,6 @@ class AppController {
 
       setKpiCards(humData, '%');
     } else {
-      // Tüm Parametreler: Sıcaklık & Nem
       ds[0].hidden = false;
       ds[1].hidden = false;
 
@@ -1847,7 +1727,7 @@ class AppController {
       setKpiCards(tempData, `°${this.currentUnit}`);
     }
 
-    this.chart.update('none'); // Animasyonsuz, sıfır gecikme ile anında çiz
+    this.chart.update('none');
   }
 
   applyTheme(theme) {
