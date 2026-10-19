@@ -466,7 +466,7 @@ class UniversalBleManager {
     // 1. ATC Standart Environmental Sensing (0x181A)
     try {
       const envService = await this.server.getPrimaryService(BLE_PROFILES.ENV_SENSING_SERVICE)
-        .catch(() => this.server.getPrimaryService(0x181a));
+        .catch(() => this.server.getPrimaryService(0x181a)).catch(() => null);
 
       if (envService) {
         this.deviceProfile = 'atc';
@@ -478,12 +478,12 @@ class UniversalBleManager {
     // 2. ATC Custom Control Servisi (0x1F10 & 0x1F1F)
     try {
       const atcService = await this.server.getPrimaryService(BLE_PROFILES.ATC_CUSTOM_SERVICE)
-        .catch(() => this.server.getPrimaryService(0x1f10));
+        .catch(() => this.server.getPrimaryService(0x1f10)).catch(() => null);
 
       if (atcService) {
         this.deviceProfile = 'atc';
         const atcChar = await atcService.getCharacteristic(BLE_PROFILES.CHAR_ATC_CUSTOM)
-          .catch(() => atcService.getCharacteristic(0x1f1f));
+          .catch(() => atcService.getCharacteristic(0x1f1f)).catch(() => null);
 
         if (atcChar) {
           this.atcChar = atcChar;
@@ -491,47 +491,41 @@ class UniversalBleManager {
             this.handleAtcNotification(e.target.value);
           });
           await atcChar.startNotifications().catch(() => {});
+
+          // BLE paket çarpışmasını ve bağlantı kopmasını önlemek için güvenli bekleme
+          await new Promise(r => setTimeout(r, 150));
+
           // 0x33 telemetri akışını başlat komutu
           await this.sendAtcCommand(new Uint8Array([0x33, 0x01])).catch(() => {});
-          // 0x23 sensör saatini doğrudan sorgula
-          await this.sendAtcCommand(new Uint8Array([0x23])).catch(() => {});
+
+          await new Promise(r => setTimeout(r, 150));
+
+          // 0x23 sensör donanım saatini (RTC) 5 baytlık tam paket ile senkronize et (0x23 + uint32 epoch saniye)
+          const nowSec = Math.floor(Date.now() / 1000);
+          const timeCmd = new Uint8Array([
+            0x23,
+            nowSec & 0xff,
+            (nowSec >> 8) & 0xff,
+            (nowSec >> 16) & 0xff,
+            (nowSec >> 24) & 0xff
+          ]);
+          await this.sendAtcCommand(timeCmd).catch(() => {});
+          if (this.onSensorTime) {
+            this.onSensorTime(nowSec * 1000);
+          }
+
           bound = true;
         }
       }
     } catch (e) {}
 
-    // 3. Standart Pil Servisi (0x180F & 0x2A19)
-    try {
-      const batService = await this.server.getPrimaryService(BLE_PROFILES.BATTERY_SERVICE)
-        .catch(() => this.server.getPrimaryService(0x180f));
-      if (batService) {
-        const batChar = await batService.getCharacteristic(BLE_PROFILES.CHAR_BATTERY)
-          .catch(() => batService.getCharacteristic(0x2a19));
-        if (batChar) {
-          const val = await batChar.readValue().catch(() => null);
-          if (val && val.byteLength >= 1) {
-            this.cachedBattery = val.getUint8(0);
-            this.cachedVoltage = Number((2.1 + (this.cachedBattery / 100) * 0.9).toFixed(2));
-          }
-          batChar.addEventListener('characteristicvaluechanged', (e) => {
-            const v = e.target.value;
-            if (v && v.byteLength >= 1) {
-              this.cachedBattery = v.getUint8(0);
-              this.cachedVoltage = Number((2.1 + (this.cachedBattery / 100) * 0.9).toFixed(2));
-              if (this.cachedTemp !== null && this.cachedHum !== null) {
-                this.emitTelemetry(this.cachedTemp, this.cachedHum, 'gatt_live', this.deviceProfile, this.cachedBattery, this.cachedVoltage);
-              }
-            }
-          });
-          await batChar.startNotifications().catch(() => {});
-        }
-      }
-    } catch (e) {}
+    // 3. Standart Pil Servislerinden Pil & Voltaj Değerini Güvenli Oku (GATT çökmesini önlemek için tek okuma)
+    await this.readBatterySafely();
 
-    // 3. Orijinal Xiaomi Servisi
+    // 4. Orijinal Xiaomi Servisi
     if (!bound) {
       try {
-        const xiaomiService = await this.server.getPrimaryService(BLE_PROFILES.XIAOMI_SERVICE);
+        const xiaomiService = await this.server.getPrimaryService(BLE_PROFILES.XIAOMI_SERVICE).catch(() => null);
         if (xiaomiService) {
           this.deviceProfile = 'stock_xiaomi';
           this.primaryService = xiaomiService;
@@ -540,6 +534,71 @@ class UniversalBleManager {
         }
       } catch (e) {}
     }
+  }
+
+  async readBatterySafely() {
+    // 1. Standart Pil Servisi (0x180F -> 0x2A19)
+    try {
+      const batService = await this.server.getPrimaryService(BLE_PROFILES.BATTERY_SERVICE)
+        .catch(() => this.server.getPrimaryService(0x180f)).catch(() => null);
+      if (batService) {
+        const batChar = await batService.getCharacteristic(BLE_PROFILES.CHAR_BATTERY)
+          .catch(() => batService.getCharacteristic(0x2a19)).catch(() => null);
+        if (batChar) {
+          const val = await batChar.readValue().catch(() => null);
+          if (val && val.byteLength >= 1) {
+            const b = val.getUint8(0);
+            if (b <= 100) {
+              this.cachedBattery = b;
+              this.cachedVoltage = Number((2.1 + (b / 100) * 0.9).toFixed(2));
+              if (this.cachedTemp !== null && this.cachedHum !== null) {
+                this.emitTelemetry(this.cachedTemp, this.cachedHum, 'gatt_live', this.deviceProfile, this.cachedBattery, this.cachedVoltage);
+              }
+              return;
+            }
+          }
+        }
+      }
+    } catch (e) {}
+
+    // 2. Environmental Sensing Servisi (0x181A) altındaki Pil (0x2A19) veya Voltaj (0x2A58)
+    try {
+      const envService = await this.server.getPrimaryService(BLE_PROFILES.ENV_SENSING_SERVICE)
+        .catch(() => this.server.getPrimaryService(0x181a)).catch(() => null);
+      if (envService) {
+        const batChar = await envService.getCharacteristic(0x2a19).catch(() => null);
+        if (batChar) {
+          const val = await batChar.readValue().catch(() => null);
+          if (val && val.byteLength >= 1) {
+            const b = val.getUint8(0);
+            if (b <= 100) {
+              this.cachedBattery = b;
+              this.cachedVoltage = Number((2.1 + (b / 100) * 0.9).toFixed(2));
+              if (this.cachedTemp !== null && this.cachedHum !== null) {
+                this.emitTelemetry(this.cachedTemp, this.cachedHum, 'gatt_live', this.deviceProfile, this.cachedBattery, this.cachedVoltage);
+              }
+              return;
+            }
+          }
+        }
+
+        const voltChar = await envService.getCharacteristic(0x2a58).catch(() => null);
+        if (voltChar) {
+          const val = await voltChar.readValue().catch(() => null);
+          if (val && val.byteLength >= 2) {
+            const mv = val.getUint16(0, true);
+            if (mv > 500) {
+              this.cachedVoltage = Number((mv / 1000).toFixed(2));
+              this.cachedBattery = Math.min(100, Math.max(0, Math.round(((mv - 2100) / 900) * 100)));
+              if (this.cachedTemp !== null && this.cachedHum !== null) {
+                this.emitTelemetry(this.cachedTemp, this.cachedHum, 'gatt_live', this.deviceProfile, this.cachedBattery, this.cachedVoltage);
+              }
+              return;
+            }
+          }
+        }
+      }
+    } catch (e) {}
   }
 
   async bindAtcEnvService(service) {
@@ -559,7 +618,7 @@ class UniversalBleManager {
           if (v && v.byteLength >= 2) {
             this.cachedTemp = v.getInt16(0, true) / 100.0;
             if (this.cachedHum !== null) {
-              this.emitTelemetry(this.cachedTemp, this.cachedHum, 'gatt_live', 'atc');
+              this.emitTelemetry(this.cachedTemp, this.cachedHum, 'gatt_live', 'atc', this.cachedBattery, this.cachedVoltage);
             }
           }
         });
@@ -585,7 +644,7 @@ class UniversalBleManager {
               ? v.getUint16(0, true) / 100.0
               : v.getUint8(0);
             if (this.cachedTemp !== null) {
-              this.emitTelemetry(this.cachedTemp, this.cachedHum, 'gatt_live', 'atc');
+              this.emitTelemetry(this.cachedTemp, this.cachedHum, 'gatt_live', 'atc', this.cachedBattery, this.cachedVoltage);
             }
           }
         });
@@ -607,6 +666,8 @@ class UniversalBleManager {
       const batt = Math.min(100, Math.max(0, Math.round(((voltMv - 2100) / 900) * 100)));
       this.cachedTemp = temp;
       this.cachedHum = hum;
+      this.cachedBattery = batt;
+      this.cachedVoltage = volt;
       this.emitTelemetry(temp, hum, 'gatt_live', 'stock_xiaomi', batt, volt);
     }
 
@@ -620,6 +681,8 @@ class UniversalBleManager {
         const batt = Math.min(100, Math.max(0, Math.round(((voltMv - 2100) / 900) * 100)));
         this.cachedTemp = temp;
         this.cachedHum = hum;
+        this.cachedBattery = batt;
+        this.cachedVoltage = volt;
         this.emitTelemetry(temp, hum, 'gatt_live', 'stock_xiaomi', batt, volt);
       }
     });
@@ -663,13 +726,16 @@ class UniversalBleManager {
           }
         }
         if (b.byteLength >= offset + 7) {
-          batt = b.getUint8(offset + 6);
+          const pBatt = b.getUint8(offset + 6);
+          if (pBatt <= 100) batt = pBatt;
         }
 
         if (t >= -40 && t <= 85 && h >= 0 && h <= 100) {
           this.cachedTemp = t;
           this.cachedHum = h;
-          this.emitTelemetry(t, h, 'gatt_live', 'atc', batt, volt);
+          if (batt != null) this.cachedBattery = batt;
+          if (volt != null) this.cachedVoltage = volt;
+          this.emitTelemetry(t, h, 'gatt_live', 'atc', this.cachedBattery, this.cachedVoltage);
         }
       }
     }
@@ -678,10 +744,16 @@ class UniversalBleManager {
   async sendAtcCommand(cmdBytes) {
     if (!this.atcChar) throw new Error('0x1F1F karakteristiği bulunamadı.');
     const buf = cmdBytes instanceof Uint8Array ? cmdBytes : new Uint8Array(cmdBytes);
-    if (this.atcChar.writeValueWithoutResponse) {
-      await this.atcChar.writeValueWithoutResponse(buf);
-    } else {
-      await this.atcChar.writeValue(buf);
+    try {
+      if (this.atcChar.writeValueWithoutResponse) {
+        await this.atcChar.writeValueWithoutResponse(buf);
+      } else {
+        await this.atcChar.writeValue(buf);
+      }
+    } catch (e) {
+      if (this.atcChar.writeValue) {
+        await this.atcChar.writeValue(buf);
+      }
     }
   }
 
@@ -813,6 +885,15 @@ class UniversalBleManager {
           }
 
           records.sort((a, b) => a.timestamp - b.timestamp);
+
+          // Flaş kayıtlarından son geçerli pil ve voltajı alıp önbelleğe aktar
+          for (let i = records.length - 1; i >= 0; i--) {
+            if (records[i].battery != null) {
+              this.cachedBattery = records[i].battery;
+              if (records[i].voltage != null) this.cachedVoltage = records[i].voltage;
+              break;
+            }
+          }
 
           if (isEpochValid && this.onSensorTime) {
             this.onSensorTime(maxTc * 1000);
@@ -976,6 +1057,9 @@ class AppController {
     this.currentPage = 1;
     this.pageSize = 15;
     this.latestTelemetry = null;
+    this.latestBattery = null;
+    this.latestVoltage = null;
+    this._autoSyncTimer = null;
 
     this.cacheDomElements();
     this.init();
@@ -1062,8 +1146,26 @@ class AppController {
     await this.storage.initPromise;
     this.updateStatsAndTable();
 
+    // En son kaydedilmiş geçerli pil ve voltaj değerlerini bulup önbelleğe al
+    for (let i = this.storage.records.length - 1; i >= 0; i--) {
+      const rec = this.storage.records[i];
+      if (rec.battery != null && this.latestBattery == null) {
+        this.latestBattery = rec.battery;
+      }
+      if (rec.voltage != null && this.latestVoltage == null) {
+        this.latestVoltage = rec.voltage;
+      }
+      if (this.latestBattery != null && this.latestVoltage != null) break;
+    }
+
     if (this.storage.records.length > 0) {
-      const last = this.storage.records[this.storage.records.length - 1];
+      const last = { ...this.storage.records[this.storage.records.length - 1] };
+      if (last.battery == null && this.latestBattery != null) {
+        last.battery = this.latestBattery;
+      }
+      if (last.voltage == null && this.latestVoltage != null) {
+        last.voltage = this.latestVoltage;
+      }
       this.renderTelemetryCards(last);
       this.updateChart();
     }
@@ -1304,7 +1406,20 @@ class AppController {
       }
       const records = await this.ble.fetchDeviceHistory();
       if (records && records.length > 0) {
+        for (let i = records.length - 1; i >= 0; i--) {
+          if (records[i].battery != null) {
+            this.latestBattery = records[i].battery;
+            if (records[i].voltage != null) this.latestVoltage = records[i].voltage;
+            break;
+          }
+        }
         const addedCount = await this.storage.addBatch(records);
+        const last = this.storage.records[this.storage.records.length - 1];
+        if (last) {
+          if (last.battery == null && this.latestBattery != null) last.battery = this.latestBattery;
+          if (last.voltage == null && this.latestVoltage != null) last.voltage = this.latestVoltage;
+          this.renderTelemetryCards(last);
+        }
         this.updateStatsAndTable();
         this.updateChart();
         this.showToast(`Cihaz belleğinden ${records.length} ölçüm başarıyla aktarıldı (${addedCount} yeni).`, 'success');
@@ -1325,8 +1440,18 @@ class AppController {
     if (this.dom.connectionStatusText) this.dom.connectionStatusText.textContent = text;
 
     if (status === 'connected') {
-      // Bağlantı kurulduğu an tüm ölçümleri otomatik çek
-      this.syncDeviceHistory(true);
+      // Bağlantının ve GATT bildirimlerinin oturması için 1.5 saniye bekle ve ardından geçmişi çek
+      if (this._autoSyncTimer) clearTimeout(this._autoSyncTimer);
+      this._autoSyncTimer = setTimeout(() => {
+        if (this.ble && this.ble.isConnected) {
+          this.syncDeviceHistory(true);
+        }
+      }, 1500);
+    } else {
+      if (this._autoSyncTimer) {
+        clearTimeout(this._autoSyncTimer);
+        this._autoSyncTimer = null;
+      }
     }
 
     const updateDot = (el) => {
@@ -1376,6 +1501,21 @@ class AppController {
   }
 
   async handleNewData(data) {
+    if (data.battery != null) {
+      this.latestBattery = data.battery;
+    } else if (this.latestBattery != null) {
+      data.battery = this.latestBattery;
+    }
+
+    if (data.voltage != null) {
+      this.latestVoltage = data.voltage;
+    } else if (this.latestVoltage != null) {
+      data.voltage = this.latestVoltage;
+    } else if (data.battery != null) {
+      data.voltage = Number((2.1 + (data.battery / 100) * 0.9).toFixed(2));
+      this.latestVoltage = data.voltage;
+    }
+
     const enriched = await this.storage.addRecord(data);
     if (!enriched) return;
     this.latestTelemetry = enriched;
@@ -1399,12 +1539,15 @@ class AppController {
     const humFormatted = !isNaN(humNum) ? humNum.toFixed(2) : data.humidity;
 
     // Grafik KPI
+    const effectiveBattery = data.battery != null ? data.battery : this.latestBattery;
+    const effectiveVoltage = data.voltage != null ? data.voltage : this.latestVoltage;
+
     if (this.dom.chartKpiCurrent) {
       if (this.chartMode === 'hum') {
         this.dom.chartKpiCurrent.textContent = `%${humFormatted}`;
         if (this.dom.chartKpiCurrentUnit) this.dom.chartKpiCurrentUnit.textContent = '%';
       } else if (this.chartMode === 'battery') {
-        this.dom.chartKpiCurrent.textContent = data.battery != null ? `%${data.battery}` : '--';
+        this.dom.chartKpiCurrent.textContent = effectiveBattery != null ? `%${effectiveBattery}` : '--';
         if (this.dom.chartKpiCurrentUnit) this.dom.chartKpiCurrentUnit.textContent = '%';
       } else {
         this.dom.chartKpiCurrent.textContent = displayTemp.toFixed(2);
@@ -1429,13 +1572,13 @@ class AppController {
 
     // 3. Pil & Voltaj Kartı
     if (this.dom.valBattery) {
-      if (data.battery != null) {
-        this.dom.valBattery.textContent = data.battery;
+      if (effectiveBattery != null) {
+        this.dom.valBattery.textContent = effectiveBattery;
         if (this.dom.batteryProgressBar) {
-          this.dom.batteryProgressBar.style.width = `${Math.min(100, Math.max(0, data.battery))}%`;
-          if (data.battery < 20) {
+          this.dom.batteryProgressBar.style.width = `${Math.min(100, Math.max(0, effectiveBattery))}%`;
+          if (effectiveBattery < 20) {
             this.dom.batteryProgressBar.className = 'h-full bg-rose-500 rounded-full';
-          } else if (data.battery < 50) {
+          } else if (effectiveBattery < 50) {
             this.dom.batteryProgressBar.className = 'h-full bg-amber-500 rounded-full';
           } else {
             this.dom.batteryProgressBar.className = 'h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full';
@@ -1447,10 +1590,10 @@ class AppController {
     }
 
     if (this.dom.valVoltageBadge) {
-      if (data.voltage != null) {
-        this.dom.valVoltageBadge.textContent = `${Number(data.voltage).toFixed(2)} V`;
-      } else if (data.battery != null) {
-        const calcV = (2.1 + (data.battery / 100) * 0.9).toFixed(2);
+      if (effectiveVoltage != null) {
+        this.dom.valVoltageBadge.textContent = `${Number(effectiveVoltage).toFixed(2)} V`;
+      } else if (effectiveBattery != null) {
+        const calcV = (2.1 + (effectiveBattery / 100) * 0.9).toFixed(2);
         this.dom.valVoltageBadge.textContent = `${calcV} V`;
       } else {
         this.dom.valVoltageBadge.textContent = '-- V';
