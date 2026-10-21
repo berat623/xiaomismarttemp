@@ -51,16 +51,12 @@ body {
   font-weight: 500;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
   overflow-x: hidden;
 }
 
-/* Enforce Minimum 500 Weight Everywhere */
+/* Font Weights */
 p, span, div, a, button, input, td, th, label, small {
   font-weight: 500;
-}
-.font-medium {
-  font-weight: 500 !important;
 }
 .font-semibold {
   font-weight: 600 !important;
@@ -74,83 +70,38 @@ h1, h2, h3, h4, th, .font-bold {
 
 /* Custom Sleek Scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #a8c7fa;
-  border-radius: 8px;
+  background: #cbd5e1;
+  border-radius: 6px;
 }
 .dark ::-webkit-scrollbar-thumb {
-  background: #1b2b48;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #0b57d0;
-}
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: #0842a0;
+  background: #1e293b;
 }
 
-/* Material 3 Surface & Card Styles (High-Contrast, Instant Rendering) */
-.m3-surface {
-  background-color: #dbe8fc;
-  color: #041e49;
-}
-.dark .m3-surface {
-  background-color: #081220;
-  color: #f0f4fc;
-}
-
+/* Minimalist Card Styles */
 .m3-card {
   background: #ffffff;
-  border: 1.5px solid rgba(11, 87, 208, 0.16);
-  border-radius: 24px;
-  box-shadow: 0 1px 4px rgba(11, 87, 208, 0.06);
+  border: 1px solid rgba(11, 87, 208, 0.12);
+  border-radius: 18px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .dark .m3-card {
   background: #121f33;
-  border: 1.5px solid rgba(168, 199, 250, 0.22);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(168, 199, 250, 0.16);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
 }
 
-/* Material 3 Filter Chips (Range Filters: 1h, 24h, 7d, all) */
-.filter-btn {
-  color: #444746;
-  font-weight: 500;
-  border-radius: 9999px;
-  touch-action: manipulation;
-}
-.filter-btn:hover {
-  color: #0b57d0;
-  background-color: rgba(11, 87, 208, 0.08);
-}
-.filter-btn.active {
-  background-color: #0b57d0;
-  color: #ffffff;
-  font-weight: 600;
-}
-
-.dark .filter-btn {
-  color: #c4c7c5;
-}
-.dark .filter-btn:hover {
-  color: #a8c7fa;
-  background-color: rgba(168, 199, 250, 0.1);
-}
-.dark .filter-btn.active {
-  background-color: #a8c7fa;
-  color: #041e49;
-  font-weight: 700;
-}
-
-/* Material 3 Segmented Mode Tabs */
+/* Mode Tabs */
 .mode-btn {
-  color: #444746;
-  font-weight: 500;
+  color: #475569;
+  font-weight: 600;
   border-radius: 9999px;
   touch-action: manipulation;
   white-space: nowrap;
@@ -161,66 +112,39 @@ h1, h2, h3, h4, th, .font-bold {
   background-color: rgba(11, 87, 208, 0.06);
 }
 .mode-btn.active {
-  background-color: #d3e3fd;
-  color: #041e49;
+  background-color: #0b57d0;
+  color: #ffffff;
   font-weight: 700;
-  border-color: rgba(11, 87, 208, 0.25);
 }
 
 .dark .mode-btn {
-  color: #c4c7c5;
+  color: #94a3b8;
 }
 .dark .mode-btn:hover {
   color: #a8c7fa;
   background-color: rgba(168, 199, 250, 0.1);
 }
 .dark .mode-btn.active {
-  background-color: #0842a0;
-  color: #d3e3fd;
+  background-color: #a8c7fa;
+  color: #041e49;
   font-weight: 700;
-  border-color: rgba(168, 199, 250, 0.35);
 }
 
-/* Status Indicators (Static & High Performance) */
-.dot-live {
-  background-color: #0b57d0;
+/* High-Performance Unified Table */
+table {
+  border-collapse: collapse;
 }
-.dark .dot-live {
-  background-color: #a8c7fa;
+table th, table td {
+  padding: 8px 12px;
+}
+@media (max-width: 640px) {
+  table th, table td {
+    padding: 6px 8px;
+    font-size: 11px;
+  }
 }
 
-/* Fast Toast Display (Zero Animation) */
-.toast-animate {
-  opacity: 1;
-}
-
-/* 4-Bar Signal Strength Meter Styles */
-.signal-bars {
-  display: inline-flex;
-  align-items: flex-end;
-  gap: 2px;
-  height: 14px;
-}
-.signal-bar {
-  width: 3px;
-  background-color: #cbd5e1;
-  border-radius: 1px;
-}
-.dark .signal-bar {
-  background-color: #334155;
-}
-.signal-bar.active {
-  background-color: #0b57d0;
-}
-.dark .signal-bar.active {
-  background-color: #a8c7fa;
-}
-.signal-bar:nth-child(1) { height: 4px; }
-.signal-bar:nth-child(2) { height: 7px; }
-.signal-bar:nth-child(3) { height: 10px; }
-.signal-bar:nth-child(4) { height: 14px; }
-
-/* Mobile Fluidity & Ergonomics */
+/* Mobile Fluidity & Ergonomics for Samsung A23 and similar */
 @media (max-width: 640px) {
   html, body {
     overflow-x: hidden;
@@ -228,22 +152,10 @@ h1, h2, h3, h4, th, .font-bold {
   }
 
   header {
-    padding-top: max(0.5rem, env(safe-area-inset-top));
-  }
-  
-  body {
-    padding-bottom: max(2rem, env(safe-area-inset-bottom));
+    padding-top: max(0.4rem, env(safe-area-inset-top));
   }
 
   button {
-    min-height: 40px;
-  }
-
-  .touch-scroll {
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-  }
-  .touch-scroll::-webkit-scrollbar {
-    display: none;
+    min-height: 36px;
   }
 }

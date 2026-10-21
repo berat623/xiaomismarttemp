@@ -117,7 +117,6 @@ class TelemetryStorage {
         for (let i = 0; i < raw.length; i++) {
           const r = raw[i];
           const formatted = TelemetryProcessor.format(r);
-          // Hatalı/bozuk kayıtları (örn: 279°C veya %548 nem) otomatik olarak temizle
           if (formatted) {
             clean.push(formatted);
           } else if (r.id) {
@@ -229,6 +228,7 @@ class UniversalBleManager {
     this.isConnected = false;
     this.isConnecting = false;
     this.isFetchingHistory = false;
+    this._activeHistoryPromise = null;
     this.deviceProfile = 'unknown'; // 'stock_xiaomi' | 'atc'
 
     this.primaryService = null;
@@ -350,7 +350,7 @@ class UniversalBleManager {
       if (this.isWatchingAdvertisements) {
         this.isConnected = true;
         this.isConnecting = false;
-        this.onStatus('connected', `${devName} (BLE Yayın Aktif)`);
+        this.onStatus('connected', `${devName} (BLE Yayın)`);
         return true;
       }
       this.isConnecting = false;
@@ -492,15 +492,14 @@ class UniversalBleManager {
           });
           await atcChar.startNotifications().catch(() => {});
 
-          // BLE paket çarpışmasını ve bağlantı kopmasını önlemek için güvenli bekleme
-          await new Promise(r => setTimeout(r, 150));
+          await new Promise(r => setTimeout(r, 120));
 
-          // 0x33 telemetri akışını başlat komutu
+          // 0x33 telemetri akışını başlat (PVVX live telemetry format)
           await this.sendAtcCommand(new Uint8Array([0x33, 0x01])).catch(() => {});
 
-          await new Promise(r => setTimeout(r, 150));
+          await new Promise(r => setTimeout(r, 120));
 
-          // 0x23 sensör donanım saatini (RTC) 5 baytlık tam paket ile senkronize et (0x23 + uint32 epoch saniye)
+          // 0x23 sensör donanım saatini (RTC) senkronize et (5 bayt: 0x23 + uint32 epoch)
           const nowSec = Math.floor(Date.now() / 1000);
           const timeCmd = new Uint8Array([
             0x23,
@@ -519,7 +518,7 @@ class UniversalBleManager {
       }
     } catch (e) {}
 
-    // 3. Standart Pil Servislerinden Pil & Voltaj Değerini Güvenli Oku (GATT çökmesini önlemek için tek okuma)
+    // 3. Standart Pil Servislerinden Pil Bilgisini Güvenli Oku
     await this.readBatterySafely();
 
     // 4. Orijinal Xiaomi Servisi
@@ -561,7 +560,7 @@ class UniversalBleManager {
       }
     } catch (e) {}
 
-    // 2. Environmental Sensing Servisi (0x181A) altındaki Pil (0x2A19) veya Voltaj (0x2A58)
+    // 2. Environmental Sensing Servisi (0x181A) altındaki 0x2A19 veya 0x2A58
     try {
       const envService = await this.server.getPrimaryService(BLE_PROFILES.ENV_SENSING_SERVICE)
         .catch(() => this.server.getPrimaryService(0x181a)).catch(() => null);
@@ -784,53 +783,57 @@ class UniversalBleManager {
     if (!this.isConnected) {
       throw new Error('Önce cihaza bağlanmalısınız.');
     }
-    if (this.isFetchingHistory) {
-      return [];
+    // Halihazırda süren bir çekme işlemi varsa, onu bekle ve sonucunu dön
+    if (this.isFetchingHistory && this._activeHistoryPromise) {
+      return await this._activeHistoryPromise;
     }
 
     this.isFetchingHistory = true;
-    this.onHistoryProgress({ active: true, percent: 5, message: 'Flaş bellek taranıyor...' });
+    this._activeHistoryPromise = (async () => {
+      try {
+        this.onHistoryProgress({ active: true, percent: 5, message: 'Flaş bellek taranıyor...' });
 
-    try {
-      // 1. ATC / PVVX Modlu Cihaz
-      if (this.atcChar) {
-        const fetchedRecords = await this.fetchAtcHistoryFromFlash();
-        this.isFetchingHistory = false;
-        this.onHistoryProgress({ active: false, percent: 100, message: 'Tamamlandı' });
-        return fetchedRecords;
-      }
-
-      // 2. Orijinal Xiaomi Cihazı
-      if (this.primaryService) {
-        const historyChar = await this.primaryService.getCharacteristic(BLE_PROFILES.CHAR_HISTORY_STREAM).catch(() => null);
-        if (historyChar) {
-          await historyChar.startNotifications();
-          const records = [];
-          const handler = (e) => {
-            const chunk = e.target.value;
-            if (chunk) {
-              const item = this.parseHistoryChunk(chunk);
-              if (item) records.push(item);
-            }
-          };
-          historyChar.addEventListener('characteristicvaluechanged', handler);
-          await new Promise(r => setTimeout(r, 2500));
-          historyChar.removeEventListener('characteristicvaluechanged', handler);
-          await historyChar.stopNotifications().catch(() => {});
-          this.isFetchingHistory = false;
+        // 1. ATC / PVVX Modlu Cihaz
+        if (this.atcChar) {
+          const fetchedRecords = await this.fetchAtcHistoryFromFlash();
           this.onHistoryProgress({ active: false, percent: 100, message: 'Tamamlandı' });
-          return records;
+          return fetchedRecords;
         }
-      }
 
-      this.onHistoryProgress({ active: false, percent: 100, message: 'Kayıt bulunamadı' });
-      this.isFetchingHistory = false;
-      return [];
-    } catch (err) {
-      this.isFetchingHistory = false;
-      this.onHistoryProgress({ active: false, percent: 0, message: 'Hata' });
-      throw err;
-    }
+        // 2. Orijinal Xiaomi Cihazı
+        if (this.primaryService) {
+          const historyChar = await this.primaryService.getCharacteristic(BLE_PROFILES.CHAR_HISTORY_STREAM).catch(() => null);
+          if (historyChar) {
+            await historyChar.startNotifications();
+            const records = [];
+            const handler = (e) => {
+              const chunk = e.target.value;
+              if (chunk) {
+                const item = this.parseHistoryChunk(chunk);
+                if (item) records.push(item);
+              }
+            };
+            historyChar.addEventListener('characteristicvaluechanged', handler);
+            await new Promise(r => setTimeout(r, 2800));
+            historyChar.removeEventListener('characteristicvaluechanged', handler);
+            await historyChar.stopNotifications().catch(() => {});
+            this.onHistoryProgress({ active: false, percent: 100, message: 'Tamamlandı' });
+            return records;
+          }
+        }
+
+        this.onHistoryProgress({ active: false, percent: 100, message: 'Kayıt bulunamadı' });
+        return [];
+      } catch (err) {
+        this.onHistoryProgress({ active: false, percent: 0, message: 'Hata' });
+        throw err;
+      } finally {
+        this.isFetchingHistory = false;
+        this._activeHistoryPromise = null;
+      }
+    })();
+
+    return await this._activeHistoryPromise;
   }
 
   async fetchAtcHistoryFromFlash() {
@@ -838,13 +841,22 @@ class UniversalBleManager {
       const rawSamples = [];
       let expectedTotal = null;
       let timeoutTimer = null;
+      let retryTimer = null;
       let hasCompleted = false;
+      let receivedAnyPacket = false;
+      let attempt = 0;
 
       const finishDownload = async () => {
         if (hasCompleted) return;
         hasCompleted = true;
         if (timeoutTimer) clearTimeout(timeoutTimer);
+        if (retryTimer) clearInterval(retryTimer);
         this._atcHistoryHandler = null;
+
+        // Canlı telemetri akışını tekrar başlat (PVVX 0x33, 0x01)
+        try {
+          await this.sendAtcCommand(new Uint8Array([0x33, 0x01])).catch(() => {});
+        } catch (e) {}
 
         if (rawSamples.length === 0) {
           resolve([]);
@@ -899,7 +911,7 @@ class UniversalBleManager {
             this.onSensorTime(maxTc * 1000);
           }
 
-          // Cihaz saatini senkronize et
+          // Cihaz saatini senkronize et (5 bayt)
           try {
             const timeNowSec = Math.floor(Date.now() / 1000);
             const timePkt = new Uint8Array([
@@ -921,7 +933,7 @@ class UniversalBleManager {
         }
       };
 
-      const resetTimeout = (delay = 3500) => {
+      const resetTimeout = (delay = 4500) => {
         if (timeoutTimer) clearTimeout(timeoutTimer);
         timeoutTimer = setTimeout(() => {
           finishDownload();
@@ -934,23 +946,25 @@ class UniversalBleManager {
         const cmdId = val.getUint8(0);
         if (cmdId !== 0x35) return;
 
+        receivedAnyPacket = true;
+        if (retryTimer) {
+          clearInterval(retryTimer);
+          retryTimer = null;
+        }
+
         // 1. Toplam kayıt sayısı bildirimi paketi
-        if (len === 2) {
-          expectedTotal = val.getUint8(1);
+        if (len === 2 || (len >= 3 && len < 13)) {
+          expectedTotal = len === 2 ? val.getUint8(1) : val.getUint16(1, true);
+          if (expectedTotal === 0 && rawSamples.length === 0) {
+            finishDownload();
+            return;
+          }
           this.onHistoryProgress({
             active: true,
-            percent: 10,
+            percent: Math.min(25, Math.max(10, Math.round((rawSamples.length / Math.max(1, expectedTotal)) * 80))),
             message: `${expectedTotal} bellek kaydı taranıyor...`
           });
-          resetTimeout(3500);
-        } else if (len >= 3 && len < 13) {
-          expectedTotal = val.getUint16(1, true);
-          this.onHistoryProgress({
-            active: true,
-            percent: 10,
-            message: `${expectedTotal} bellek kaydı aktarılıyor...`
-          });
-          resetTimeout(3500);
+          resetTimeout(4500);
         } else if (len >= 13) {
           // 2. Ölçüm verileri paketi (1 pakette birden çok 12 baytlık kayıt gelebilir)
           let offset = 1;
@@ -962,7 +976,6 @@ class UniversalBleManager {
             const vb = val.getUint16(offset + 10, true);
             offset += 12;
 
-            // Sensör sınırları dışındaki bozuk/boş flaş kayıtlarını ele
             if (tm >= -40 && tm <= 85 && hm >= 0 && hm <= 100) {
               rawSamples.push({ cnt, tc, tm, hm, vb });
             }
@@ -970,9 +983,9 @@ class UniversalBleManager {
 
           let pct;
           if (expectedTotal && expectedTotal > 0) {
-            pct = Math.min(95, Math.round((rawSamples.length / expectedTotal) * 80) + 15);
+            pct = Math.min(95, Math.round((rawSamples.length / expectedTotal) * 85) + 10);
           } else {
-            pct = Math.min(92, 15 + Math.floor(rawSamples.length / 5));
+            pct = Math.min(92, 10 + Math.floor(rawSamples.length / 4));
           }
 
           this.onHistoryProgress({
@@ -981,23 +994,48 @@ class UniversalBleManager {
             message: `${rawSamples.length} kayıt aktarıldı...`
           });
 
-          // Beklenen sayıya tam ulaşıldığında hemen bitir
           if (expectedTotal && rawSamples.length >= expectedTotal) {
             finishDownload();
             return;
           }
 
-          resetTimeout(3500);
+          resetTimeout(4500);
         }
       };
 
       try {
+        // Canlı telemetri bildirimlerini geçici olarak duraklat (paket çakışmasını engellemek için)
+        await this.sendAtcCommand(new Uint8Array([0x33, 0x00])).catch(() => {});
+        await new Promise(r => setTimeout(r, 100));
+
         // PVVX 0x35: Tüm bellek kayıtlarını talep et
-        const cmd = new Uint8Array([0x35, 0xff, 0xff, 0x00, 0x00]);
-        await this.sendAtcCommand(cmd);
-        resetTimeout(5000);
+        const sendReq = async (mode = 0) => {
+          const cmd = mode === 0
+            ? new Uint8Array([0x35, 0xff, 0xff, 0x00, 0x00])
+            : (mode === 1 ? new Uint8Array([0x35, 0x00, 0x00, 0x00, 0x00]) : new Uint8Array([0x35, 0x00, 0x00]));
+          await this.sendAtcCommand(cmd).catch(() => {});
+        };
+
+        await sendReq(0);
+        resetTimeout(6000);
+
+        // Akıllı Yeniden Deneme: 1.5 sn içinde yanıt gelmezse komutu tekrarla
+        retryTimer = setInterval(async () => {
+          if (receivedAnyPacket || hasCompleted) {
+            clearInterval(retryTimer);
+            return;
+          }
+          attempt++;
+          if (attempt <= 2) {
+            await sendReq(attempt);
+          } else {
+            clearInterval(retryTimer);
+          }
+        }, 1500);
+
       } catch (err) {
         if (timeoutTimer) clearTimeout(timeoutTimer);
+        if (retryTimer) clearInterval(retryTimer);
         this._atcHistoryHandler = null;
         reject(err);
       }
@@ -1052,7 +1090,6 @@ class AppController {
 
     this.currentTheme = localStorage.getItem('smarttemp_theme') || 'light';
     this.currentUnit = localStorage.getItem('smarttemp_unit') || 'C';
-    this.chartRange = 'all';
     this.chartMode = 'temps'; // 'temps' | 'hum' | 'battery' | 'all'
     this.currentPage = 1;
     this.pageSize = 15;
@@ -1060,6 +1097,8 @@ class AppController {
     this.latestBattery = null;
     this.latestVoltage = null;
     this._autoSyncTimer = null;
+    this._updateScheduled = false;
+    this.isSyncing = false;
 
     this.cacheDomElements();
     this.init();
@@ -1067,23 +1106,15 @@ class AppController {
 
   cacheDomElements() {
     this.dom = {
-      // Header & Navigation
+      // Header
       liveClockTime: document.getElementById('liveClockTime'),
-      liveClockDate: document.getElementById('liveClockDate'),
       sensorClockPulse: document.getElementById('sensorClockPulse'),
-      offlineBadge: document.getElementById('offlineBadge'),
-      offlineBadgeMobile: document.getElementById('offlineBadgeMobile'),
-      connectionDot: document.getElementById('connectionDot'),
-      connectionDotMobile: document.getElementById('connectionDotMobile'),
       connectionStatusText: document.getElementById('connectionStatusText'),
-      lastUpdatedAgo: document.getElementById('lastUpdatedAgo'),
       btnConnect: document.getElementById('btnConnect'),
-      btnConnectMobile: document.getElementById('btnConnectMobile'),
-      btnFetchHistoryHeader: document.getElementById('btnFetchHistoryHeader'),
-      btnFetchHistoryMobile: document.getElementById('btnFetchHistoryMobile'),
+      btnConnectLabel: document.getElementById('btnConnectLabel'),
+      btnFetchHistory: document.getElementById('btnFetchHistory'),
       btnThemeToggle: document.getElementById('btnThemeToggle'),
       themeIcon: document.getElementById('themeIcon'),
-      themeLabel: document.getElementById('themeLabel'),
 
       // Sync Progress Banner
       syncProgressBanner: document.getElementById('syncProgressBanner'),
@@ -1104,27 +1135,15 @@ class AppController {
       valVoltageBadge: document.getElementById('valVoltageBadge'),
       batteryProgressBar: document.getElementById('batteryProgressBar'),
 
-      // Chart & Analytics
-      chartStatsStrip: document.getElementById('chartStatsStrip'),
-      chartKpiCurrent: document.getElementById('chartKpiCurrent'),
-      chartKpiCurrentUnit: document.getElementById('chartKpiCurrentUnit'),
-      chartKpiMin: document.getElementById('chartKpiMin'),
-      chartKpiMinTime: document.getElementById('chartKpiMinTime'),
-      chartKpiMax: document.getElementById('chartKpiMax'),
-      chartKpiMaxTime: document.getElementById('chartKpiMaxTime'),
-      chartKpiAvg: document.getElementById('chartKpiAvg'),
-      chartKpiCount: document.getElementById('chartKpiCount'),
+      // Chart
       chartEmptyOverlay: document.getElementById('chartEmptyOverlay'),
       telemetryChart: document.getElementById('telemetryChart'),
 
-      // Records Table & Feed
-      btnFetchHistory: document.getElementById('btnFetchHistory'),
-      btnExportCsv: document.getElementById('btnExportCsv'),
-      btnExportJson: document.getElementById('btnExportJson'),
-      btnClearData: document.getElementById('btnClearData'),
-      mobileHistoryFeed: document.getElementById('mobileHistoryFeed'),
+      // Records Table
       historyTableBody: document.getElementById('historyTableBody'),
       tableSummaryText: document.getElementById('tableSummaryText'),
+      btnExportCsv: document.getElementById('btnExportCsv'),
+      btnClearData: document.getElementById('btnClearData'),
       btnPrevPage: document.getElementById('btnPrevPage'),
       pageIndicator: document.getElementById('pageIndicator'),
       btnNextPage: document.getElementById('btnNextPage'),
@@ -1136,7 +1155,6 @@ class AppController {
 
   async init() {
     this.initServiceWorker();
-    this.initNetworkStatus();
     this.initLiveClock();
     this.applyTheme(this.currentTheme);
     lucide.createIcons();
@@ -1144,7 +1162,7 @@ class AppController {
     this.initChart();
 
     await this.storage.initPromise;
-    this.updateStatsAndTable();
+    this.renderTable();
 
     // En son kaydedilmiş geçerli pil ve voltaj değerlerini bulup önbelleğe al
     for (let i = this.storage.records.length - 1; i >= 0; i--) {
@@ -1206,23 +1224,6 @@ class AppController {
     }
   }
 
-  initNetworkStatus() {
-    const updateOnline = () => {
-      const isOnline = navigator.onLine;
-      if (this.dom.offlineBadge) {
-        this.dom.offlineBadge.classList.toggle('hidden', isOnline);
-        this.dom.offlineBadge.classList.toggle('inline-flex', !isOnline);
-      }
-      if (this.dom.offlineBadgeMobile) {
-        this.dom.offlineBadgeMobile.classList.toggle('hidden', isOnline);
-        this.dom.offlineBadgeMobile.classList.toggle('flex', !isOnline);
-      }
-    };
-    window.addEventListener('online', updateOnline);
-    window.addEventListener('offline', updateOnline);
-    updateOnline();
-  }
-
   setSensorClock(sensorTimeMs) {
     if (!sensorTimeMs || isNaN(sensorTimeMs)) return;
     this.sensorClockOffset = sensorTimeMs - Date.now();
@@ -1233,10 +1234,7 @@ class AppController {
   updateSensorClockDisplay() {
     if (!this.hasReceivedSensorClock) {
       if (this.dom.liveClockTime) this.dom.liveClockTime.textContent = '--:--:--';
-      if (this.dom.liveClockDate) this.dom.liveClockDate.textContent = 'Sensör Saati Bekleniyor';
-      if (this.dom.sensorClockPulse) {
-        this.dom.sensorClockPulse.className = 'w-2 h-2 rounded-full bg-slate-400 dark:bg-slate-600 flex-shrink-0';
-      }
+      if (this.dom.connectionStatusText) this.dom.connectionStatusText.textContent = 'Sensör Saati';
       return;
     }
 
@@ -1248,15 +1246,8 @@ class AppController {
         second: '2-digit'
       });
     }
-    if (this.dom.liveClockDate) {
-      this.dom.liveClockDate.textContent = `Sensör: ${sensorNow.toLocaleDateString('tr-TR', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric'
-      })}`;
-    }
-    if (this.dom.sensorClockPulse) {
-      this.dom.sensorClockPulse.className = 'w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0';
+    if (this.dom.connectionStatusText) {
+      this.dom.connectionStatusText.textContent = 'Canlı RTC';
     }
   }
 
@@ -1268,22 +1259,23 @@ class AppController {
   }
 
   setupEventListeners() {
-    // Bluetooth Connect Buttons
-    const handleConnect = () => {
-      if (this.ble.isConnected) {
-        this.ble.disconnect();
-      } else {
-        this.connectBluetooth();
-      }
-    };
-    if (this.dom.btnConnect) this.dom.btnConnect.addEventListener('click', handleConnect);
-    if (this.dom.btnConnectMobile) this.dom.btnConnectMobile.addEventListener('click', handleConnect);
+    // Bluetooth Connect Button
+    if (this.dom.btnConnect) {
+      this.dom.btnConnect.addEventListener('click', () => {
+        if (this.ble.isConnected) {
+          this.ble.disconnect();
+        } else {
+          this.connectBluetooth();
+        }
+      });
+    }
 
-    // Fetch History Buttons (Header, Mobile & Body)
-    const handleFetchAll = () => this.syncDeviceHistory(false);
-    if (this.dom.btnFetchHistory) this.dom.btnFetchHistory.addEventListener('click', handleFetchAll);
-    if (this.dom.btnFetchHistoryHeader) this.dom.btnFetchHistoryHeader.addEventListener('click', handleFetchAll);
-    if (this.dom.btnFetchHistoryMobile) this.dom.btnFetchHistoryMobile.addEventListener('click', handleFetchAll);
+    // Fetch History Button
+    if (this.dom.btnFetchHistory) {
+      this.dom.btnFetchHistory.addEventListener('click', () => {
+        this.syncDeviceHistory(false);
+      });
+    }
 
     // Theme Toggle
     if (this.dom.btnThemeToggle) {
@@ -1301,22 +1293,11 @@ class AppController {
         if (this.latestTelemetry) {
           this.renderTelemetryCards(this.latestTelemetry);
         }
-        this.updateStatsAndTable();
-        this.updateChart();
+        this.scheduleVisualUpdate();
       });
     }
 
-    // Range Filters
-    document.querySelectorAll('.filter-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-        e.currentTarget.classList.add('active');
-        this.chartRange = e.currentTarget.dataset.range || 'all';
-        this.updateChart();
-      });
-    });
-
-    // Chart Parameter Modes
+    // Chart Mode Buttons (Sıcaklık, Nem, Pil, Tümü)
     document.querySelectorAll('.mode-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
@@ -1326,7 +1307,7 @@ class AppController {
       });
     });
 
-    // CSV & JSON Exports
+    // CSV Export
     if (this.dom.btnExportCsv) {
       this.dom.btnExportCsv.addEventListener('click', () => {
         const csv = this.storage.exportCSV();
@@ -1339,21 +1320,13 @@ class AppController {
       });
     }
 
-    if (this.dom.btnExportJson) {
-      this.dom.btnExportJson.addEventListener('click', () => {
-        const json = this.storage.exportJSON();
-        this.downloadFile(json, `Xiaomi_SmartTemp_${new Date().toISOString().slice(0, 10)}.json`, 'application/json');
-        this.showToast('JSON arşivi başarıyla indirildi.', 'success');
-      });
-    }
-
     // Clear Database
     if (this.dom.btnClearData) {
       this.dom.btnClearData.addEventListener('click', async () => {
         if (confirm('Tüm kayıtlar silinecektir. Emin misiniz?')) {
           await this.storage.clearAll();
           this.latestTelemetry = null;
-          this.updateStatsAndTable();
+          this.renderTable();
           this.updateChart();
           this.showToast('Tüm telemetri geçmişi temizlendi.', 'info');
         }
@@ -1395,14 +1368,22 @@ class AppController {
   async syncDeviceHistory(isAuto = false) {
     if (!this.ble.isConnected) {
       if (!isAuto) {
-        this.showToast('Ölçülen verileri çekmek için önce cihaza bağlanmalısınız.', 'info');
+        this.showToast('Önce Bluetooth ile cihaza bağlanmalısınız.', 'info');
       }
       return;
     }
 
+    if (this.isSyncing) {
+      if (!isAuto) {
+        this.showToast('Veriler zaten aktarılıyor, lütfen bekleyin...', 'info');
+      }
+      return;
+    }
+
+    this.isSyncing = true;
     try {
       if (!isAuto) {
-        this.showToast('Sensör flaş belleğindeki tüm kayıtlar taranıyor...', 'info');
+        this.showToast('Sensör belleğindeki kayıtlar taranıyor...', 'info');
       }
       const records = await this.ble.fetchDeviceHistory();
       if (records && records.length > 0) {
@@ -1420,7 +1401,7 @@ class AppController {
           if (last.voltage == null && this.latestVoltage != null) last.voltage = this.latestVoltage;
           this.renderTelemetryCards(last);
         }
-        this.updateStatsAndTable();
+        this.renderTable();
         this.updateChart();
         this.showToast(`Cihaz belleğinden ${records.length} ölçüm başarıyla aktarıldı (${addedCount} yeni).`, 'success');
       } else {
@@ -1433,11 +1414,15 @@ class AppController {
       if (!isAuto) {
         this.showToast(`Bellek okuma hatası: ${err.message}`, 'error');
       }
+    } finally {
+      this.isSyncing = false;
     }
   }
 
   handleBleStatus(status, text) {
-    if (this.dom.connectionStatusText) this.dom.connectionStatusText.textContent = text;
+    if (this.dom.connectionStatusText) {
+      this.dom.connectionStatusText.textContent = text;
+    }
 
     if (status === 'connected') {
       // Bağlantının ve GATT bildirimlerinin oturması için 1.5 saniye bekle ve ardından geçmişi çek
@@ -1454,37 +1439,27 @@ class AppController {
       }
     }
 
-    const updateDot = (el) => {
-      if (!el) return;
-      el.className = 'w-2.5 h-2.5 rounded-full inline-block flex-shrink-0';
+    // Durum Noktası
+    if (this.dom.sensorClockPulse) {
       if (status === 'connected') {
-        el.classList.add('bg-[#0b57d0]', 'dark:bg-[#a8c7fa]');
+        this.dom.sensorClockPulse.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500 flex-shrink-0';
       } else if (status === 'connecting' || status === 'scanning') {
-        el.classList.add('bg-amber-500');
+        this.dom.sensorClockPulse.className = 'w-2.5 h-2.5 rounded-full bg-amber-500 flex-shrink-0';
       } else {
-        el.classList.add('bg-slate-400', 'dark:bg-slate-500');
+        this.dom.sensorClockPulse.className = 'w-2.5 h-2.5 rounded-full bg-slate-400 dark:bg-slate-600 flex-shrink-0';
       }
-    };
-    updateDot(this.dom.connectionDot);
-    updateDot(this.dom.connectionDotMobile);
+    }
 
-    const updateBtn = (btn, isMobile = false) => {
-      if (!btn) return;
+    // Bağlan Butonu
+    if (this.dom.btnConnect) {
       if (status === 'connected') {
-        btn.innerHTML = `<i data-lucide="power" class="w-4 h-4"></i><span>Bağlantıyı Kes</span>`;
-        btn.className = `${isMobile ? 'flex-1' : ''} py-2.5 px-3 rounded-full text-xs font-semibold flex items-center justify-center gap-1.5 bg-[#ba1a1a] hover:bg-[#93000a] text-white shadow-sm`;
+        if (this.dom.btnConnectLabel) this.dom.btnConnectLabel.textContent = 'Bağlantıyı Kes';
+        this.dom.btnConnect.className = 'px-3.5 sm:px-4 py-2 rounded-full text-xs font-bold flex items-center gap-1.5 bg-[#ba1a1a] hover:bg-[#93000a] text-white shadow-sm';
       } else {
-        btn.innerHTML = `<i data-lucide="bluetooth" class="w-4 h-4"></i><span>${isMobile ? 'Bağlan' : 'Cihaza Bağlan'}</span>`;
-        btn.className = `${isMobile ? 'flex-1' : ''} py-2.5 px-3 rounded-full text-xs font-semibold flex items-center justify-center gap-1.5 bg-[#0b57d0] hover:bg-[#0842a0] text-white shadow-sm`;
+        if (this.dom.btnConnectLabel) this.dom.btnConnectLabel.textContent = 'Bağlan';
+        this.dom.btnConnect.className = 'px-3.5 sm:px-4 py-2 rounded-full text-xs font-bold flex items-center gap-1.5 bg-[#0b57d0] hover:bg-[#0842a0] text-white shadow-sm';
       }
-    };
-    updateBtn(this.dom.btnConnect, false);
-    updateBtn(this.dom.btnConnectMobile, true);
-
-    const isConnected = status === 'connected';
-    if (this.dom.lastUpdatedAgo) this.dom.lastUpdatedAgo.classList.toggle('hidden', !isConnected);
-
-    lucide.createIcons();
+    }
   }
 
   handleHistoryProgress({ active, percent, message }) {
@@ -1520,9 +1495,21 @@ class AppController {
     if (!enriched) return;
     this.latestTelemetry = enriched;
 
+    // 1. Ana kartlar gecikmesiz, anında güncellenir (0ms anlık his)
     this.renderTelemetryCards(enriched);
-    this.updateStatsAndTable();
-    this.updateChart();
+
+    // 2. Tablo ve grafik güncellemeleri Samsung A23 vb. cihazlarda 60-90 FPS akıcılık için optimize edilir
+    this.scheduleVisualUpdate();
+  }
+
+  scheduleVisualUpdate() {
+    if (this._updateScheduled) return;
+    this._updateScheduled = true;
+    requestAnimationFrame(() => {
+      this._updateScheduled = false;
+      this.renderTable();
+      this.updateChart();
+    });
   }
 
   renderTelemetryCards(data) {
@@ -1531,61 +1518,50 @@ class AppController {
     if (this.currentUnit === 'F') {
       displayTemp = (data.temperature * 9 / 5) + 32;
     }
-    this.dom.valTemp.textContent = displayTemp.toFixed(2);
-    this.dom.lblTempUnit.textContent = `°${this.currentUnit}`;
+    if (this.dom.valTemp) this.dom.valTemp.textContent = displayTemp.toFixed(2);
+    if (this.dom.lblTempUnit) this.dom.lblTempUnit.textContent = `°${this.currentUnit}`;
 
-    // Bağıl Nem Değeri
+    // 2. Bağıl Nem Kartı
     const humNum = Number(data.humidity);
     const humFormatted = !isNaN(humNum) ? humNum.toFixed(2) : data.humidity;
+    if (this.dom.valHum) this.dom.valHum.textContent = humFormatted;
+    if (this.dom.humProgressBar) {
+      this.dom.humProgressBar.style.width = `${Math.min(100, Math.max(0, humNum))}%`;
+    }
 
-    // Grafik KPI
-    const effectiveBattery = data.battery != null ? data.battery : this.latestBattery;
-    const effectiveVoltage = data.voltage != null ? data.voltage : this.latestVoltage;
-
-    if (this.dom.chartKpiCurrent) {
-      if (this.chartMode === 'hum') {
-        this.dom.chartKpiCurrent.textContent = `%${humFormatted}`;
-        if (this.dom.chartKpiCurrentUnit) this.dom.chartKpiCurrentUnit.textContent = '%';
-      } else if (this.chartMode === 'battery') {
-        this.dom.chartKpiCurrent.textContent = effectiveBattery != null ? `%${effectiveBattery}` : '--';
-        if (this.dom.chartKpiCurrentUnit) this.dom.chartKpiCurrentUnit.textContent = '%';
+    if (this.dom.humidityStatusBadge) {
+      if (humNum < 30) {
+        this.dom.humidityStatusBadge.textContent = 'Kuru';
+        this.dom.humidityStatusBadge.className = 'text-[11px] px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 font-semibold';
+      } else if (humNum > 60) {
+        this.dom.humidityStatusBadge.textContent = 'Yüksek Nem';
+        this.dom.humidityStatusBadge.className = 'text-[11px] px-2.5 py-0.5 rounded-full bg-sky-100 text-[#0284c7] dark:bg-sky-950/80 dark:text-sky-300 font-semibold';
       } else {
-        this.dom.chartKpiCurrent.textContent = displayTemp.toFixed(2);
-        if (this.dom.chartKpiCurrentUnit) this.dom.chartKpiCurrentUnit.textContent = `°${this.currentUnit}`;
+        this.dom.humidityStatusBadge.textContent = 'İdeal';
+        this.dom.humidityStatusBadge.className = 'text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300 font-semibold';
       }
     }
 
-    // 2. Bağıl Nem Kartı
-    this.dom.valHum.textContent = humFormatted;
-    this.dom.humProgressBar.style.width = `${Math.min(100, Math.max(0, humNum))}%`;
+    // 3. Pil & Voltaj Kartı
+    const effectiveBattery = data.battery != null ? data.battery : this.latestBattery;
+    const effectiveVoltage = data.voltage != null ? data.voltage : this.latestVoltage;
 
-    if (humNum < 30) {
-      this.dom.humidityStatusBadge.textContent = 'Kuru';
-      this.dom.humidityStatusBadge.className = 'text-xs px-3 py-1 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 font-semibold';
-    } else if (humNum > 60) {
-      this.dom.humidityStatusBadge.textContent = 'Yüksek Nem';
-      this.dom.humidityStatusBadge.className = 'text-xs px-3 py-1 rounded-full bg-[#0b57d0]/10 text-[#0b57d0] dark:text-[#a8c7fa] border border-[#0b57d0]/20 font-semibold';
-    } else {
-      this.dom.humidityStatusBadge.textContent = 'İdeal';
-      this.dom.humidityStatusBadge.className = 'text-xs px-3 py-1 rounded-full bg-[#0b57d0]/10 text-[#0b57d0] dark:text-[#a8c7fa] border border-[#0b57d0]/20 font-semibold';
+    if (this.dom.valBattery) {
+      this.dom.valBattery.textContent = effectiveBattery != null ? effectiveBattery : '--';
     }
 
-    // 3. Pil & Voltaj Kartı
-    if (this.dom.valBattery) {
+    if (this.dom.batteryProgressBar) {
       if (effectiveBattery != null) {
-        this.dom.valBattery.textContent = effectiveBattery;
-        if (this.dom.batteryProgressBar) {
-          this.dom.batteryProgressBar.style.width = `${Math.min(100, Math.max(0, effectiveBattery))}%`;
-          if (effectiveBattery < 20) {
-            this.dom.batteryProgressBar.className = 'h-full bg-rose-500 rounded-full';
-          } else if (effectiveBattery < 50) {
-            this.dom.batteryProgressBar.className = 'h-full bg-amber-500 rounded-full';
-          } else {
-            this.dom.batteryProgressBar.className = 'h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full';
-          }
+        this.dom.batteryProgressBar.style.width = `${Math.min(100, Math.max(0, effectiveBattery))}%`;
+        if (effectiveBattery < 20) {
+          this.dom.batteryProgressBar.className = 'h-full bg-rose-500 rounded-full';
+        } else if (effectiveBattery < 50) {
+          this.dom.batteryProgressBar.className = 'h-full bg-amber-500 rounded-full';
+        } else {
+          this.dom.batteryProgressBar.className = 'h-full bg-emerald-500 rounded-full';
         }
       } else {
-        this.dom.valBattery.textContent = '--';
+        this.dom.batteryProgressBar.style.width = '0%';
       }
     }
 
@@ -1599,131 +1575,59 @@ class AppController {
         this.dom.valVoltageBadge.textContent = '-- V';
       }
     }
-
-    if (this.dom.lastUpdatedAgo) {
-      this.dom.lastUpdatedAgo.textContent = `• ${new Date().toLocaleTimeString('tr-TR')}`;
-    }
-  }
-
-  updateStatsAndTable() {
-    this.renderTable();
   }
 
   renderTable() {
     const list = this.storage.records;
     const total = list.length;
-    this.dom.tableSummaryText.textContent = `${total} kayıt`;
+    if (this.dom.tableSummaryText) {
+      this.dom.tableSummaryText.textContent = `${total} kayıt`;
+    }
 
     if (total === 0) {
-      const emptyHtml = `
-        <div class="py-8 text-center text-xs text-slate-400 dark:text-slate-500 font-sans">
-          Henüz kayıt bulunmuyor. Cihazınıza bağlanarak ölçüm alabilirsiniz.
-        </div>
-      `;
-      if (this.dom.mobileHistoryFeed) this.dom.mobileHistoryFeed.innerHTML = emptyHtml;
       if (this.dom.historyTableBody) {
         this.dom.historyTableBody.innerHTML = `
           <tr>
-            <td colspan="5" class="py-8 text-center text-slate-400 dark:text-slate-500 font-sans">
-              Henüz kayıt bulunmuyor. Cihazınıza bağlanarak ölçüm alabilirsiniz.
+            <td colspan="4" class="py-6 text-center text-slate-400 dark:text-slate-500 font-sans">
+              Henüz kayıt bulunmuyor.
             </td>
           </tr>
         `;
       }
-      this.dom.pageIndicator.textContent = '1 / 1';
-      this.dom.btnPrevPage.disabled = true;
-      this.dom.btnNextPage.disabled = true;
+      if (this.dom.pageIndicator) this.dom.pageIndicator.textContent = '1 / 1';
+      if (this.dom.btnPrevPage) this.dom.btnPrevPage.disabled = true;
+      if (this.dom.btnNextPage) this.dom.btnNextPage.disabled = true;
       return;
     }
 
     const maxPage = Math.ceil(total / this.pageSize) || 1;
     this.currentPage = Math.min(this.currentPage, maxPage);
-    this.dom.pageIndicator.textContent = `${this.currentPage} / ${maxPage}`;
-    this.dom.btnPrevPage.disabled = this.currentPage <= 1;
-    this.dom.btnNextPage.disabled = this.currentPage >= maxPage;
+    if (this.dom.pageIndicator) this.dom.pageIndicator.textContent = `${this.currentPage} / ${maxPage}`;
+    if (this.dom.btnPrevPage) this.dom.btnPrevPage.disabled = this.currentPage <= 1;
+    if (this.dom.btnNextPage) this.dom.btnNextPage.disabled = this.currentPage >= maxPage;
 
     const reversed = [...list].reverse();
     const start = (this.currentPage - 1) * this.pageSize;
     const pageItems = reversed.slice(start, start + this.pageSize);
 
-    // 1. Mobil Kart Beslemesi
-    if (this.dom.mobileHistoryFeed) {
-      this.dom.mobileHistoryFeed.innerHTML = pageItems.map(item => {
-        const d = new Date(item.timestamp);
-        const timeStr = `${d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })} ${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
-        const typeBadge = item.type === 'history_hour'
-          ? '<span class="px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20 text-[10px] font-sans font-medium">Hafıza</span>'
-          : (item.source === 'ble_adv'
-            ? '<span class="px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border border-cyan-500/20 text-[10px] font-sans font-medium">BLE Yayın</span>'
-            : '<span class="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-sans font-medium">Canlı</span>');
-
-        let t = item.temperature;
-        if (this.currentUnit === 'F') {
-          t = (t * 9 / 5) + 32;
-        }
-        const humNum = Number(item.humidity);
-
-        return `
-          <div class="p-3.5 rounded-2xl bg-white dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700/80 shadow-sm space-y-2.5">
-            <div class="flex items-center justify-between text-xs">
-              <span class="font-medium text-slate-500 dark:text-slate-400">${timeStr}</span>
-              ${typeBadge}
-            </div>
-
-            <div class="grid grid-cols-3 gap-2 pt-1 border-t border-slate-100 dark:border-slate-700/50">
-              <div>
-                <span class="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-sans">Sıcaklık</span>
-                <div class="flex items-baseline gap-1">
-                  <span class="text-base sm:text-lg font-extrabold font-mono text-[#0b57d0] dark:text-[#a8c7fa]">${t.toFixed(2)}</span>
-                  <span class="text-[10px] font-bold text-[#0b57d0] dark:text-[#a8c7fa]">°${this.currentUnit}</span>
-                </div>
-              </div>
-              <div>
-                <span class="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-sans">Bağıl Nem</span>
-                <div class="flex items-baseline gap-1">
-                  <span class="text-base sm:text-lg font-extrabold font-mono text-cyan-600 dark:text-cyan-400">%${humNum.toFixed(2)}</span>
-                </div>
-              </div>
-              <div>
-                <span class="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-sans">Pil (Voltaj)</span>
-                <div class="flex items-baseline gap-1">
-                  <span class="text-base sm:text-lg font-extrabold font-mono text-emerald-600 dark:text-emerald-400">${item.battery != null ? `%${item.battery}` : (item.voltage != null ? `${item.voltage}V` : '--')}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
-
-    // 2. Masaüstü Tablosu (5 Sütunlu)
     if (this.dom.historyTableBody) {
       this.dom.historyTableBody.innerHTML = pageItems.map(item => {
         const d = new Date(item.timestamp);
-        const timeStr = `${d.toLocaleDateString('tr-TR')} ${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
-        const typeBadge = item.type === 'history_hour'
-          ? '<span class="px-2.5 py-0.5 rounded-full bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20 text-[10px] font-sans font-medium">Hafıza</span>'
-          : (item.source === 'ble_adv'
-            ? '<span class="px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border border-cyan-500/20 text-[10px] font-sans font-medium">BLE Yayın</span>'
-            : '<span class="px-2.5 py-0.5 rounded-full bg-[#0b57d0]/10 text-[#0b57d0] dark:text-[#a8c7fa] border border-[#0b57d0]/20 text-[10px] font-sans font-medium">Canlı</span>');
+        const timeStr = `${d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'numeric' })} ${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
 
         let t = item.temperature;
         if (this.currentUnit === 'F') {
           t = (t * 9 / 5) + 32;
         }
         const humNum = Number(item.humidity);
+        const batStr = item.battery != null ? `%${item.battery}` : (item.voltage != null ? `${item.voltage}V` : '--');
 
         return `
           <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-            <td class="py-2.5 sm:py-3 px-3 text-slate-600 dark:text-slate-300 font-sans font-medium">${timeStr}</td>
-            <td class="py-2.5 sm:py-3 px-3">${typeBadge}</td>
-            <td class="py-2.5 sm:py-3 px-3 font-bold text-[#0b57d0] dark:text-[#a8c7fa]">
-              ${t.toFixed(2)} °${this.currentUnit}
-            </td>
-            <td class="py-2.5 sm:py-3 px-3 text-cyan-600 dark:text-cyan-400 font-semibold">%${humNum.toFixed(2)}</td>
-            <td class="py-2.5 sm:py-3 px-3 text-emerald-600 dark:text-emerald-400 font-semibold font-mono">
-              ${item.battery != null ? `%${item.battery}` : '--'} ${item.voltage != null ? `<span class="text-xs text-slate-400 font-normal">(${item.voltage.toFixed(2)}V)</span>` : ''}
-            </td>
+            <td class="py-2 px-2.5 sm:px-3 text-slate-600 dark:text-slate-300 font-sans">${timeStr}</td>
+            <td class="py-2 px-2 sm:px-3 font-bold text-[#0b57d0] dark:text-[#a8c7fa]">${t.toFixed(1)}°${this.currentUnit}</td>
+            <td class="py-2 px-2 sm:px-3 font-semibold text-sky-600 dark:text-sky-400">%${humNum.toFixed(1)}</td>
+            <td class="py-2 px-2 sm:px-3 font-semibold text-emerald-600 dark:text-emerald-400">${batStr}</td>
           </tr>
         `;
       }).join('');
@@ -1735,15 +1639,15 @@ class AppController {
     const isDark = this.currentTheme === 'dark';
     const isMobile = window.innerWidth < 640;
 
-    const tempGradient = ctx.createLinearGradient(0, 0, 0, 300);
+    const tempGradient = ctx.createLinearGradient(0, 0, 0, 260);
     tempGradient.addColorStop(0, isDark ? 'rgba(11, 87, 208, 0.3)' : 'rgba(11, 87, 208, 0.15)');
     tempGradient.addColorStop(1, 'rgba(11, 87, 208, 0.0)');
 
-    const humGradient = ctx.createLinearGradient(0, 0, 0, 300);
+    const humGradient = ctx.createLinearGradient(0, 0, 0, 260);
     humGradient.addColorStop(0, isDark ? 'rgba(2, 132, 199, 0.25)' : 'rgba(2, 132, 199, 0.12)');
     humGradient.addColorStop(1, 'rgba(2, 132, 199, 0.0)');
 
-    const batGradient = ctx.createLinearGradient(0, 0, 0, 300);
+    const batGradient = ctx.createLinearGradient(0, 0, 0, 260);
     batGradient.addColorStop(0, isDark ? 'rgba(16, 185, 129, 0.25)' : 'rgba(16, 185, 129, 0.12)');
     batGradient.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
 
@@ -1758,14 +1662,10 @@ class AppController {
             data: [],
             borderColor: '#0b57d0',
             backgroundColor: tempGradient,
-            borderWidth: isMobile ? 2.0 : 2.5,
+            borderWidth: 2.0,
             fill: true,
-            tension: 0.3,
+            tension: 0.2,
             pointRadius: 0,
-            pointHoverRadius: 5,
-            pointHoverBackgroundColor: '#0b57d0',
-            pointHoverBorderColor: '#ffffff',
-            pointHoverBorderWidth: 2,
             yAxisID: 'yTemp'
           },
           {
@@ -1774,14 +1674,10 @@ class AppController {
             data: [],
             borderColor: '#0284c7',
             backgroundColor: humGradient,
-            borderWidth: isMobile ? 2.0 : 2.5,
+            borderWidth: 2.0,
             fill: true,
-            tension: 0.3,
+            tension: 0.2,
             pointRadius: 0,
-            pointHoverRadius: 5,
-            pointHoverBackgroundColor: '#0284c7',
-            pointHoverBorderColor: '#ffffff',
-            pointHoverBorderWidth: 2,
             yAxisID: 'yHum'
           },
           {
@@ -1790,14 +1686,10 @@ class AppController {
             data: [],
             borderColor: '#10b981',
             backgroundColor: batGradient,
-            borderWidth: isMobile ? 2.0 : 2.5,
+            borderWidth: 2.0,
             fill: true,
-            tension: 0.3,
+            tension: 0.2,
             pointRadius: 0,
-            pointHoverRadius: 5,
-            pointHoverBackgroundColor: '#10b981',
-            pointHoverBorderColor: '#ffffff',
-            pointHoverBorderWidth: 2,
             yAxisID: 'yBat'
           }
         ]
@@ -1806,27 +1698,14 @@ class AppController {
         responsive: true,
         maintainAspectRatio: false,
         animation: false,
-        transitions: {
-          active: { animation: { duration: 0 } }
-        },
+        normalized: true,
         interaction: {
-          mode: 'index',
+          mode: 'nearest',
           intersect: false
         },
         plugins: {
           legend: {
-            display: true,
-            position: 'top',
-            align: 'end',
-            labels: {
-              color: isDark ? '#94a3b8' : '#475569',
-              font: { family: 'Parkinsans', size: isMobile ? 10 : 11, weight: 600 },
-              usePointStyle: true,
-              pointStyle: 'circle',
-              boxWidth: 7,
-              boxHeight: 7,
-              padding: isMobile ? 8 : 14
-            }
+            display: false // Mode butonları üstte bulunduğu için grafik legend'ı kapatılarak ekran alanı açıldı
           },
           tooltip: {
             enabled: true,
@@ -1836,8 +1715,8 @@ class AppController {
             borderWidth: 1.5,
             titleColor: isDark ? '#f8fafd' : '#041e49',
             bodyColor: isDark ? '#cbd5e1' : '#334155',
-            padding: 10,
-            cornerRadius: 12,
+            padding: 8,
+            cornerRadius: 10,
             bodyFont: { family: 'Parkinsans', size: 11, weight: 500 },
             titleFont: { family: 'Parkinsans', size: 12, weight: '700' },
             callbacks: {
@@ -1847,8 +1726,7 @@ class AppController {
                 if (val == null) return null;
                 let unit = '%';
                 if (context.dataset.yAxisID === 'yTemp') unit = `°${this.currentUnit}`;
-                else if (context.dataset.yAxisID === 'yBat') unit = '%';
-                return ` ${label}: ${Number(val).toFixed(2)} ${unit}`;
+                return ` ${label}: ${Number(val).toFixed(1)} ${unit}`;
               }
             }
           }
@@ -1869,12 +1747,6 @@ class AppController {
             type: 'linear',
             display: true,
             position: 'left',
-            title: {
-              display: !isMobile,
-              text: `Sıcaklık (°${this.currentUnit})`,
-              color: '#0b57d0',
-              font: { family: 'Parkinsans', size: 11, weight: 600 }
-            },
             grid: {
               color: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
               drawBorder: false
@@ -1889,12 +1761,6 @@ class AppController {
             type: 'linear',
             display: false,
             position: 'right',
-            title: {
-              display: !isMobile,
-              text: 'Bağıl Nem (%)',
-              color: '#0284c7',
-              font: { family: 'Parkinsans', size: 11, weight: 600 }
-            },
             grid: { drawOnChartArea: false },
             ticks: {
               color: '#0284c7',
@@ -1908,12 +1774,6 @@ class AppController {
             type: 'linear',
             display: false,
             position: 'right',
-            title: {
-              display: !isMobile,
-              text: 'Pil (%)',
-              color: '#10b981',
-              font: { family: 'Parkinsans', size: 11, weight: 600 }
-            },
             grid: { drawOnChartArea: false },
             ticks: {
               color: '#10b981',
@@ -1932,7 +1792,6 @@ class AppController {
     if (!this.chart) return;
     const isDark = this.currentTheme === 'dark';
 
-    this.chart.options.plugins.legend.labels.color = isDark ? '#94a3b8' : '#475569';
     this.chart.options.plugins.tooltip.backgroundColor = isDark ? 'rgba(12, 19, 28, 0.96)' : 'rgba(255, 255, 255, 0.98)';
     this.chart.options.plugins.tooltip.borderColor = isDark ? 'rgba(168, 199, 250, 0.25)' : 'rgba(11, 87, 208, 0.2)';
     this.chart.options.plugins.tooltip.titleColor = isDark ? '#f8fafd' : '#041e49';
@@ -1946,21 +1805,8 @@ class AppController {
 
   updateChart() {
     if (!this.chart) return;
-
     let records = [...this.storage.records];
-    const now = Date.now();
 
-    if (this.chartRange === '1h') {
-      records = records.filter(r => (now - r.timestamp) <= 3600 * 1000);
-    } else if (this.chartRange === '24h') {
-      records = records.filter(r => (now - r.timestamp) <= 24 * 3600 * 1000);
-    } else if (this.chartRange === '7d') {
-      records = records.filter(r => (now - r.timestamp) <= 7 * 24 * 3600 * 1000);
-    }
-
-    if (records.length === 0 && this.storage.records.length > 0) {
-      records = [...this.storage.records];
-    }
     if (records.length === 0 && this.latestTelemetry) {
       records = [this.latestTelemetry];
     }
@@ -1976,37 +1822,30 @@ class AppController {
     }
 
     if (records.length === 0) {
-      if (this.dom.chartKpiCurrent) this.dom.chartKpiCurrent.textContent = '--.--';
-      if (this.dom.chartKpiCurrentUnit) this.dom.chartKpiCurrentUnit.textContent = `°${this.currentUnit}`;
-      if (this.dom.chartKpiMin) this.dom.chartKpiMin.textContent = '--.--';
-      if (this.dom.chartKpiMinTime) this.dom.chartKpiMinTime.textContent = '--:--';
-      if (this.dom.chartKpiMax) this.dom.chartKpiMax.textContent = '--.--';
-      if (this.dom.chartKpiMaxTime) this.dom.chartKpiMaxTime.textContent = '--:--';
-      if (this.dom.chartKpiAvg) this.dom.chartKpiAvg.textContent = '--.--';
-      if (this.dom.chartKpiCount) this.dom.chartKpiCount.textContent = '0 nokta';
-
       this.chart.data.labels = [];
       this.chart.data.datasets.forEach(ds => { ds.data = []; });
       this.chart.update('none');
       return;
     }
 
-    const pRadius = records.length <= 4 ? 4.0 : 0;
+    const isMobile = window.innerWidth < 640;
+    // Samsung A23 vb. telefonlarda grafik akıcılığını maksimuma çıkarmak için downsampling
+    const maxPoints = isMobile ? 100 : 250;
+    if (records.length > maxPoints) {
+      const step = Math.ceil(records.length / maxPoints);
+      records = records.filter((_, idx) => idx % step === 0 || idx === records.length - 1);
+    }
+
+    const pRadius = records.length <= 4 ? 3.0 : 0;
     this.chart.data.datasets.forEach(ds => {
       ds.pointRadius = pRadius;
     });
 
-    if (records.length > 250) {
-      const step = Math.ceil(records.length / 250);
-      records = records.filter((_, idx) => idx % step === 0 || idx === records.length - 1);
-    }
-
-    const isMobile = window.innerWidth < 640;
     const labels = records.map(r => {
       const d = new Date(r.timestamp);
-      return (this.chartRange === '1h' || records.length <= 5)
+      return (records.length <= 6)
         ? d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-        : `${d.toLocaleDateString('tr-TR', { day: 'numeric', month: isMobile ? 'numeric' : 'short' })} ${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
+        : `${d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'numeric' })} ${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
     });
 
     const tempData = records.map(r => {
@@ -2026,106 +1865,34 @@ class AppController {
     const ds = this.chart.data.datasets;
     const scales = this.chart.options.scales;
 
-    const formatClock = (ts) => {
-      const d = new Date(ts);
-      return d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
-    };
-
-    const setKpiCards = (arr, unit) => {
-      if (!arr || arr.length === 0) return;
-      const current = arr[arr.length - 1];
-      const minVal = Math.min(...arr);
-      const minIdx = arr.indexOf(minVal);
-      const minTime = formatClock(records[minIdx] ? records[minIdx].timestamp : Date.now());
-
-      const maxVal = Math.max(...arr);
-      const maxIdx = arr.lastIndexOf(maxVal);
-      const maxTime = formatClock(records[maxIdx] ? records[maxIdx].timestamp : Date.now());
-
-      const sum = arr.reduce((a, b) => a + b, 0);
-      const avg = (sum / arr.length).toFixed(2);
-
-      if (this.dom.chartKpiCurrent) this.dom.chartKpiCurrent.textContent = Number(current).toFixed(2);
-      if (this.dom.chartKpiCurrentUnit) this.dom.chartKpiCurrentUnit.textContent = unit;
-      if (this.dom.chartKpiMin) this.dom.chartKpiMin.textContent = Number(minVal).toFixed(2);
-      if (this.dom.chartKpiMinTime) this.dom.chartKpiMinTime.textContent = minTime;
-      if (this.dom.chartKpiMax) this.dom.chartKpiMax.textContent = Number(maxVal).toFixed(2);
-      if (this.dom.chartKpiMaxTime) this.dom.chartKpiMaxTime.textContent = maxTime;
-      if (this.dom.chartKpiAvg) this.dom.chartKpiAvg.textContent = avg;
-      if (this.dom.chartKpiCount) this.dom.chartKpiCount.textContent = `${records.length} nokta`;
-    };
-
     if (this.chartMode === 'temps') {
       ds[0].hidden = false;
       ds[1].hidden = true;
       ds[2].hidden = true;
-
       scales.yTemp.display = true;
       scales.yHum.display = false;
       scales.yBat.display = false;
-
-      const minT = Math.min(...tempData);
-      const maxT = Math.max(...tempData);
-      const pad = Math.max(0.6, (maxT - minT) * 0.12);
-      scales.yTemp.min = Math.floor((minT - pad) * 2) / 2;
-      scales.yTemp.max = Math.ceil((maxT + pad) * 2) / 2;
-
-      setKpiCards(tempData, `°${this.currentUnit}`);
     } else if (this.chartMode === 'hum') {
       ds[0].hidden = true;
       ds[1].hidden = false;
       ds[2].hidden = true;
-
       scales.yTemp.display = false;
       scales.yHum.display = true;
       scales.yBat.display = false;
-
-      const minH = Math.min(...humData);
-      const maxH = Math.max(...humData);
-      scales.yHum.min = Math.max(0, Math.floor((minH - 5) / 5) * 5);
-      scales.yHum.max = Math.min(100, Math.ceil((maxH + 5) / 5) * 5);
-
-      setKpiCards(humData, '%');
     } else if (this.chartMode === 'battery') {
       ds[0].hidden = true;
       ds[1].hidden = true;
       ds[2].hidden = false;
-
       scales.yTemp.display = false;
       scales.yHum.display = false;
       scales.yBat.display = true;
-
-      const validBat = batData.filter(v => v !== null);
-      if (validBat.length > 0) {
-        setKpiCards(validBat, '%');
-      } else {
-        if (this.dom.chartKpiCurrent) this.dom.chartKpiCurrent.textContent = '--';
-        if (this.dom.chartKpiCurrentUnit) this.dom.chartKpiCurrentUnit.textContent = '%';
-        if (this.dom.chartKpiMin) this.dom.chartKpiMin.textContent = '--';
-        if (this.dom.chartKpiMax) this.dom.chartKpiMax.textContent = '--';
-        if (this.dom.chartKpiAvg) this.dom.chartKpiAvg.textContent = '--';
-      }
-
-      scales.yBat.min = 0;
-      scales.yBat.max = 100;
     } else {
       ds[0].hidden = false;
       ds[1].hidden = false;
       ds[2].hidden = false;
-
       scales.yTemp.display = true;
       scales.yHum.display = true;
       scales.yBat.display = false;
-
-      const minT = Math.min(...tempData);
-      const maxT = Math.max(...tempData);
-      const pad = Math.max(0.6, (maxT - minT) * 0.12);
-      scales.yTemp.min = Math.floor((minT - pad) * 2) / 2;
-      scales.yTemp.max = Math.ceil((maxT + pad) * 2) / 2;
-      scales.yHum.min = 0;
-      scales.yHum.max = 100;
-
-      setKpiCards(tempData, `°${this.currentUnit}`);
     }
 
     this.chart.update('none');
@@ -2140,68 +1907,53 @@ class AppController {
       html.classList.add('dark');
       html.classList.remove('light');
       if (this.dom.themeIcon) this.dom.themeIcon.setAttribute('data-lucide', 'sun');
-      if (this.dom.themeLabel) this.dom.themeLabel.textContent = 'Açık';
       const meta = document.getElementById('metaThemeColor');
       if (meta) meta.setAttribute('content', '#0c131c');
     } else {
       html.classList.remove('dark');
       html.classList.add('light');
       if (this.dom.themeIcon) this.dom.themeIcon.setAttribute('data-lucide', 'moon');
-      if (this.dom.themeLabel) this.dom.themeLabel.textContent = 'Koyu';
       const meta = document.getElementById('metaThemeColor');
       if (meta) meta.setAttribute('content', '#f8fafc');
     }
 
-    lucide.createIcons();
     this.adaptChartTheme();
   }
 
   showToast(message, type = 'info') {
     if (!this.dom.toastContainer) return;
-
     const toast = document.createElement('div');
-    const bgColors = {
-      success: 'bg-[#d3e3fd] text-[#041e49] border-[#0b57d0]/30 dark:bg-[#0842a0] dark:text-[#d3e3fd]',
-      error: 'bg-rose-100 text-rose-900 border-rose-300 dark:bg-rose-950 dark:text-rose-200',
-      info: 'bg-[#edf2f9] text-[#041e49] border-[#d8e2ee] dark:bg-[#1e2938] dark:text-slate-200',
-      warn: 'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950 dark:text-amber-200'
+    const colors = {
+      success: 'bg-emerald-600 text-white',
+      error: 'bg-rose-600 text-white',
+      info: 'bg-slate-900 dark:bg-slate-800 text-white'
     };
-
-    toast.className = `p-3 rounded-2xl border shadow-md flex items-center justify-between gap-3 text-xs font-semibold ${bgColors[type] || bgColors.info}`;
-    toast.innerHTML = `
-      <span>${message}</span>
-      <button class="p-1 rounded-full hover:opacity-70 text-current">
-        <i data-lucide="x" class="w-3.5 h-3.5"></i>
-      </button>
-    `;
-
-    toast.querySelector('button').addEventListener('click', () => {
-      toast.remove();
-    });
+    toast.className = `p-3 rounded-2xl shadow-lg text-xs font-semibold flex items-center justify-between gap-2 pointer-events-auto ${colors[type] || colors.info}`;
+    toast.textContent = message;
 
     this.dom.toastContainer.appendChild(toast);
-    lucide.createIcons();
-
     setTimeout(() => {
-      toast.remove();
-    }, 3500);
+      toast.style.opacity = '0';
+      setTimeout(() => toast.remove(), 200);
+    }, 2800);
   }
 
-  downloadFile(content, fileName, contentType) {
+  downloadFile(content, fileName, mimeType) {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    const file = new Blob([content], { type: contentType });
-    a.href = URL.createObjectURL(file);
+    a.href = url;
     a.download = fileName;
     document.body.appendChild(a);
     a.click();
-    setTimeout(() => {
-      document.body.removeChild(a);
-      URL.revokeObjectURL(a.href);
-    }, 100);
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 }
 
-// DOM Yüklendiğinde Başlat
+// ==========================================
+// 6. APPLICATION BOOTSTRAP
+// ==========================================
 window.addEventListener('DOMContentLoaded', () => {
   window.app = new AppController();
 });
