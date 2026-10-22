@@ -159,3 +159,32 @@ table th, table td {
     min-height: 36px;
   }
 }
+
+/* Fullscreen / Expanded Chart Modal */
+.chart-fullscreen {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 9999 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: 100vw !important;
+  border-radius: 0 !important;
+  margin: 0 !important;
+  padding: max(0.75rem, env(safe-area-inset-top)) max(0.75rem, env(safe-area-inset-right)) max(0.75rem, env(safe-area-inset-bottom)) max(0.75rem, env(safe-area-inset-left)) !important;
+  background: #ffffff !important;
+  display: flex !important;
+  flex-direction: column !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+.dark .chart-fullscreen {
+  background: #0d1522 !important;
+}
+
+.chart-fullscreen #chartCanvasContainer {
+  flex: 1 1 0% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+}
+

@@ -1136,6 +1136,9 @@ class AppController {
       batteryProgressBar: document.getElementById('batteryProgressBar'),
 
       // Chart
+      chartCard: document.getElementById('chartCard'),
+      btnToggleFullscreenChart: document.getElementById('btnToggleFullscreenChart'),
+      iconChartFullscreen: document.getElementById('iconChartFullscreen'),
       chartEmptyOverlay: document.getElementById('chartEmptyOverlay'),
       telemetryChart: document.getElementById('telemetryChart'),
 
@@ -1204,7 +1207,9 @@ class AppController {
 
     window.addEventListener('resize', () => {
       if (this.chart) {
-        this.chart.options.scales.x.ticks.maxTicksLimit = window.innerWidth < 640 ? 4 : 7;
+        const isFullscreen = this.dom.chartCard?.classList.contains('chart-fullscreen');
+        const isMobile = window.innerWidth < 640;
+        this.chart.options.scales.x.ticks.maxTicksLimit = isFullscreen ? (isMobile ? 8 : 14) : (isMobile ? 4 : 7);
         this.chart.resize();
       }
     });
@@ -1297,7 +1302,7 @@ class AppController {
       });
     }
 
-    // Chart Mode Buttons (Sıcaklık, Nem, Pil, Tümü)
+    // Chart Mode Buttons (Sıcaklık, Nem, Voltaj, Tümü)
     document.querySelectorAll('.mode-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
@@ -1305,6 +1310,23 @@ class AppController {
         this.chartMode = e.currentTarget.dataset.mode || 'temps';
         this.updateChart();
       });
+    });
+
+    // Chart Fullscreen Toggle Button
+    if (this.dom.btnToggleFullscreenChart) {
+      this.dom.btnToggleFullscreenChart.addEventListener('click', () => {
+        this.toggleChartFullscreen();
+      });
+    }
+
+    // Escape Key to Exit Fullscreen Chart
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const chartCard = this.dom.chartCard || document.getElementById('chartCard');
+        if (chartCard && chartCard.classList.contains('chart-fullscreen')) {
+          this.toggleChartFullscreen();
+        }
+      }
     });
 
     // CSV Export
@@ -1620,7 +1642,14 @@ class AppController {
           t = (t * 9 / 5) + 32;
         }
         const humNum = Number(item.humidity);
-        const batStr = item.battery != null ? `%${item.battery}` : (item.voltage != null ? `${item.voltage}V` : '--');
+        let batStr = '--';
+        if (item.voltage != null && !isNaN(Number(item.voltage))) {
+          const v = Number(item.voltage).toFixed(2);
+          batStr = item.battery != null ? `${v}V (%${item.battery})` : `${v}V`;
+        } else if (item.battery != null) {
+          const v = (2.1 + (Number(item.battery) / 100) * 0.9).toFixed(2);
+          batStr = `${v}V (%${item.battery})`;
+        }
 
         return `
           <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40">
@@ -1639,16 +1668,16 @@ class AppController {
     const isDark = this.currentTheme === 'dark';
     const isMobile = window.innerWidth < 640;
 
-    const tempGradient = ctx.createLinearGradient(0, 0, 0, 260);
-    tempGradient.addColorStop(0, isDark ? 'rgba(11, 87, 208, 0.3)' : 'rgba(11, 87, 208, 0.15)');
+    const tempGradient = ctx.createLinearGradient(0, 0, 0, 320);
+    tempGradient.addColorStop(0, isDark ? 'rgba(96, 165, 250, 0.35)' : 'rgba(11, 87, 208, 0.22)');
     tempGradient.addColorStop(1, 'rgba(11, 87, 208, 0.0)');
 
-    const humGradient = ctx.createLinearGradient(0, 0, 0, 260);
-    humGradient.addColorStop(0, isDark ? 'rgba(2, 132, 199, 0.25)' : 'rgba(2, 132, 199, 0.12)');
+    const humGradient = ctx.createLinearGradient(0, 0, 0, 320);
+    humGradient.addColorStop(0, isDark ? 'rgba(56, 189, 248, 0.30)' : 'rgba(2, 132, 199, 0.20)');
     humGradient.addColorStop(1, 'rgba(2, 132, 199, 0.0)');
 
-    const batGradient = ctx.createLinearGradient(0, 0, 0, 260);
-    batGradient.addColorStop(0, isDark ? 'rgba(16, 185, 129, 0.25)' : 'rgba(16, 185, 129, 0.12)');
+    const batGradient = ctx.createLinearGradient(0, 0, 0, 320);
+    batGradient.addColorStop(0, isDark ? 'rgba(52, 211, 153, 0.30)' : 'rgba(16, 185, 129, 0.20)');
     batGradient.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
 
     this.chart = new Chart(ctx, {
@@ -1660,12 +1689,17 @@ class AppController {
             // 0: Sıcaklık
             label: 'Sıcaklık',
             data: [],
-            borderColor: '#0b57d0',
+            borderColor: isDark ? '#60a5fa' : '#0b57d0',
             backgroundColor: tempGradient,
-            borderWidth: 2.0,
+            borderWidth: 2.2,
             fill: true,
-            tension: 0.2,
+            tension: 0.25,
             pointRadius: 0,
+            pointHoverRadius: 6,
+            pointHitRadius: 15,
+            pointBackgroundColor: isDark ? '#60a5fa' : '#0b57d0',
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 1.5,
             yAxisID: 'yTemp'
           },
           {
@@ -1674,22 +1708,32 @@ class AppController {
             data: [],
             borderColor: '#0284c7',
             backgroundColor: humGradient,
-            borderWidth: 2.0,
+            borderWidth: 2.2,
             fill: true,
-            tension: 0.2,
+            tension: 0.25,
             pointRadius: 0,
+            pointHoverRadius: 6,
+            pointHitRadius: 15,
+            pointBackgroundColor: '#0284c7',
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 1.5,
             yAxisID: 'yHum'
           },
           {
-            // 2: Pil & Voltaj
-            label: 'Pil (%)',
+            // 2: Pil Voltajı
+            label: 'Pil Voltajı (V)',
             data: [],
             borderColor: '#10b981',
             backgroundColor: batGradient,
-            borderWidth: 2.0,
+            borderWidth: 2.2,
             fill: true,
-            tension: 0.2,
+            tension: 0.25,
             pointRadius: 0,
+            pointHoverRadius: 6,
+            pointHitRadius: 15,
+            pointBackgroundColor: '#10b981',
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 1.5,
             yAxisID: 'yBat'
           }
         ]
@@ -1705,7 +1749,7 @@ class AppController {
         },
         plugins: {
           legend: {
-            display: false // Mode butonları üstte bulunduğu için grafik legend'ı kapatılarak ekran alanı açıldı
+            display: false
           },
           tooltip: {
             enabled: true,
@@ -1715,18 +1759,34 @@ class AppController {
             borderWidth: 1.5,
             titleColor: isDark ? '#f8fafd' : '#041e49',
             bodyColor: isDark ? '#cbd5e1' : '#334155',
-            padding: 8,
-            cornerRadius: 10,
-            bodyFont: { family: 'Parkinsans', size: 11, weight: 500 },
-            titleFont: { family: 'Parkinsans', size: 12, weight: '700' },
+            padding: 10,
+            cornerRadius: 12,
+            boxPadding: 4,
+            usePointStyle: true,
+            bodyFont: { family: 'Parkinsans', size: 12, weight: 500 },
+            titleFont: { family: 'Parkinsans', size: 12, weight: 700 },
             callbacks: {
+              title: (items) => {
+                if (!items || items.length === 0) return '';
+                const idx = items[0].dataIndex;
+                const rec = this.chartRecords ? this.chartRecords[idx] : null;
+                if (rec && rec.timestamp) {
+                  const d = new Date(rec.timestamp);
+                  return `${d.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })} ${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
+                }
+                return items[0].label || '';
+              },
               label: (context) => {
                 const label = context.dataset.label || '';
                 const val = context.parsed.y;
                 if (val == null) return null;
-                let unit = '%';
-                if (context.dataset.yAxisID === 'yTemp') unit = `°${this.currentUnit}`;
-                return ` ${label}: ${Number(val).toFixed(1)} ${unit}`;
+                if (context.dataset.yAxisID === 'yTemp') {
+                  return ` ${label}: ${Number(val).toFixed(2)} °${this.currentUnit}`;
+                } else if (context.dataset.yAxisID === 'yHum') {
+                  return ` ${label}: %${Number(val).toFixed(1)}`;
+                } else {
+                  return ` ${label}: ${Number(val).toFixed(2)} V`;
+                }
               }
             }
           }
@@ -1734,13 +1794,14 @@ class AppController {
         scales: {
           x: {
             grid: {
-              color: isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.04)',
+              color: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
+              borderDash: [3, 3],
               drawBorder: false
             },
             ticks: {
               color: isDark ? '#64748b' : '#94a3b8',
-              font: { family: 'Parkinsans', size: isMobile ? 9 : 10, weight: 500 },
-              maxTicksLimit: isMobile ? 4 : 7
+              font: { family: 'Parkinsans', size: isMobile ? 10 : 11, weight: 600 },
+              maxTicksLimit: isMobile ? 5 : 8
             }
           },
           yTemp: {
@@ -1749,12 +1810,13 @@ class AppController {
             position: 'left',
             grid: {
               color: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
+              borderDash: [3, 3],
               drawBorder: false
             },
             ticks: {
               color: isDark ? '#a8c7fa' : '#0b57d0',
               font: { family: 'Parkinsans', size: isMobile ? 10 : 11, weight: 600 },
-              callback: (v) => `${v.toFixed(1)}°`
+              callback: (v) => `${Number(v).toFixed(1)}°`
             }
           },
           yHum: {
@@ -1765,7 +1827,7 @@ class AppController {
             ticks: {
               color: '#0284c7',
               font: { family: 'Parkinsans', size: isMobile ? 10 : 11, weight: 600 },
-              callback: (v) => `%${v}`
+              callback: (v) => `%${Number(v).toFixed(0)}`
             },
             min: 0,
             max: 100
@@ -1778,10 +1840,10 @@ class AppController {
             ticks: {
               color: '#10b981',
               font: { family: 'Parkinsans', size: isMobile ? 10 : 11, weight: 600 },
-              callback: (v) => `%${v}`
+              callback: (v) => `${Number(v).toFixed(2)} V`
             },
-            min: 0,
-            max: 100
+            suggestedMin: 2.1,
+            suggestedMax: 3.3
           }
         }
       }
@@ -1797,8 +1859,13 @@ class AppController {
     this.chart.options.plugins.tooltip.titleColor = isDark ? '#f8fafd' : '#041e49';
     this.chart.options.plugins.tooltip.bodyColor = isDark ? '#cbd5e1' : '#334155';
 
-    this.chart.options.scales.x.grid.color = isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.04)';
+    this.chart.options.scales.x.grid.color = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
     this.chart.options.scales.yTemp.grid.color = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
+    this.chart.options.scales.x.ticks.color = isDark ? '#64748b' : '#94a3b8';
+    this.chart.options.scales.yTemp.ticks.color = isDark ? '#a8c7fa' : '#0b57d0';
+
+    this.chart.data.datasets[0].borderColor = isDark ? '#60a5fa' : '#0b57d0';
+    this.chart.data.datasets[0].pointBackgroundColor = isDark ? '#60a5fa' : '#0b57d0';
 
     this.chart.update('none');
   }
@@ -1822,45 +1889,67 @@ class AppController {
     }
 
     if (records.length === 0) {
+      this.chartRecords = [];
       this.chart.data.labels = [];
       this.chart.data.datasets.forEach(ds => { ds.data = []; });
       this.chart.update('none');
       return;
     }
 
+    const isFullscreen = this.dom.chartCard?.classList.contains('chart-fullscreen');
     const isMobile = window.innerWidth < 640;
-    // Samsung A23 vb. telefonlarda grafik akıcılığını maksimuma çıkarmak için downsampling
-    const maxPoints = isMobile ? 100 : 250;
+
+    // Detay seviyesi: Samsung A23 ve mobilde 300 (tam ekranda 500), masaüstünde 700 (tam ekranda 1200) nokta
+    const maxPoints = isFullscreen ? (isMobile ? 500 : 1200) : (isMobile ? 300 : 700);
     if (records.length > maxPoints) {
       const step = Math.ceil(records.length / maxPoints);
       records = records.filter((_, idx) => idx % step === 0 || idx === records.length - 1);
     }
+    this.chartRecords = records;
 
-    const pRadius = records.length <= 4 ? 3.0 : 0;
+    const pRadius = records.length <= 8 ? 3.5 : (records.length <= 25 ? 2.0 : 0);
     this.chart.data.datasets.forEach(ds => {
       ds.pointRadius = pRadius;
     });
 
     const labels = records.map(r => {
       const d = new Date(r.timestamp);
-      return (records.length <= 6)
+      return (records.length <= 8)
         ? d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
         : `${d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'numeric' })} ${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
     });
 
     const tempData = records.map(r => {
-      return this.currentUnit === 'F' ? (r.temperature * 9 / 5) + 32 : r.temperature;
+      const t = Number(r.temperature);
+      return this.currentUnit === 'F' ? Number(((t * 9 / 5) + 32).toFixed(2)) : Number(t.toFixed(2));
     });
-    const humData = records.map(r => r.humidity);
-    const batData = records.map(r => r.battery != null ? r.battery : null);
+
+    const humData = records.map(r => Number(Number(r.humidity).toFixed(1)));
+
+    // Voltaj verisi: Kayıttan veya pilden voltaj (V) türetilir
+    const voltData = records.map(r => {
+      if (r.voltage != null && !isNaN(Number(r.voltage))) {
+        return Number(Number(r.voltage).toFixed(2));
+      }
+      if (r.battery != null && !isNaN(Number(r.battery))) {
+        return Number((2.1 + (Number(r.battery) / 100) * 0.9).toFixed(2));
+      }
+      if (this.latestVoltage != null && !isNaN(Number(this.latestVoltage))) {
+        return Number(Number(this.latestVoltage).toFixed(2));
+      }
+      if (this.latestBattery != null && !isNaN(Number(this.latestBattery))) {
+        return Number((2.1 + (Number(this.latestBattery) / 100) * 0.9).toFixed(2));
+      }
+      return null;
+    });
 
     this.chart.data.labels = labels;
     this.chart.data.datasets[0].label = `Sıcaklık (°${this.currentUnit})`;
     this.chart.data.datasets[0].data = tempData;
     this.chart.data.datasets[1].label = `Bağıl Nem (%)`;
     this.chart.data.datasets[1].data = humData;
-    this.chart.data.datasets[2].label = `Pil (%)`;
-    this.chart.data.datasets[2].data = batData;
+    this.chart.data.datasets[2].label = `Pil Voltajı (V)`;
+    this.chart.data.datasets[2].data = voltData;
 
     const ds = this.chart.data.datasets;
     const scales = this.chart.options.scales;
@@ -1872,6 +1961,7 @@ class AppController {
       scales.yTemp.display = true;
       scales.yHum.display = false;
       scales.yBat.display = false;
+      this.chart.options.interaction.mode = 'nearest';
     } else if (this.chartMode === 'hum') {
       ds[0].hidden = true;
       ds[1].hidden = false;
@@ -1879,6 +1969,7 @@ class AppController {
       scales.yTemp.display = false;
       scales.yHum.display = true;
       scales.yBat.display = false;
+      this.chart.options.interaction.mode = 'nearest';
     } else if (this.chartMode === 'battery') {
       ds[0].hidden = true;
       ds[1].hidden = true;
@@ -1886,16 +1977,47 @@ class AppController {
       scales.yTemp.display = false;
       scales.yHum.display = false;
       scales.yBat.display = true;
+      this.chart.options.interaction.mode = 'nearest';
     } else {
+      // 'all'
       ds[0].hidden = false;
       ds[1].hidden = false;
       ds[2].hidden = false;
       scales.yTemp.display = true;
       scales.yHum.display = true;
       scales.yBat.display = false;
+      this.chart.options.interaction.mode = 'index';
     }
 
     this.chart.update('none');
+  }
+
+  toggleChartFullscreen() {
+    const chartCard = this.dom.chartCard || document.getElementById('chartCard');
+    const icon = this.dom.iconChartFullscreen || document.getElementById('iconChartFullscreen');
+    if (!chartCard) return;
+
+    const isFullscreen = chartCard.classList.toggle('chart-fullscreen');
+    document.body.classList.toggle('overflow-hidden', isFullscreen);
+
+    if (icon) {
+      icon.setAttribute('data-lucide', isFullscreen ? 'minimize-2' : 'maximize-2');
+      lucide.createIcons();
+    }
+
+    if (this.dom.btnToggleFullscreenChart) {
+      this.dom.btnToggleFullscreenChart.setAttribute(
+        'title',
+        isFullscreen ? 'Grafiği Küçült (Normal Görünüm)' : 'Grafiği Tam Ekran Büyüt'
+      );
+    }
+
+    if (this.chart) {
+      const isMobile = window.innerWidth < 640;
+      this.chart.options.scales.x.ticks.maxTicksLimit = isFullscreen ? (isMobile ? 8 : 14) : (isMobile ? 4 : 7);
+      this.chart.resize();
+      this.updateChart();
+    }
   }
 
   applyTheme(theme) {

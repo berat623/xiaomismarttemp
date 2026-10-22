@@ -165,24 +165,31 @@
     </div>
 
     <!-- Minimalist Chart Section -->
-    <div class="m3-card p-3 sm:p-5 space-y-2.5">
-      <div class="flex items-center justify-between gap-2 border-b border-[#d8e2ee] dark:border-[#263445] pb-2">
-        <h2 class="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-          <i data-lucide="line-chart" class="w-4 h-4 text-[#0b57d0] dark:text-[#a8c7fa]"></i>
+    <div id="chartCard" class="m3-card p-3 sm:p-5 space-y-2.5">
+      <div class="flex items-center justify-between gap-1.5 sm:gap-2 border-b border-[#d8e2ee] dark:border-[#263445] pb-2">
+        <h2 class="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 shrink-0">
+          <i data-lucide="line-chart" class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#0b57d0] dark:text-[#a8c7fa]"></i>
           <span>Ölçüm Grafiği</span>
         </h2>
 
-        <!-- Mode Buttons (Sıcaklık, Nem, Pil, Tümü) -->
-        <div class="inline-flex rounded-full bg-[#edf2f9] dark:bg-[#1e2938] p-0.5 border border-[#d8e2ee] dark:border-[#2e3b4e] text-xs">
-          <button class="mode-btn active px-2.5 sm:px-3 py-1 font-semibold" data-mode="temps">Sıcaklık</button>
-          <button class="mode-btn px-2.5 sm:px-3 py-1 font-semibold" data-mode="hum">Nem</button>
-          <button class="mode-btn px-2.5 sm:px-3 py-1 font-semibold" data-mode="battery">Pil</button>
-          <button class="mode-btn px-2.5 sm:px-3 py-1 font-semibold" data-mode="all">Tümü</button>
+        <div class="flex items-center gap-1.5 shrink-0">
+          <!-- Mode Buttons (Sıcaklık, Nem, Voltaj, Tümü) -->
+          <div class="inline-flex rounded-full bg-[#edf2f9] dark:bg-[#1e2938] p-0.5 border border-[#d8e2ee] dark:border-[#2e3b4e] text-[11px] sm:text-xs">
+            <button class="mode-btn active px-2 sm:px-2.5 py-0.5 sm:py-1 font-semibold" data-mode="temps">Sıcaklık</button>
+            <button class="mode-btn px-2 sm:px-2.5 py-0.5 sm:py-1 font-semibold" data-mode="hum">Nem</button>
+            <button class="mode-btn px-2 sm:px-2.5 py-0.5 sm:py-1 font-semibold" data-mode="battery">Voltaj (V)</button>
+            <button class="mode-btn px-2 sm:px-2.5 py-0.5 sm:py-1 font-semibold" data-mode="all">Tümü</button>
+          </div>
+
+          <!-- Büyüt / Küçült (Fullscreen) Butonu -->
+          <button id="btnToggleFullscreenChart" class="p-1 sm:p-1.5 rounded-full bg-[#edf2f9] dark:bg-[#1e2938] hover:bg-[#e0e8f4] dark:hover:bg-[#253346] text-slate-600 dark:text-slate-300 border border-[#d8e2ee] dark:border-[#2e3b4e] flex items-center justify-center cursor-pointer" title="Grafiği Tam Ekran Büyüt / Küçült" aria-label="Grafiği Büyüt">
+            <i id="iconChartFullscreen" data-lucide="maximize-2" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i>
+          </button>
         </div>
       </div>
 
       <!-- Chart Canvas Container -->
-      <div class="relative w-full h-56 sm:h-72">
+      <div id="chartCanvasContainer" class="relative w-full h-56 sm:h-72">
         <div id="chartEmptyOverlay" class="absolute inset-0 flex flex-col items-center justify-center bg-white dark:bg-[#161f2b] z-10 rounded-2xl text-center p-4">
           <i data-lucide="radio" class="w-6 h-6 text-[#0b57d0] dark:text-[#a8c7fa] mb-1.5"></i>
           <p class="text-xs text-slate-500 dark:text-slate-400">Veri bekleniyor... <strong>"Bağlan"</strong> veya <strong>"Kayıtları Çek"</strong> butonuna basabilirsiniz.</p>
@@ -222,7 +229,7 @@
               <th scope="col" class="py-2 px-2.5 sm:px-3">Zaman</th>
               <th scope="col" class="py-2 px-2 sm:px-3">Sıcaklık</th>
               <th scope="col" class="py-2 px-2 sm:px-3">Nem</th>
-              <th scope="col" class="py-2 px-2 sm:px-3">Pil</th>
+              <th scope="col" class="py-2 px-2 sm:px-3">Pil (V)</th>
             </tr>
           </thead>
           <tbody id="historyTableBody" class="divide-y divide-[#d8e2ee]/60 dark:divide-[#263445]/60 font-mono text-[11px] sm:text-xs">
