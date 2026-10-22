@@ -160,7 +160,7 @@ table th, table td {
   }
 }
 
-/* Fullscreen / Expanded Chart Modal */
+/* Fullscreen / Expanded Chart Modal (Mobile & Desktop Responsive) */
 .chart-fullscreen {
   position: fixed !important;
   inset: 0 !important;
@@ -176,6 +176,12 @@ table th, table td {
   flex-direction: column !important;
   box-shadow: none !important;
   border: none !important;
+}
+
+@media (min-width: 640px) {
+  .chart-fullscreen {
+    padding: 1.5rem 2rem !important;
+  }
 }
 
 .dark .chart-fullscreen {

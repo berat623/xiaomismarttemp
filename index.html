@@ -47,7 +47,7 @@
 
   <!-- Ultra-Minimalist Unified Header (Single Line on All Screens) -->
   <header class="relative z-10 border-b border-[#d8e2ee] dark:border-[#263445] bg-[#ffffff] dark:bg-[#161f2b] sticky top-0 px-3 sm:px-6 py-2.5">
-    <div class="max-w-5xl mx-auto flex items-center justify-between gap-2">
+    <div class="max-w-6xl mx-auto flex items-center justify-between gap-2">
       
       <!-- Left: Sensor Hardware Clock & Status -->
       <div class="flex items-center gap-2 min-w-0" title="Sensör donanım saati (RTC)">
@@ -55,7 +55,7 @@
         <div class="min-w-0">
           <div class="flex items-baseline gap-1.5">
             <span id="liveClockTime" class="text-base sm:text-xl font-extrabold font-mono tracking-tight text-slate-900 dark:text-white tabular-nums">--:--:--</span>
-            <span id="connectionStatusText" class="text-[10px] text-slate-500 dark:text-slate-400 font-semibold truncate hidden xs:inline">Sensör Saati</span>
+            <span id="connectionStatusText" class="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 font-semibold truncate hidden xs:inline">Sensör Saati</span>
           </div>
         </div>
       </div>
@@ -64,19 +64,19 @@
       <div class="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
         
         <!-- Fetch Records Button -->
-        <button id="btnFetchHistory" class="px-3 sm:px-4 py-2 rounded-full text-xs font-bold flex items-center gap-1.5 bg-[#d3e3fd] hover:bg-[#c2d7fb] text-[#041e49] dark:bg-[#0842a0] dark:hover:bg-[#0b57d0] dark:text-[#d3e3fd] shadow-sm" title="Sensör flaş belleğindeki kayıtları çek">
-          <i data-lucide="download-cloud" class="w-3.5 h-3.5"></i>
+        <button id="btnFetchHistory" class="px-2.5 sm:px-4 py-2 rounded-full text-xs font-bold flex items-center gap-1.5 bg-[#d3e3fd] hover:bg-[#c2d7fb] text-[#041e49] dark:bg-[#0842a0] dark:hover:bg-[#0b57d0] dark:text-[#d3e3fd] shadow-sm cursor-pointer" title="Sensör flaş belleğindeki tüm kayıtları çek">
+          <i data-lucide="download-cloud" class="w-3.5 h-3.5 shrink-0"></i>
           <span>Kayıtları Çek</span>
         </button>
 
         <!-- Connect / Disconnect Button -->
-        <button id="btnConnect" class="px-3.5 sm:px-4 py-2 rounded-full text-xs font-bold flex items-center gap-1.5 bg-[#0b57d0] hover:bg-[#0842a0] text-white shadow-sm">
-          <i data-lucide="bluetooth" class="w-3.5 h-3.5"></i>
+        <button id="btnConnect" class="px-3 sm:px-4 py-2 rounded-full text-xs font-bold flex items-center gap-1.5 bg-[#0b57d0] hover:bg-[#0842a0] text-white shadow-sm cursor-pointer">
+          <i data-lucide="bluetooth" class="w-3.5 h-3.5 shrink-0"></i>
           <span id="btnConnectLabel">Bağlan</span>
         </button>
 
         <!-- Theme Toggle Button -->
-        <button id="btnThemeToggle" title="Temayı Değiştir" aria-label="Temayı Değiştir" class="p-2 rounded-full text-slate-600 dark:text-slate-300 bg-[#edf2f9] dark:bg-[#1e2938] hover:bg-[#e0e8f4] dark:hover:bg-[#253346] border border-[#d8e2ee] dark:border-[#2e3b4e] flex items-center justify-center">
+        <button id="btnThemeToggle" title="Temayı Değiştir" aria-label="Temayı Değiştir" class="p-2 rounded-full text-slate-600 dark:text-slate-300 bg-[#edf2f9] dark:bg-[#1e2938] hover:bg-[#e0e8f4] dark:hover:bg-[#253346] border border-[#d8e2ee] dark:border-[#2e3b4e] flex items-center justify-center cursor-pointer">
           <i id="themeIcon" data-lucide="moon" class="w-4 h-4"></i>
         </button>
 
@@ -86,7 +86,7 @@
   </header>
 
   <!-- Main Dashboard Container -->
-  <main class="relative z-10 flex-1 max-w-5xl w-full mx-auto p-3 sm:p-5 space-y-3 sm:space-y-4 pb-12">
+  <main class="relative z-10 flex-1 max-w-6xl w-full mx-auto p-3 sm:p-5 lg:p-6 space-y-3 sm:space-y-4 pb-12">
 
     <!-- Progress Notification Banner (Visible only during memory sync) -->
     <div id="syncProgressBanner" class="hidden p-3 rounded-2xl bg-[#d3e3fd] dark:bg-[#0842a0]/60 border border-[#0b57d0]/20">
@@ -102,28 +102,31 @@
       </div>
     </div>
 
-    <!-- 3 PRIMARY TELEMETRY CARDS (Sıcaklık, Bağıl Nem, Pil) -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3.5">
+    <!-- 3 PRIMARY TELEMETRY CARDS (Sıcaklık, Bağıl Nem, Pil Voltajı) -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-4">
       
       <!-- Card 1: Sıcaklık (Temperature) -->
-      <div class="m3-card p-4 sm:p-5">
+      <div class="m3-card p-4 sm:p-5 flex flex-col justify-between">
         <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-1.5">
           <span class="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
             <i data-lucide="thermometer" class="w-4 h-4 text-[#0b57d0] dark:text-[#a8c7fa]"></i>
             Sıcaklık
           </span>
-          <button id="btnToggleUnit" class="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-[#edf2f9] dark:bg-[#1e2938] text-[#0b57d0] dark:text-[#a8c7fa] border border-[#d8e2ee] dark:border-[#2e3b4e]" title="Birim değiştir">
+          <button id="btnToggleUnit" class="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-[#edf2f9] dark:bg-[#1e2938] text-[#0b57d0] dark:text-[#a8c7fa] border border-[#d8e2ee] dark:border-[#2e3b4e] cursor-pointer" title="Birim değiştir">
             °C / °F
           </button>
         </div>
         <div class="flex items-baseline gap-1 py-1">
-          <span id="valTemp" class="text-4xl sm:text-5xl font-extrabold font-mono text-slate-900 dark:text-slate-100 tabular-nums">--.--</span>
+          <span id="valTemp" class="text-4xl sm:text-4xl lg:text-5xl font-extrabold font-mono text-slate-900 dark:text-slate-100 tabular-nums">--.--</span>
           <span id="lblTempUnit" class="text-xl sm:text-2xl font-bold text-[#0b57d0] dark:text-[#a8c7fa]">°C</span>
+        </div>
+        <div class="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden mt-1.5">
+          <div id="tempProgressBar" class="h-full bg-[#0b57d0] dark:bg-[#60a5fa] rounded-full" style="width: 0%"></div>
         </div>
       </div>
 
       <!-- Card 2: Bağıl Nem (Relative Humidity) -->
-      <div class="m3-card p-4 sm:p-5">
+      <div class="m3-card p-4 sm:p-5 flex flex-col justify-between">
         <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-1.5">
           <span class="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
             <i data-lucide="droplets" class="w-4 h-4 text-sky-500"></i>
@@ -134,7 +137,7 @@
           </span>
         </div>
         <div class="flex items-baseline gap-1 py-1">
-          <span id="valHum" class="text-4xl sm:text-5xl font-extrabold font-mono text-slate-900 dark:text-slate-100 tabular-nums">--.--</span>
+          <span id="valHum" class="text-4xl sm:text-4xl lg:text-5xl font-extrabold font-mono text-slate-900 dark:text-slate-100 tabular-nums">--.--</span>
           <span class="text-xl sm:text-2xl font-bold text-sky-500">%</span>
         </div>
         <div class="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden mt-1.5">
@@ -142,20 +145,20 @@
         </div>
       </div>
 
-      <!-- Card 3: Pil & Voltaj (Battery & Voltage) -->
-      <div class="m3-card p-4 sm:p-5">
+      <!-- Card 3: Pil Voltajı (Direct Sensor Voltage in V) -->
+      <div class="m3-card p-4 sm:p-5 flex flex-col justify-between">
         <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-1.5">
           <span class="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
             <i data-lucide="battery-charging" class="w-4 h-4 text-emerald-500"></i>
-            Pil
+            Pil Voltajı
           </span>
-          <span id="valVoltageBadge" class="text-[11px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300">
-            -- V
+          <span id="valVoltageBadge" class="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300">
+            -- mV
           </span>
         </div>
         <div class="flex items-baseline gap-1 py-1">
-          <span id="valBattery" class="text-4xl sm:text-5xl font-extrabold font-mono text-slate-900 dark:text-slate-100 tabular-nums">--</span>
-          <span class="text-xl sm:text-2xl font-bold text-emerald-500">%</span>
+          <span id="valBattery" class="text-4xl sm:text-4xl lg:text-5xl font-extrabold font-mono text-slate-900 dark:text-slate-100 tabular-nums">--.--</span>
+          <span class="text-xl sm:text-2xl font-bold text-emerald-500">V</span>
         </div>
         <div class="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden mt-1.5">
           <div id="batteryProgressBar" class="h-full bg-emerald-500 rounded-full" style="width: 0%"></div>
@@ -166,30 +169,39 @@
 
     <!-- Minimalist Chart Section -->
     <div id="chartCard" class="m3-card p-3 sm:p-5 space-y-2.5">
-      <div class="flex items-center justify-between gap-1.5 sm:gap-2 border-b border-[#d8e2ee] dark:border-[#263445] pb-2">
-        <h2 class="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 shrink-0">
-          <i data-lucide="line-chart" class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#0b57d0] dark:text-[#a8c7fa]"></i>
-          <span>Ölçüm Grafiği</span>
-        </h2>
+      <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[#d8e2ee] dark:border-[#263445] pb-2.5">
+        <div class="flex items-center justify-between w-full sm:w-auto gap-2">
+          <h2 class="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 shrink-0">
+            <i data-lucide="line-chart" class="w-4 h-4 text-[#0b57d0] dark:text-[#a8c7fa]"></i>
+            <span>Ölçüm Grafiği</span>
+          </h2>
 
-        <div class="flex items-center gap-1.5 shrink-0">
+          <!-- Mobile-visible Fullscreen button right next to title on small screens -->
+          <button id="btnToggleFullscreenChartMobile" class="sm:hidden px-2.5 py-1 rounded-full bg-[#edf2f9] dark:bg-[#1e2938] hover:bg-[#e0e8f4] dark:hover:bg-[#253346] text-slate-700 dark:text-slate-200 border border-[#d8e2ee] dark:border-[#2e3b4e] flex items-center gap-1 text-[11px] font-bold cursor-pointer" title="Grafiği Tam Ekran Büyüt / Küçült" aria-label="Grafiği Büyüt">
+            <i id="iconChartFullscreenMobile" data-lucide="maximize-2" class="w-3.5 h-3.5"></i>
+            <span id="lblChartFullscreenMobile">Büyüt</span>
+          </button>
+        </div>
+
+        <div class="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-2">
           <!-- Mode Buttons (Sıcaklık, Nem, Voltaj, Tümü) -->
-          <div class="inline-flex rounded-full bg-[#edf2f9] dark:bg-[#1e2938] p-0.5 border border-[#d8e2ee] dark:border-[#2e3b4e] text-[11px] sm:text-xs">
-            <button class="mode-btn active px-2 sm:px-2.5 py-0.5 sm:py-1 font-semibold" data-mode="temps">Sıcaklık</button>
-            <button class="mode-btn px-2 sm:px-2.5 py-0.5 sm:py-1 font-semibold" data-mode="hum">Nem</button>
-            <button class="mode-btn px-2 sm:px-2.5 py-0.5 sm:py-1 font-semibold" data-mode="battery">Voltaj (V)</button>
-            <button class="mode-btn px-2 sm:px-2.5 py-0.5 sm:py-1 font-semibold" data-mode="all">Tümü</button>
+          <div class="inline-flex w-full sm:w-auto justify-between sm:justify-start rounded-full bg-[#edf2f9] dark:bg-[#1e2938] p-0.5 border border-[#d8e2ee] dark:border-[#2e3b4e] text-[11px] sm:text-xs">
+            <button class="mode-btn active flex-1 sm:flex-initial px-2.5 sm:px-3 py-1 font-semibold cursor-pointer" data-mode="temps">Sıcaklık</button>
+            <button class="mode-btn flex-1 sm:flex-initial px-2.5 sm:px-3 py-1 font-semibold cursor-pointer" data-mode="hum">Nem</button>
+            <button class="mode-btn flex-1 sm:flex-initial px-2.5 sm:px-3 py-1 font-semibold cursor-pointer" data-mode="battery">Voltaj (V)</button>
+            <button class="mode-btn flex-1 sm:flex-initial px-2.5 sm:px-3 py-1 font-semibold cursor-pointer" data-mode="all">Tümü</button>
           </div>
 
-          <!-- Büyüt / Küçült (Fullscreen) Butonu -->
-          <button id="btnToggleFullscreenChart" class="p-1 sm:p-1.5 rounded-full bg-[#edf2f9] dark:bg-[#1e2938] hover:bg-[#e0e8f4] dark:hover:bg-[#253346] text-slate-600 dark:text-slate-300 border border-[#d8e2ee] dark:border-[#2e3b4e] flex items-center justify-center cursor-pointer" title="Grafiği Tam Ekran Büyüt / Küçült" aria-label="Grafiği Büyüt">
-            <i id="iconChartFullscreen" data-lucide="maximize-2" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i>
+          <!-- Desktop Büyüt / Küçült (Fullscreen) Butonu -->
+          <button id="btnToggleFullscreenChart" class="hidden sm:flex px-3 py-1.5 rounded-full bg-[#edf2f9] dark:bg-[#1e2938] hover:bg-[#e0e8f4] dark:hover:bg-[#253346] text-slate-700 dark:text-slate-200 border border-[#d8e2ee] dark:border-[#2e3b4e] items-center gap-1.5 text-xs font-bold cursor-pointer" title="Grafiği Tam Ekran Büyüt / Küçült" aria-label="Grafiği Büyüt">
+            <i id="iconChartFullscreen" data-lucide="maximize-2" class="w-3.5 h-3.5"></i>
+            <span id="lblChartFullscreen">Büyüt</span>
           </button>
         </div>
       </div>
 
       <!-- Chart Canvas Container -->
-      <div id="chartCanvasContainer" class="relative w-full h-56 sm:h-72">
+      <div id="chartCanvasContainer" class="relative w-full h-60 sm:h-80 lg:h-96">
         <div id="chartEmptyOverlay" class="absolute inset-0 flex flex-col items-center justify-center bg-white dark:bg-[#161f2b] z-10 rounded-2xl text-center p-4">
           <i data-lucide="radio" class="w-6 h-6 text-[#0b57d0] dark:text-[#a8c7fa] mb-1.5"></i>
           <p class="text-xs text-slate-500 dark:text-slate-400">Veri bekleniyor... <strong>"Bağlan"</strong> veya <strong>"Kayıtları Çek"</strong> butonuna basabilirsiniz.</p>
@@ -229,7 +241,7 @@
               <th scope="col" class="py-2 px-2.5 sm:px-3">Zaman</th>
               <th scope="col" class="py-2 px-2 sm:px-3">Sıcaklık</th>
               <th scope="col" class="py-2 px-2 sm:px-3">Nem</th>
-              <th scope="col" class="py-2 px-2 sm:px-3">Pil (V)</th>
+              <th scope="col" class="py-2 px-2 sm:px-3">Voltaj (V)</th>
             </tr>
           </thead>
           <tbody id="historyTableBody" class="divide-y divide-[#d8e2ee]/60 dark:divide-[#263445]/60 font-mono text-[11px] sm:text-xs">
