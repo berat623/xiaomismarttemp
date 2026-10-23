@@ -5,6 +5,30 @@
  */
 
 // ==========================================
+// 0. GLOBAL WEB BLUETOOTH GATT OPERATION SERIALIZER
+// Android Chrome & Windows allow only one GATT operation at a time.
+// This serializes all characteristic/descriptor operations globally.
+// ==========================================
+(function() {
+  if (typeof BluetoothRemoteGATTCharacteristic === 'undefined' || window.__gattQueue) return;
+  let q = Promise.resolve();
+  const wrap = (proto, name) => {
+    const orig = proto[name];
+    if (!orig) return;
+    proto[name] = function(...args) {
+      const run = () => orig.apply(this, args);
+      const p = q.then(run, run);
+      q = p.catch(() => {});
+      return p;
+    };
+  };
+  ["readValue", "writeValue", "writeValueWithResponse", "writeValueWithoutResponse",
+   "startNotifications", "stopNotifications"].forEach(n => wrap(BluetoothRemoteGATTCharacteristic.prototype, n));
+  ["readValue", "writeValue"].forEach(n => wrap(BluetoothRemoteGATTDescriptor.prototype, n));
+  window.__gattQueue = true;
+})();
+
+// ==========================================
 // 1. CONSTANTS & BLE PROFILES
 // ==========================================
 const BLE_PROFILES = {
@@ -23,12 +47,7 @@ const BLE_PROFILES = {
 
   // ATC Custom Control & Command Characteristic (0x1F1F)
   ATC_CUSTOM_SERVICE: '00001f10-0000-1000-8000-00805f9b34fb',
-  CHAR_ATC_CUSTOM: '00001f1f-0000-1000-8000-00805f9b34fb',
-
-  // Advertisement UUIDs
-  UUID_MIBEACON: '0000fe95-0000-1000-8000-00805f9b34fb',
-  UUID_BTHOME_V2: '0000fcd2-0000-1000-8000-00805f9b34fb',
-  UUID_BTHOME_V1: '0000181c-0000-1000-8000-00805f9b34fb'
+  CHAR_ATC_CUSTOM: '00001f1f-0000-1000-8000-00805f9b34fb'
 };
 
 // ==========================================
@@ -99,7 +118,6 @@ class TelemetryStorage {
   }
 
   async initDB() {
-    // Eski hatalı (v3) veritabanındaki bozuk 0x33 kayıtlarını temizle
     try {
       indexedDB.deleteDatabase('XiaomiSmartTempDB_v3');
     } catch (e) {}
@@ -155,7 +173,7 @@ class TelemetryStorage {
     const formatted = TelemetryProcessor.format(record);
     if (!formatted) return null;
 
-    // Aynı saniye içinde birden fazla GATT karakteristiğinden gelen mükerrer canlı bildirimleri birleştir
+    // Aynı saniye içinde birden fazla canlı bildirim geldiğinde birleştir
     if (this.records.length > 0) {
       const last = this.records[this.records.length - 1];
       if (last.type === 'live' && formatted.type === 'live' && Math.abs(formatted.timestamp - last.timestamp) < 1200) {
@@ -179,9 +197,6 @@ class TelemetryStorage {
     return formatted;
   }
 
-  /**
-   * Cihaz flaş belleğinden çekilen tüm geçmiş kayıtlarını eksiksiz ve tekilleştirilmiş olarak kaydeder.
-   */
   async addBatch(recordsList) {
     if (!recordsList || recordsList.length === 0) return 0;
 
@@ -194,8 +209,6 @@ class TelemetryStorage {
     }
     if (validIncoming.length === 0) return 0;
 
-    // Gelen liste cihazın tam flaş geçmişiyse, önceki flaş kayıtlarını güncel tam listeyle değiştir
-    // ve son flaş kaydından daha yeni olan canlı (live) ölçümleri koru.
     const maxIncomingTs = Math.max(...validIncoming.map(r => r.timestamp));
     const minIncomingTs = Math.min(...validIncoming.map(r => r.timestamp));
 
@@ -258,7 +271,7 @@ class TelemetryStorage {
         i + 1,
         d.toLocaleDateString('tr-TR'),
         d.toLocaleTimeString('tr-TR'),
-        r.type === 'history_hour' ? 'Cihaz Belleği' : (r.source === 'ble_adv' ? 'BLE Yayın' : 'Canlı Ölçüm'),
+        r.type === 'history_hour' ? 'Cihaz Belleği' : 'Canlı Ölçüm',
         r.temperature.toFixed(2),
         !isNaN(parseFloat(humVal)) ? humVal : r.humidity,
         r.voltage != null ? r.voltage.toFixed(2) : ''
@@ -273,7 +286,7 @@ class TelemetryStorage {
 }
 
 // ==========================================
-// 4. UNIVERSAL BLE MANAGER (Light-Speed Engine)
+// 4. UNIVERSAL BLE MANAGER (Robust GATT Engine)
 // ==========================================
 class UniversalBleManager {
   constructor(onDataCallback, onStatusCallback, onHistoryProgressCallback, onSensorTimeCallback) {
@@ -293,23 +306,11 @@ class UniversalBleManager {
     this.primaryService = null;
     this.atcChar = null;
     this.hasAtcLiveStream = false;
-    this.isWatchingAdvertisements = false;
-    this._gattQueue = Promise.resolve();
 
     this.cachedTemp = null;
     this.cachedHum = null;
     this.cachedBattery = null;
     this.cachedVoltage = null;
-  }
-
-  /**
-   * Web Bluetooth GATT işlemlerini sıraya sokarak Android/Windows'ta
-   * "GATT operation already in progress" hatalarını ve paket kayıplarını önler.
-   */
-  enqueueGatt(operationFn) {
-    const run = this._gattQueue.then(() => operationFn());
-    this._gattQueue = run.catch(() => {});
-    return run;
   }
 
   async tryAutoConnect() {
@@ -322,7 +323,7 @@ class UniversalBleManager {
                        devices.find(d => d.name && (d.name.includes('LYWSD') || d.name.includes('MHO') || d.name.includes('Thermo'))) ||
                        devices[0];
         if (target) {
-          console.log(`⚡ ${target.name} bulundu, doğrudan otomatik bağlanılıyor...`);
+          console.log(`⚡ ${target.name} kayıtlı cihaz bulundu, bağlanılıyor...`);
           return await this.connectToDevice(target);
         }
       }
@@ -340,32 +341,15 @@ class UniversalBleManager {
     this.onStatus('scanning', 'ATC_597941 aranıyor...');
 
     const optionalServices = [
-      BLE_PROFILES.XIAOMI_SERVICE,
-      BLE_PROFILES.ENV_SENSING_SERVICE,
-      0x181a,
-      BLE_PROFILES.BATTERY_SERVICE,
-      0x180f,
-      BLE_PROFILES.ATC_CUSTOM_SERVICE,
+      '00001f10-0000-1000-8000-00805f9b34fb',
+      '0000181a-0000-1000-8000-00805f9b34fb',
+      '0000180f-0000-1000-8000-00805f9b34fb',
+      'ebe0ccb0-7a0a-4b0c-8a1a-6ff2997da3a6',
       0x1f10,
-      '00001f11-0000-1000-8000-00805f9b34fb',
-      0x1f11,
-      '0000180a-0000-1000-8000-00805f9b34fb',
-      0x180a,
-      BLE_PROFILES.UUID_MIBEACON,
+      0x181a,
+      0x180f,
       0xfe95,
-      BLE_PROFILES.UUID_BTHOME_V2,
-      0xfcd2,
-      BLE_PROFILES.UUID_BTHOME_V1,
-      0x181c,
-      '0000181e-0000-1000-8000-00805f9b34fb',
-      0x181e,
-      '22210000-554a-4546-5542-46534450464d',
-      '0000fff9-0000-1000-8000-00805f9b34fb',
-      0xfff9,
-      '0000fdcd-0000-1000-8000-00805f9b34fb',
-      0xfdcd,
-      '0000ffe0-0000-1000-8000-00805f9b34fb',
-      0xffe0
+      0xfcd2
     ];
 
     try {
@@ -373,7 +357,9 @@ class UniversalBleManager {
         this.device = await navigator.bluetooth.requestDevice({
           filters: [
             { name: 'ATC_597941' },
-            { namePrefix: 'ATC_' }
+            { namePrefix: 'ATC_' },
+            { namePrefix: 'LYWSD03' },
+            { namePrefix: 'MHO' }
           ],
           optionalServices: optionalServices
         });
@@ -401,159 +387,80 @@ class UniversalBleManager {
   }
 
   async connectToDevice(device) {
+    if (!device) return false;
     this.isConnecting = true;
     this.device = device;
+    this.server = null;
     this.atcChar = null;
+    this.primaryService = null;
     this.hasAtcLiveStream = false;
     const devName = this.device.name || 'ATC_597941';
+
     this.onStatus('connecting', `${devName} bağlanıyor...`);
+
+    // Önceki bağlantı kalıntısını temizle
+    if (this.device.gatt && this.device.gatt.connected) {
+      try {
+        this.device.gatt.disconnect();
+        await new Promise(r => setTimeout(r, 200));
+      } catch (e) {}
+    }
 
     this.device.removeEventListener?.('gattserverdisconnected', this._boundDisconnect);
     this._boundDisconnect = () => this.handleDisconnect();
     this.device.addEventListener('gattserverdisconnected', this._boundDisconnect);
 
-    // 1. Reklam Paket Yakalayıcı
-    this.startAdvertisementWatcher();
-
-    // 2. GATT Bağlantısı
-    try {
-      this.server = await this.device.gatt.connect();
-    } catch (connErr) {
-      console.warn('GATT bağlantısı kurulamadı:', connErr);
-      if (this.isWatchingAdvertisements) {
-        this.isConnected = true;
-        this.isConnecting = false;
-        if (this.onSensorTime) this.onSensorTime(Date.now());
-        this.onStatus('connected', `${devName} (BLE Yayın)`);
-        return true;
+    // GATT Bağlantısını kur (Telink uyku durumuna karşı 3 kez güvenli deneme)
+    let lastError = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        if (attempt > 1) {
+          this.onStatus('connecting', `${devName} bağlanıyor (${attempt}/3)...`);
+          await new Promise(r => setTimeout(r, 450));
+        }
+        this.server = await this.device.gatt.connect();
+        if (this.server && this.server.connected) {
+          break;
+        }
+      } catch (connErr) {
+        lastError = connErr;
+        console.warn(`GATT denemesi ${attempt} başarısız:`, connErr);
       }
-      this.isConnecting = false;
-      throw connErr;
     }
 
-    // 3. GATT Servislerini Keşfet
+    if (!this.server || !this.server.connected) {
+      this.isConnected = false;
+      this.isConnecting = false;
+      this.onStatus('disconnected', 'GATT bağlantısı kurulamadı.');
+      throw (lastError || new Error('Cihaza bağlanılamadı. Lütfen cihazın yakınında olduğundan emin olun.'));
+    }
+
+    // GATT Servislerini Keşfet ve Karakteristikleri Bağla
     await this.setupGattProfiles();
 
     this.isConnected = true;
     this.isConnecting = false;
+
     if (this.onSensorTime) {
       this.onSensorTime(Date.now());
     }
+
     const fwBadge = this.deviceProfile === 'atc' ? 'Canlı Bağlı' : 'Xiaomi FW';
     this.onStatus('connected', `${devName} · ${fwBadge}`);
     return true;
   }
 
-  startAdvertisementWatcher() {
-    if (!this.device || !this.device.watchAdvertisements) return;
-    try {
-      this.device.addEventListener('advertisementreceived', (event) => {
-        this.handleAdvertisementPacket(event);
-      });
-      this.device.watchAdvertisements().then(() => {
-        this.isWatchingAdvertisements = true;
-      }).catch(() => {});
-    } catch (e) {}
-  }
-
-  handleAdvertisementPacket(event) {
-    if (!event.serviceData) return;
-
-    for (const [key, dataView] of event.serviceData.entries()) {
-      const lowerKey = key.toLowerCase();
-      const b = dataView;
-      const len = b.byteLength;
-
-      // 1. Environmental Sensing Service (0x181A) — ATC / PVVX
-      if (lowerKey.includes('181a')) {
-        this.deviceProfile = 'atc';
-        if (len >= 15) {
-          // PVVX Custom Format: bytes 6..7 temp (int16 LE / 100), 8..9 humi (uint16 LE / 100), 10..11 vbat (uint16 LE mV), 12 bat%
-          const temp = b.getInt16(6, true) / 100.0;
-          const hum = b.getUint16(8, true) / 100.0;
-          const vb = b.getUint16(10, true);
-          const batt = b.getUint8(12);
-          const volt = (vb >= 1500 && vb <= 3800) ? Number((vb / 1000).toFixed(2)) : null;
-          this.emitTelemetry(temp, hum, 'ble_adv', 'atc', batt, volt);
-          return;
-        } else if (len >= 13) {
-          // ATC1441 Format: bytes 6..7 temp (int16 BE / 10), 8 humi (uint8), 9 bat%, 10..11 vbat (uint16 BE mV)
-          const temp = b.getInt16(6, false) / 10.0;
-          const hum = b.getUint8(8);
-          const batt = b.getUint8(9);
-          const vb = b.getUint16(10, false);
-          const volt = (vb >= 1500 && vb <= 3800) ? Number((vb / 1000).toFixed(2)) : null;
-          this.emitTelemetry(temp, hum, 'ble_adv', 'atc', batt, volt);
-          return;
-        }
-      }
-
-      // 2. BTHome v2 (0xFCD2)
-      if (lowerKey.includes('fcd2') && len > 1) {
-        this.deviceProfile = 'atc';
-        let ptr = 1;
-        let t = null, h = null, batt = null, volt = null;
-        while (ptr < len) {
-          const id = b.getUint8(ptr);
-          if (id === 0x01 && ptr + 1 < len) {
-            batt = b.getUint8(ptr + 1);
-            ptr += 2;
-          } else if (id === 0x02 && ptr + 2 < len) {
-            t = b.getInt16(ptr + 1, true) * 0.01;
-            ptr += 3;
-          } else if (id === 0x03 && ptr + 2 < len) {
-            h = b.getUint16(ptr + 1, true) * 0.01;
-            ptr += 3;
-          } else if (id === 0x0c && ptr + 2 < len) {
-            const mv = b.getUint16(ptr + 1, true);
-            if (mv >= 1500 && mv <= 3800) {
-              volt = Number((mv * 0.001).toFixed(2));
-            }
-            ptr += 3;
-          } else {
-            break;
-          }
-        }
-        if (t !== null && h !== null) {
-          this.emitTelemetry(t, h, 'ble_adv', 'atc', batt, volt);
-          return;
-        }
-      }
-
-      // 3. Xiaomi MiBeacon (0xFE95)
-      if (lowerKey.includes('fe95') && len >= 14) {
-        this.deviceProfile = 'stock_xiaomi';
-        let temp = null, hum = null, batt = null;
-        for (let p = 11; p < len - 3; p++) {
-          const objId = b.getUint16(p, true);
-          const objLen = b.getUint8(p + 2);
-          if (objId === 0x100d && objLen === 4 && p + 7 <= len) {
-            temp = b.getInt16(p + 3, true) / 10.0;
-            hum = b.getInt16(p + 5, true) / 10.0;
-          } else if (objId === 0x100a && objLen === 1 && p + 4 <= len) {
-            batt = b.getUint8(p + 3);
-          }
-        }
-        if (temp !== null && hum !== null) {
-          this.emitTelemetry(temp, hum, 'ble_adv', 'stock_xiaomi', batt, null);
-          return;
-        }
-      }
-    }
-  }
-
   async setupGattProfiles() {
     let bound = false;
 
-    // 1. ÖNCE ATC/PVVX Custom Control Servisini (0x1F10 -> 0x1F1F) Bağla
-    // Çünkü 0x1F1F üzerinden gelen 0x33 paketi voltaj (mV), sıcaklık ve nemi tek pakette atomik olarak verir!
+    // 1. ATC / PVVX Custom Control Servisini (0x1F10 -> 0x1F1F) Keşfet
     try {
-      const atcService = await this.server.getPrimaryService(BLE_PROFILES.ATC_CUSTOM_SERVICE)
+      const atcService = await this.server.getPrimaryService('00001f10-0000-1000-8000-00805f9b34fb')
         .catch(() => this.server.getPrimaryService(0x1f10)).catch(() => null);
 
       if (atcService) {
         this.deviceProfile = 'atc';
-        const atcChar = await atcService.getCharacteristic(BLE_PROFILES.CHAR_ATC_CUSTOM)
+        const atcChar = await atcService.getCharacteristic('00001f1f-0000-1000-8000-00805f9b34fb')
           .catch(() => atcService.getCharacteristic(0x1f1f)).catch(() => null);
 
         if (atcChar) {
@@ -561,9 +468,9 @@ class UniversalBleManager {
           atcChar.addEventListener('characteristicvaluechanged', (e) => {
             this.handleAtcNotification(e.target.value);
           });
-          await this.enqueueGatt(() => atcChar.startNotifications()).catch(() => {});
+          await atcChar.startNotifications().catch(() => {});
 
-          // 0x23 sensör donanım saatini (RTC) senkronize et (5 bayt: 0x23 + uint32 epoch)
+          // RTC senkronizasyonu (0x23 + uint32 epoch)
           const nowSec = Math.floor(Date.now() / 1000);
           const timeCmd = new Uint8Array([
             0x23,
@@ -573,33 +480,37 @@ class UniversalBleManager {
             (nowSec >> 24) & 0xff
           ]);
           await this.sendAtcCommand(timeCmd).catch(() => {});
-          if (this.onSensorTime) {
-            this.onSensorTime(nowSec * 1000);
-          }
 
-          // 0x33 canlı telemetri akışını başlat (PVVX live telemetry format: vbat, temp, humi)
+          // Konfigürasyon ve flaş belleği hazırla (0x55)
+          await new Promise(r => setTimeout(r, 100));
+          await this.sendAtcCommand(new Uint8Array([0x55])).catch(() => {});
+
+          // Canlı telemetri akışını başlat (0x33, 0x01)
+          await new Promise(r => setTimeout(r, 100));
           await this.sendAtcCommand(new Uint8Array([0x33, 0x01])).catch(() => {});
+
           bound = true;
         }
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn('ATC GATT servisi başlatılamadı:', e);
+    }
 
     // 2. Standart Pil Servisini (0x180F) Oku
     await this.readBatterySafely();
 
-    // 3. ATC Standart Environmental Sensing (0x181A)
+    // 3. Standart Çevre Algılama Servisi (0x181A)
     try {
-      const envService = await this.server.getPrimaryService(BLE_PROFILES.ENV_SENSING_SERVICE)
+      const envService = await this.server.getPrimaryService('0000181a-0000-1000-8000-00805f9b34fb')
         .catch(() => this.server.getPrimaryService(0x181a)).catch(() => null);
 
       if (envService) {
-        this.deviceProfile = 'atc';
         await this.bindAtcEnvService(envService);
         bound = true;
       }
     } catch (e) {}
 
-    // 4. Orijinal Xiaomi Servisi
+    // 4. Xiaomi Orijinal Servisi
     if (!bound) {
       try {
         const xiaomiService = await this.server.getPrimaryService(BLE_PROFILES.XIAOMI_SERVICE).catch(() => null);
@@ -614,15 +525,14 @@ class UniversalBleManager {
   }
 
   async readBatterySafely() {
-    // 1. Standart Pil Servisi (0x180F -> 0x2A19)
     try {
-      const batService = await this.server.getPrimaryService(BLE_PROFILES.BATTERY_SERVICE)
+      const batService = await this.server.getPrimaryService('0000180f-0000-1000-8000-00805f9b34fb')
         .catch(() => this.server.getPrimaryService(0x180f)).catch(() => null);
       if (batService) {
         const batChar = await batService.getCharacteristic(BLE_PROFILES.CHAR_BATTERY)
           .catch(() => batService.getCharacteristic(0x2a19)).catch(() => null);
         if (batChar) {
-          const val = await this.enqueueGatt(() => batChar.readValue()).catch(() => null);
+          const val = await batChar.readValue().catch(() => null);
           if (val && val.byteLength >= 1) {
             const b = val.getUint8(0);
             if (b <= 100) {
@@ -633,7 +543,6 @@ class UniversalBleManager {
               if (this.cachedTemp !== null && this.cachedHum !== null) {
                 this.emitTelemetry(this.cachedTemp, this.cachedHum, 'gatt_live', this.deviceProfile, this.cachedBattery, this.cachedVoltage);
               }
-              return;
             }
           }
         }
@@ -658,13 +567,12 @@ class UniversalBleManager {
       const divisor = isHighRes ? 100.0 : 10.0;
 
       if (tempChar) {
-        const initial = await this.enqueueGatt(() => tempChar.readValue()).catch(() => null);
+        const initial = await tempChar.readValue().catch(() => null);
         if (initial && initial.byteLength >= 2) {
           const t = initial.getInt16(0, true) / divisor;
           if (t >= -35 && t <= 75) this.cachedTemp = t;
         }
         tempChar.addEventListener('characteristicvaluechanged', (e) => {
-          // Eğer 0x1F1F (0x33) atomik akışı aktifse 0x181A'nın yarım paketlerini atla
           if (this.hasAtcLiveStream) return;
           const v = e.target.value;
           if (v && v.byteLength >= 2) {
@@ -677,7 +585,7 @@ class UniversalBleManager {
             }
           }
         });
-        await this.enqueueGatt(() => tempChar.startNotifications()).catch(() => {});
+        await tempChar.startNotifications().catch(() => {});
       }
     } catch (e) {}
 
@@ -687,7 +595,7 @@ class UniversalBleManager {
         .catch(() => null);
 
       if (humChar) {
-        const initial = await this.enqueueGatt(() => humChar.readValue()).catch(() => null);
+        const initial = await humChar.readValue().catch(() => null);
         if (initial) {
           const h = initial.byteLength >= 2
             ? initial.getUint16(0, true) / 100.0
@@ -709,7 +617,7 @@ class UniversalBleManager {
             }
           }
         });
-        await this.enqueueGatt(() => humChar.startNotifications()).catch(() => {});
+        await humChar.startNotifications().catch(() => {});
       }
     } catch (e) {}
 
@@ -722,7 +630,7 @@ class UniversalBleManager {
     const liveChar = await service.getCharacteristic(BLE_PROFILES.CHAR_STOCK_LIVE);
     if (!liveChar) return;
 
-    const initialVal = await this.enqueueGatt(() => liveChar.readValue()).catch(() => null);
+    const initialVal = await liveChar.readValue().catch(() => null);
     if (initialVal && initialVal.byteLength >= 5) {
       const temp = initialVal.getInt16(0, true) / 100.0;
       const hum = initialVal.getUint8(2);
@@ -752,19 +660,9 @@ class UniversalBleManager {
       }
     });
 
-    await this.enqueueGatt(() => liveChar.startNotifications()).catch(() => {});
+    await liveChar.startNotifications().catch(() => {});
   }
 
-  /**
-   * PVVX / ATC 0x1F1F Karakteristik Bildirim İşleyicisi
-   * Resmi PVVX (TelinkMiFlasher / GraphMemo) protokolüne %100 uyumlu bayt dizilimi:
-   * - 0x33 Canlı Paket (9 bayt):
-   *   Byte 0: 0x33
-   *   Byte 1..2: vbat_mV (uint16 LE) -> örn. 2980 mV
-   *   Byte 3..4: temp (int16 LE / 100.0) -> örn. 23.45 °C
-   *   Byte 5..6: humi (uint16 LE / 100.0) -> örn. 48.50 %
-   *   Byte 7..8: count (uint16 LE)
-   */
   handleAtcNotification(value) {
     if (!value || value.byteLength < 1) return;
     const cmdId = value.getUint8(0);
@@ -786,7 +684,7 @@ class UniversalBleManager {
       return;
     }
 
-    // 3. 0x33: Resmi PVVX Canlı Telemetri Paketi
+    // 3. 0x33: Resmi PVVX Canlı Telemetri Paketi (9 bayt: 0x33, vbat_mV, temp, humi)
     if (cmdId === 0x33 && value.byteLength >= 7) {
       const vb = value.getUint16(1, true);           // Offset 1..2: Pil Voltajı (mV)
       const t = value.getInt16(3, true) / 100.0;     // Offset 3..4: Sıcaklık (°C)
@@ -814,23 +712,21 @@ class UniversalBleManager {
   }
 
   async sendAtcCommand(cmdBytes) {
-    if (!this.atcChar) throw new Error('0x1F1F karakteristiği bulunamadı.');
+    if (!this.atcChar) throw new Error('0x1F1F karakteristiği bağlı değil.');
     const buf = cmdBytes instanceof Uint8Array ? cmdBytes : new Uint8Array(cmdBytes);
-    return this.enqueueGatt(async () => {
-      try {
-        if (this.atcChar.writeValue) {
-          await this.atcChar.writeValue(buf);
-        } else if (this.atcChar.writeValueWithResponse) {
-          await this.atcChar.writeValueWithResponse(buf);
-        } else {
-          await this.atcChar.writeValueWithoutResponse(buf);
-        }
-      } catch (e) {
-        if (this.atcChar.writeValueWithoutResponse) {
-          await this.atcChar.writeValueWithoutResponse(buf);
-        }
+    try {
+      if (this.atcChar.writeValue) {
+        await this.atcChar.writeValue(buf);
+      } else if (this.atcChar.writeValueWithResponse) {
+        await this.atcChar.writeValueWithResponse(buf);
+      } else {
+        await this.atcChar.writeValueWithoutResponse(buf);
       }
-    });
+    } catch (e) {
+      if (this.atcChar.writeValueWithoutResponse) {
+        await this.atcChar.writeValueWithoutResponse(buf);
+      }
+    }
   }
 
   emitTelemetry(temperature, humidity, source = 'gatt_live', profile = 'atc', battery = null, voltage = null) {
@@ -857,8 +753,8 @@ class UniversalBleManager {
 
   // Cihazın dahili flaş belleğindeki TÜM geçmişi eksiksiz çekme
   async fetchDeviceHistory() {
-    if (!this.isConnected) {
-      throw new Error('Önce cihaza bağlanmalısınız.');
+    if (!this.isConnected || !this.server || !this.server.connected) {
+      throw new Error('Lütfen önce Bluetooth ile cihaza bağlanın.');
     }
     if (this.isFetchingHistory && this._activeHistoryPromise) {
       return await this._activeHistoryPromise;
@@ -867,7 +763,7 @@ class UniversalBleManager {
     this.isFetchingHistory = true;
     this._activeHistoryPromise = (async () => {
       try {
-        this.onHistoryProgress({ active: true, percent: 5, message: 'Sensör flaş belleği okunuyor...' });
+        this.onHistoryProgress({ active: true, percent: 5, message: 'Sensör flaş belleği taranıyor...' });
 
         // 1. ATC / PVVX Modlu Cihaz (0x1F1F -> 0x35)
         if (this.atcChar) {
@@ -880,7 +776,7 @@ class UniversalBleManager {
         if (this.primaryService) {
           const historyChar = await this.primaryService.getCharacteristic(BLE_PROFILES.CHAR_HISTORY_STREAM).catch(() => null);
           if (historyChar) {
-            await this.enqueueGatt(() => historyChar.startNotifications());
+            await historyChar.startNotifications();
             const records = [];
             const handler = (e) => {
               const chunk = e.target.value;
@@ -892,7 +788,7 @@ class UniversalBleManager {
             historyChar.addEventListener('characteristicvaluechanged', handler);
             await new Promise(r => setTimeout(r, 3200));
             historyChar.removeEventListener('characteristicvaluechanged', handler);
-            await this.enqueueGatt(() => historyChar.stopNotifications()).catch(() => {});
+            await historyChar.stopNotifications().catch(() => {});
             this.onHistoryProgress({ active: false, percent: 100, message: 'Tamamlandı' });
             return records;
           }
@@ -913,31 +809,20 @@ class UniversalBleManager {
   }
 
   /**
-   * Resmi PVVX GraphMemo (0x35) Protokolü ile Flaş Bellekten Tüm Kayıtları Eksiksiz Çekme:
-   * - Komut: [0x35, 0xff, 0xff, 0x00, 0x00] (Başlangıç: 0, Adet: 65535 -> tüm kayıtlar)
-   * - Veri Paketi (byteLength >= 13):
-   *   Offset 0: 0x35
-   *   Offset 1..2: cnt (uint16 LE)
-   *   Offset 3..6: tc (uint32 LE, saniye)
-   *   Offset 7..8: tm (int16 LE / 100.0, °C)
-   *   Offset 9..10: hm (uint16 LE / 100.0, %)
-   *   Offset 11..12: vb (uint16 LE, mV)
-   * - Bitiş Paketi (byteLength === 3): [0x35, cnt_lo, cnt_hi] -> Tüm kayıtların aktarımı bitti!
+   * Resmi PVVX GraphMemo Protokolü ile Flaş Bellekten Tüm Kayıtları Eksiksiz Çekme
    */
   async fetchAtcHistoryFromFlash() {
+    if (!this.atcChar) throw new Error('0x1F1F karakteristiği bağlı değil.');
+
     return new Promise(async (resolve, reject) => {
       const rawSamples = [];
       let timeoutTimer = null;
-      let retryTimer = null;
       let hasCompleted = false;
-      let receivedAnyData = false;
-      let attempt = 0;
 
       const finishDownload = async () => {
         if (hasCompleted) return;
         hasCompleted = true;
         if (timeoutTimer) clearTimeout(timeoutTimer);
-        if (retryTimer) clearInterval(retryTimer);
         this._atcHistoryHandler = null;
 
         // Canlı telemetri akışını tekrar başlat (PVVX 0x33, 0x01)
@@ -951,7 +836,7 @@ class UniversalBleManager {
         }
 
         try {
-          // 1. Kayıtların kronolojik sırasını (eskiden yeniye) doğrula
+          // Kronolojik sırayı doğrula
           if (rawSamples.length >= 2) {
             let posDiffs = 0;
             let negDiffs = 0;
@@ -965,7 +850,6 @@ class UniversalBleManager {
               rawSamples.reverse();
             }
 
-            // Ardışık geçerli zaman adımlarından medyan kayıt aralığını (stepSec) bul
             for (let i = 0; i < rawSamples.length - 1; i++) {
               const d = rawSamples[i + 1].tc - rawSamples[i].tc;
               if (d > 0 && d <= 14400) {
@@ -980,9 +864,6 @@ class UniversalBleManager {
             var stepSec = 600;
           }
 
-          // 2. En son (en güncel) kaydın zamanını referans al ve geriye doğru kesintisiz zaman çizelgesi oluştur
-          // Böylece sensör saati sonradan senkronize edilmiş veya saat dilimi kaymış olsa bile
-          // hiçbir kayıt 1970 yılına düşmez ve grafikte sahte zikzak/dalgalanma oluşmaz.
           const lastSample = rawSamples[rawSamples.length - 1];
           const nowMs = Date.now();
           const nowSec = Math.floor(nowMs / 1000);
@@ -990,7 +871,6 @@ class UniversalBleManager {
 
           let anchorMs = nowMs;
           if (lastSample.tc > 1600000000) {
-            // Eğer sensör RTC saati yerel saat dilimiyle (+3 saat vb.) kurulmuşsa UTC'ye normalize et
             if (lastSample.tc > nowSec + 1200 && Math.abs((lastSample.tc - tzOffsetSec) - nowSec) < 86400) {
               anchorMs = (lastSample.tc - tzOffsetSec) * 1000;
             } else if (lastSample.tc <= nowSec + 300 && (nowSec - lastSample.tc) < 14 * 86400) {
@@ -1033,29 +913,13 @@ class UniversalBleManager {
             if (latestRec.voltage != null) this.cachedVoltage = latestRec.voltage;
           }
 
-          // Cihaz saatini senkronize et (5 bayt)
-          try {
-            const timeNowSec = Math.floor(Date.now() / 1000);
-            const timePkt = new Uint8Array([
-              0x23,
-              timeNowSec & 0xff,
-              (timeNowSec >> 8) & 0xff,
-              (timeNowSec >> 16) & 0xff,
-              (timeNowSec >> 24) & 0xff
-            ]);
-            await this.sendAtcCommand(timePkt).catch(() => {});
-            if (this.onSensorTime) {
-              this.onSensorTime(timeNowSec * 1000);
-            }
-          } catch (e) {}
-
           resolve(records);
         } catch (err) {
           reject(err);
         }
       };
 
-      const resetTimeout = (delay = 3000) => {
+      const resetTimeout = (delay = 2500) => {
         if (timeoutTimer) clearTimeout(timeoutTimer);
         timeoutTimer = setTimeout(() => {
           finishDownload();
@@ -1069,13 +933,6 @@ class UniversalBleManager {
         if (cmdId !== 0x35) return;
 
         if (len >= 13) {
-          // 12 baytlık ölçüm kayıtları paketi (1 BLE paketinde birden fazla kayıt bulunabilir)
-          receivedAnyData = true;
-          if (retryTimer) {
-            clearInterval(retryTimer);
-            retryTimer = null;
-          }
-
           let offset = 1;
           while (offset + 12 <= len) {
             const cnt = val.getUint16(offset, true);
@@ -1085,66 +942,42 @@ class UniversalBleManager {
             const vb = val.getUint16(offset + 10, true);
             offset += 12;
 
-            // Sadece gerçekçi sıcaklık (-35..75°C), nem (0..100%) ve CR2032 voltaj (1500..3800mV) kayıtlarını kabul et
             if (tm >= -35 && tm <= 75 && hm > 0 && hm <= 100 && vb >= 1500 && vb <= 3800 && tc !== 0xffffffff) {
               rawSamples.push({ cnt, tc, tm, hm, vb });
             }
           }
 
-          const pct = Math.min(95, 10 + Math.round((rawSamples.length / Math.max(100, rawSamples.length + 40)) * 85));
+          const pct = Math.min(95, 10 + Math.round((rawSamples.length / Math.max(80, rawSamples.length + 30)) * 85));
           this.onHistoryProgress({
             active: true,
             percent: pct,
             message: `${rawSamples.length} kayıt indirildi...`
           });
-
-          // Paketler gelmeye devam ettiği sürece süreyi uzat (binlerce kaydın yarıda kesilmesini engeller)
-          resetTimeout(2800);
+          resetTimeout(2500);
         } else if (len >= 2 && len < 13) {
-          // 3 baytlık [0x35, cnt_lo, cnt_hi] paketi:
-          // Resmi PVVX yazılımında (GraphMemo.html) tüm kayıtlar gönderildikten sonra gelen "Memo End" paketidir!
+          // Memo End bildirimi
           if (rawSamples.length > 0) {
             finishDownload();
-            return;
-          }
-          const hdrCount = len >= 3 ? val.getUint16(1, true) : val.getUint8(1);
-          if (hdrCount === 0) {
-            resetTimeout(400);
           } else {
-            resetTimeout(2800);
+            resetTimeout(600);
           }
         }
       };
 
       try {
-        // Canlı telemetri bildirimlerini geçici olarak duraklat (paket çakışmasını engellemek için)
+        // Canlı akışı geçici duraklat
         await this.sendAtcCommand(new Uint8Array([0x33, 0x00])).catch(() => {});
-        await new Promise(r => setTimeout(r, 80));
+        await new Promise(r => setTimeout(r, 60));
 
-        // PVVX 0x35: Tüm bellek kayıtlarını talep et (count = 0xFFFF = 65535, start = 0x0000)
-        const requestAllRecordsCmd = new Uint8Array([0x35, 0xff, 0xff, 0x00, 0x00]);
-        await this.sendAtcCommand(requestAllRecordsCmd).catch(() => {});
-        resetTimeout(5000);
+        // 0x55 (config) göndererek flaş bellek yöneticisini uyandır
+        await this.sendAtcCommand(new Uint8Array([0x55])).catch(() => {});
+        await new Promise(r => setTimeout(r, 120));
 
-        // Eğer ilk 1.8 saniyede veri akışı başlamadıysa aynı komutu tekrar gönder (asla count=0 gönderme!)
-        retryTimer = setInterval(async () => {
-          if (receivedAnyData || hasCompleted) {
-            clearInterval(retryTimer);
-            retryTimer = null;
-            return;
-          }
-          attempt++;
-          if (attempt <= 2) {
-            await this.sendAtcCommand(requestAllRecordsCmd).catch(() => {});
-          } else {
-            clearInterval(retryTimer);
-            retryTimer = null;
-          }
-        }, 1800);
-
+        // 0x35: Tüm bellek kayıtlarını talep et (count = 0xFFFF, start = 0x0000)
+        await this.sendAtcCommand(new Uint8Array([0x35, 0xff, 0xff, 0x00, 0x00])).catch(() => {});
+        resetTimeout(4000);
       } catch (err) {
         if (timeoutTimer) clearTimeout(timeoutTimer);
-        if (retryTimer) clearInterval(retryTimer);
         this._atcHistoryHandler = null;
         reject(err);
       }
@@ -1168,8 +1001,13 @@ class UniversalBleManager {
 
   async disconnect() {
     if (this.device && this.device.gatt && this.device.gatt.connected) {
-      this.device.gatt.disconnect();
+      try {
+        this.device.gatt.disconnect();
+      } catch (e) {}
     }
+    this.server = null;
+    this.atcChar = null;
+    this.primaryService = null;
     this.isConnected = false;
     this.isConnecting = false;
     this.hasAtcLiveStream = false;
@@ -1177,6 +1015,9 @@ class UniversalBleManager {
   }
 
   handleDisconnect() {
+    this.server = null;
+    this.atcChar = null;
+    this.primaryService = null;
     this.isConnected = false;
     this.isConnecting = false;
     this.hasAtcLiveStream = false;
@@ -1308,19 +1149,8 @@ class AppController {
       this.updateChart();
     }
 
-    // Doğrudan otomatik bağlanmayı dene
+    // Doğrudan otomatik bağlanmayı dene (daha önce izin verildiyse)
     this.ble.tryAutoConnect().catch(() => {});
-
-    // İlk kullanıcı dokunuşunda anında bağlan
-    const fastConnectGesture = async () => {
-      if (!this.ble.isConnected && !this.ble.isConnecting) {
-        try {
-          await this.connectBluetooth();
-        } catch (e) {}
-      }
-      window.removeEventListener('pointerdown', fastConnectGesture);
-    };
-    window.addEventListener('pointerdown', fastConnectGesture, { once: true });
 
     window.addEventListener('resize', () => {
       if (this.chart) {
@@ -1508,16 +1338,16 @@ class AppController {
   }
 
   async syncDeviceHistory(isAuto = false) {
-    if (!this.ble.isConnected) {
+    if (!this.ble.isConnected || !this.ble.server || !this.ble.server.connected) {
       if (!isAuto) {
-        this.showToast('Önce Bluetooth ile cihaza bağlanmalısınız.', 'info');
+        this.showToast('Lütfen önce Bluetooth ile cihaza bağlanın.', 'info');
       }
       return;
     }
 
     if (this.isSyncing) {
       if (!isAuto) {
-        this.showToast('Veriler zaten aktarılıyor, lütfen bekleyin...', 'info');
+        this.showToast('Veriler aktarılıyor, lütfen bekleyin...', 'info');
       }
       return;
     }
@@ -1525,7 +1355,7 @@ class AppController {
     this.isSyncing = true;
     try {
       if (!isAuto) {
-        this.showToast('Sensör belleğindeki tüm kayıtlar indiriliyor...', 'info');
+        this.showToast('Sensör belleğindeki kayıtlar indiriliyor...', 'info');
       }
       const records = await this.ble.fetchDeviceHistory();
       if (records && records.length > 0) {
@@ -1546,10 +1376,10 @@ class AppController {
         }
         this.renderTable();
         this.updateChart();
-        this.showToast(`Sensör belleğinden ${records.length} kayıt eksiksiz aktarıldı.`, 'success');
+        this.showToast(`Sensör belleğinden ${records.length} kayıt aktarıldı.`, 'success');
       } else {
         if (!isAuto) {
-          this.showToast('Sensör belleğinde kayıtlı geçmiş veri bulunamadı.', 'info');
+          this.showToast('Sensör belleğinde yeni kayıt bulunamadı.', 'info');
         }
       }
     } catch (err) {
@@ -1573,13 +1403,13 @@ class AppController {
       } else {
         this.updateSensorClockDisplay();
       }
-      // Bağlantının oturması için 1.2 saniye bekle ve ardından geçmişi otomatik çek
+      // Bağlantının tam oturması için 1.8 saniye bekle ve ardından tek bir otomatik aktarım dene
       if (this._autoSyncTimer) clearTimeout(this._autoSyncTimer);
       this._autoSyncTimer = setTimeout(() => {
-        if (this.ble && this.ble.isConnected) {
+        if (this.ble && this.ble.isConnected && this.ble.server?.connected) {
           this.syncDeviceHistory(true);
         }
-      }, 1200);
+      }, 1800);
     } else {
       if (this._autoSyncTimer) {
         clearTimeout(this._autoSyncTimer);
@@ -2055,7 +1885,6 @@ class AppController {
       return;
     }
 
-    // Sensör flaş belleğindeki (~1960 kayıt) tüm noktaları kırpmadan doğrudan çiz
     const maxPoints = 2500;
     if (records.length > maxPoints) {
       const step = Math.ceil(records.length / maxPoints);
@@ -2197,6 +2026,9 @@ class AppController {
 
   showToast(message, type = 'info') {
     if (!this.dom.toastContainer) return;
+    // Bildirimlerin ekranda basamak gibi üst üste yığılmasını engelle
+    this.dom.toastContainer.innerHTML = '';
+
     const toast = document.createElement('div');
     const colors = {
       success: 'bg-emerald-600 text-white',
