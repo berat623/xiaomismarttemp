@@ -1,5 +1,5 @@
 /**
- * Xiaomi SmartTemp Pro — Ultra-Fast, Zero-Animation & Mobile/Desktop-Optimized Engine
+ * Xiaomi SmartTemp Pro — Ultra-Fast, Zero-Animation & Pastel Minimalist Engine
  * Instant BLE Auto-Connect to ATC_597941 & Complete Flash History Ingestion
  * 100% Offline-First Architecture (PWA & Web Bluetooth API)
  */
@@ -173,7 +173,6 @@ class TelemetryStorage {
     const formatted = TelemetryProcessor.format(record);
     if (!formatted) return null;
 
-    // Aynı saniye içinde birden fazla canlı bildirim geldiğinde birleştir
     if (this.records.length > 0) {
       const last = this.records[this.records.length - 1];
       if (last.type === 'live' && formatted.type === 'live' && Math.abs(formatted.timestamp - last.timestamp) < 1200) {
@@ -323,7 +322,6 @@ class UniversalBleManager {
                        devices.find(d => d.name && (d.name.includes('LYWSD') || d.name.includes('MHO') || d.name.includes('Thermo'))) ||
                        devices[0];
         if (target) {
-          console.log(`⚡ ${target.name} kayıtlı cihaz bulundu, bağlanılıyor...`);
           return await this.connectToDevice(target);
         }
       }
@@ -955,7 +953,6 @@ class UniversalBleManager {
           });
           resetTimeout(2500);
         } else if (len >= 2 && len < 13) {
-          // Memo End bildirimi
           if (rawSamples.length > 0) {
             finishDownload();
           } else {
@@ -965,15 +962,12 @@ class UniversalBleManager {
       };
 
       try {
-        // Canlı akışı geçici duraklat
         await this.sendAtcCommand(new Uint8Array([0x33, 0x00])).catch(() => {});
         await new Promise(r => setTimeout(r, 60));
 
-        // 0x55 (config) göndererek flaş bellek yöneticisini uyandır
         await this.sendAtcCommand(new Uint8Array([0x55])).catch(() => {});
         await new Promise(r => setTimeout(r, 120));
 
-        // 0x35: Tüm bellek kayıtlarını talep et (count = 0xFFFF, start = 0x0000)
         await this.sendAtcCommand(new Uint8Array([0x35, 0xff, 0xff, 0x00, 0x00])).catch(() => {});
         resetTimeout(4000);
       } catch (err) {
@@ -1033,6 +1027,11 @@ class AppController {
     this.storage = new TelemetryStorage();
     this.sensorClockOffset = 0;
     this.hasReceivedSensorClock = false;
+    this._clockTimer = null;
+    this._autoSyncTimer = null;
+    this._updateScheduled = false;
+    this.isSyncing = false;
+
     this.ble = new UniversalBleManager(
       (data) => this.handleNewData(data),
       (status, text) => this.handleBleStatus(status, text),
@@ -1048,9 +1047,6 @@ class AppController {
     this.latestTelemetry = null;
     this.latestBattery = null;
     this.latestVoltage = null;
-    this._autoSyncTimer = null;
-    this._updateScheduled = false;
-    this.isSyncing = false;
 
     this.cacheDomElements();
     this.init();
@@ -1115,7 +1111,6 @@ class AppController {
 
   async init() {
     this.initServiceWorker();
-    this.initLiveClock();
     this.applyTheme(this.currentTheme);
     lucide.createIcons();
     this.setupEventListeners();
@@ -1183,6 +1178,13 @@ class AppController {
     this.sensorClockOffset = validMs - Date.now();
     this.hasReceivedSensorClock = true;
     this.updateSensorClockDisplay();
+
+    // Sadece cihaz bağlıyken saat zamanlayıcısını çalıştır (boşta CPU harcamasını önle)
+    if (!this._clockTimer) {
+      this._clockTimer = setInterval(() => {
+        this.updateSensorClockDisplay();
+      }, 1000);
+    }
   }
 
   updateSensorClockDisplay() {
@@ -1199,13 +1201,6 @@ class AppController {
         second: '2-digit'
       });
     }
-  }
-
-  initLiveClock() {
-    this.updateSensorClockDisplay();
-    setInterval(() => {
-      this.updateSensorClockDisplay();
-    }, 1000);
   }
 
   setupEventListeners() {
@@ -1403,39 +1398,39 @@ class AppController {
       } else {
         this.updateSensorClockDisplay();
       }
-      // Bağlantının tam oturması için 1.8 saniye bekle ve ardından tek bir otomatik aktarım dene
-      if (this._autoSyncTimer) clearTimeout(this._autoSyncTimer);
-      this._autoSyncTimer = setTimeout(() => {
-        if (this.ble && this.ble.isConnected && this.ble.server?.connected) {
-          this.syncDeviceHistory(true);
-        }
-      }, 1800);
     } else {
+      if (this._clockTimer) {
+        clearInterval(this._clockTimer);
+        this._clockTimer = null;
+      }
       if (this._autoSyncTimer) {
         clearTimeout(this._autoSyncTimer);
         this._autoSyncTimer = null;
       }
-    }
-
-    // Durum Noktası
-    if (this.dom.sensorClockPulse) {
-      if (status === 'connected') {
-        this.dom.sensorClockPulse.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500 flex-shrink-0';
-      } else if (status === 'connecting' || status === 'scanning') {
-        this.dom.sensorClockPulse.className = 'w-2.5 h-2.5 rounded-full bg-amber-500 flex-shrink-0';
-      } else {
-        this.dom.sensorClockPulse.className = 'w-2.5 h-2.5 rounded-full bg-slate-400 dark:bg-slate-600 flex-shrink-0';
+      if (this.dom.liveClockTime) {
+        this.dom.liveClockTime.textContent = '--:--:--';
       }
     }
 
-    // Bağlan Butonu
+    // Durum Noktası (Pastel Tonlar)
+    if (this.dom.sensorClockPulse) {
+      if (status === 'connected') {
+        this.dom.sensorClockPulse.className = 'w-2.5 h-2.5 rounded-full bg-[#79b496] flex-shrink-0';
+      } else if (status === 'connecting' || status === 'scanning') {
+        this.dom.sensorClockPulse.className = 'w-2.5 h-2.5 rounded-full bg-[#e6b87d] flex-shrink-0';
+      } else {
+        this.dom.sensorClockPulse.className = 'w-2.5 h-2.5 rounded-full bg-[#a1abb8] flex-shrink-0';
+      }
+    }
+
+    // Bağlan Butonu (Pastel Tonlar)
     if (this.dom.btnConnect) {
       if (status === 'connected') {
         if (this.dom.btnConnectLabel) this.dom.btnConnectLabel.textContent = 'Bağlantıyı Kes';
-        this.dom.btnConnect.className = 'px-3 sm:px-4 py-2 rounded-full text-xs font-bold flex items-center gap-1.5 bg-[#ba1a1a] hover:bg-[#93000a] text-white shadow-sm cursor-pointer';
+        this.dom.btnConnect.className = 'px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 bg-[#c26d66] hover:bg-[#ab5852] text-white shadow-none cursor-pointer';
       } else {
         if (this.dom.btnConnectLabel) this.dom.btnConnectLabel.textContent = 'Bağlan';
-        this.dom.btnConnect.className = 'px-3 sm:px-4 py-2 rounded-full text-xs font-bold flex items-center gap-1.5 bg-[#0b57d0] hover:bg-[#0842a0] text-white shadow-sm cursor-pointer';
+        this.dom.btnConnect.className = 'px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 bg-[#546e7a] hover:bg-[#455a64] text-white shadow-none cursor-pointer';
       }
     }
   }
@@ -1480,7 +1475,7 @@ class AppController {
     // 1. Ana kartlar gecikmesiz, anında güncellenir
     this.renderTelemetryCards(enriched);
 
-    // 2. Tablo ve grafik güncellemeleri 60-90 FPS akıcılık için optimize edilir
+    // 2. Tablo ve grafik güncellemeleri akıcı şekilde optimize edilir
     this.scheduleVisualUpdate();
   }
 
@@ -1495,7 +1490,7 @@ class AppController {
   }
 
   renderTelemetryCards(data) {
-    // 1. Sıcaklık Kartı
+    // 1. Sıcaklık Kartı (Pastel Coral)
     const rawTemp = Number(data.temperature);
     let displayTemp = rawTemp;
     if (this.currentUnit === 'F') {
@@ -1508,7 +1503,7 @@ class AppController {
       this.dom.tempProgressBar.style.width = `${tempPct}%`;
     }
 
-    // 2. Bağıl Nem Kartı
+    // 2. Bağıl Nem Kartı (Pastel Teal)
     const humNum = Number(data.humidity);
     const humFormatted = !isNaN(humNum) ? humNum.toFixed(2) : data.humidity;
     if (this.dom.valHum) this.dom.valHum.textContent = humFormatted;
@@ -1519,17 +1514,17 @@ class AppController {
     if (this.dom.humidityStatusBadge) {
       if (humNum < 30) {
         this.dom.humidityStatusBadge.textContent = 'Kuru';
-        this.dom.humidityStatusBadge.className = 'text-[11px] px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 font-semibold';
+        this.dom.humidityStatusBadge.className = 'text-[11px] px-2 py-0.5 rounded-full bg-[#fcf5ec] text-[#9c6a28] dark:bg-[#2b2419] dark:text-[#e4b97a] border border-[#f5e3cc] dark:border-[#3e3322] font-medium';
       } else if (humNum > 60) {
         this.dom.humidityStatusBadge.textContent = 'Yüksek Nem';
-        this.dom.humidityStatusBadge.className = 'text-[11px] px-2.5 py-0.5 rounded-full bg-sky-100 text-[#0284c7] dark:bg-sky-950/80 dark:text-sky-300 font-semibold';
+        this.dom.humidityStatusBadge.className = 'text-[11px] px-2 py-0.5 rounded-full bg-[#eef4fb] text-[#3d6896] dark:bg-[#182433] dark:text-[#86b0de] border border-[#d5e4f5] dark:border-[#23354a] font-medium';
       } else {
         this.dom.humidityStatusBadge.textContent = 'İdeal';
-        this.dom.humidityStatusBadge.className = 'text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300 font-semibold';
+        this.dom.humidityStatusBadge.className = 'text-[11px] px-2 py-0.5 rounded-full bg-[#edf6f5] text-[#387671] dark:bg-[#1a2928] dark:text-[#88cec7] border border-[#d8ebe8] dark:border-[#243b39] font-medium';
       }
     }
 
-    // 3. Pil Voltajı Kartı (Doğrudan Voltaj V Gösterimi)
+    // 3. Pil Voltajı Kartı (Pastel Sage Green)
     const effectiveBattery = data.battery != null ? data.battery : this.latestBattery;
     let effectiveVoltage = data.voltage != null ? Number(data.voltage) : (this.latestVoltage != null ? Number(this.latestVoltage) : null);
 
@@ -1537,42 +1532,41 @@ class AppController {
       effectiveVoltage = Number((2.1 + (Number(effectiveBattery) / 100) * 0.9).toFixed(2));
     }
 
-    // Ana büyük değer: Doğrudan Voltaj (örn. 2.98)
     if (this.dom.valBattery) {
       this.dom.valBattery.textContent = (effectiveVoltage != null && !isNaN(effectiveVoltage))
         ? effectiveVoltage.toFixed(2)
         : '--.--';
     }
 
-    // Sağ üst rozet: mV ve Voltaj Durumu (Yüzde yerine doğrudan mV / Durum)
+    // Sağ üst rozet
     if (this.dom.valVoltageBadge) {
       if (effectiveVoltage != null && !isNaN(effectiveVoltage)) {
         const mv = Math.round(effectiveVoltage * 1000);
         const stateLabel = effectiveVoltage >= 2.75 ? 'İyi' : (effectiveVoltage >= 2.45 ? 'Orta' : 'Düşük');
         this.dom.valVoltageBadge.textContent = `${mv} mV · ${stateLabel}`;
         if (effectiveVoltage < 2.45) {
-          this.dom.valVoltageBadge.className = 'text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300';
+          this.dom.valVoltageBadge.className = 'text-[11px] font-mono font-medium px-2 py-0.5 rounded-full bg-[#faeceb] text-[#9e433e] dark:bg-[#2b1c1b] dark:text-[#e88d88] border border-[#f2d8d6] dark:border-[#3d2726]';
         } else if (effectiveVoltage < 2.75) {
-          this.dom.valVoltageBadge.className = 'text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950/80 dark:text-amber-300';
+          this.dom.valVoltageBadge.className = 'text-[11px] font-mono font-medium px-2 py-0.5 rounded-full bg-[#fcf5ec] text-[#9c6a28] dark:bg-[#2b2419] dark:text-[#e4b97a] border border-[#f5e3cc] dark:border-[#3e3322]';
         } else {
-          this.dom.valVoltageBadge.className = 'text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300';
+          this.dom.valVoltageBadge.className = 'text-[11px] font-mono font-medium px-2 py-0.5 rounded-full bg-[#eef5f0] text-[#436e53] dark:bg-[#1c2921] dark:text-[#97d0ab] border border-[#d9ebd8] dark:border-[#283b2f]';
         }
       } else {
         this.dom.valVoltageBadge.textContent = '-- mV';
       }
     }
 
-    // Voltaj çubuğu (2.10V = %0, 3.10V = %100)
+    // Voltaj çubuğu
     if (this.dom.batteryProgressBar) {
       if (effectiveVoltage != null && !isNaN(effectiveVoltage)) {
         const voltPct = Math.min(100, Math.max(5, Math.round(((effectiveVoltage - 2.1) / 1.0) * 100)));
         this.dom.batteryProgressBar.style.width = `${voltPct}%`;
         if (effectiveVoltage < 2.45) {
-          this.dom.batteryProgressBar.className = 'h-full bg-rose-500 rounded-full';
+          this.dom.batteryProgressBar.className = 'h-full bg-[#c26d66] dark:bg-[#e88d88] rounded-full';
         } else if (effectiveVoltage < 2.75) {
-          this.dom.batteryProgressBar.className = 'h-full bg-amber-500 rounded-full';
+          this.dom.batteryProgressBar.className = 'h-full bg-[#d99b43] dark:bg-[#e4b97a] rounded-full';
         } else {
-          this.dom.batteryProgressBar.className = 'h-full bg-emerald-500 rounded-full';
+          this.dom.batteryProgressBar.className = 'h-full bg-[#588b6b] dark:bg-[#83c299] rounded-full';
         }
       } else {
         this.dom.batteryProgressBar.style.width = '0%';
@@ -1591,7 +1585,7 @@ class AppController {
       if (this.dom.historyTableBody) {
         this.dom.historyTableBody.innerHTML = `
           <tr>
-            <td colspan="4" class="py-6 text-center text-slate-400 dark:text-slate-500 font-sans">
+            <td colspan="4" class="py-6 text-center text-[#7a828e] dark:text-[#8f96a3] font-sans">
               Henüz kayıt bulunmuyor.
             </td>
           </tr>
@@ -1632,11 +1626,11 @@ class AppController {
         }
 
         return `
-          <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-            <td class="py-2 px-2.5 sm:px-3 text-slate-600 dark:text-slate-300 font-sans">${timeStr}</td>
-            <td class="py-2 px-2 sm:px-3 font-bold text-[#0b57d0] dark:text-[#a8c7fa]">${t.toFixed(2)}°${this.currentUnit}</td>
-            <td class="py-2 px-2 sm:px-3 font-semibold text-sky-600 dark:text-sky-400">%${humNum.toFixed(1)}</td>
-            <td class="py-2 px-2 sm:px-3 font-semibold text-emerald-600 dark:text-emerald-400">${voltStr}</td>
+          <tr class="hover:bg-[#f6f8fa]/60 dark:hover:bg-[#1e232c]/50">
+            <td class="py-2 px-2.5 sm:px-3 text-[#525a66] dark:text-[#a1abb8] font-sans">${timeStr}</td>
+            <td class="py-2 px-2 sm:px-3 font-bold text-[#d97757] dark:text-[#f09985]">${t.toFixed(2)}°${this.currentUnit}</td>
+            <td class="py-2 px-2 sm:px-3 font-semibold text-[#4a908a] dark:text-[#76beb7]">%${humNum.toFixed(1)}</td>
+            <td class="py-2 px-2 sm:px-3 font-semibold text-[#588b6b] dark:text-[#83c299]">${voltStr}</td>
           </tr>
         `;
       }).join('');
@@ -1648,17 +1642,18 @@ class AppController {
     const isDark = this.currentTheme === 'dark';
     const isMobile = window.innerWidth < 640;
 
-    const tempGradient = ctx.createLinearGradient(0, 0, 0, 360);
-    tempGradient.addColorStop(0, isDark ? 'rgba(96, 165, 250, 0.32)' : 'rgba(11, 87, 208, 0.20)');
-    tempGradient.addColorStop(1, 'rgba(11, 87, 208, 0.0)');
+    // Pastel Gradients
+    const tempGradient = ctx.createLinearGradient(0, 0, 0, 320);
+    tempGradient.addColorStop(0, isDark ? 'rgba(240, 153, 133, 0.20)' : 'rgba(217, 119, 87, 0.14)');
+    tempGradient.addColorStop(1, 'rgba(217, 119, 87, 0.0)');
 
-    const humGradient = ctx.createLinearGradient(0, 0, 0, 360);
-    humGradient.addColorStop(0, isDark ? 'rgba(56, 189, 248, 0.28)' : 'rgba(2, 132, 199, 0.18)');
-    humGradient.addColorStop(1, 'rgba(2, 132, 199, 0.0)');
+    const humGradient = ctx.createLinearGradient(0, 0, 0, 320);
+    humGradient.addColorStop(0, isDark ? 'rgba(118, 190, 183, 0.20)' : 'rgba(74, 144, 138, 0.14)');
+    humGradient.addColorStop(1, 'rgba(74, 144, 138, 0.0)');
 
-    const batGradient = ctx.createLinearGradient(0, 0, 0, 360);
-    batGradient.addColorStop(0, isDark ? 'rgba(52, 211, 153, 0.28)' : 'rgba(16, 185, 129, 0.18)');
-    batGradient.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+    const batGradient = ctx.createLinearGradient(0, 0, 0, 320);
+    batGradient.addColorStop(0, isDark ? 'rgba(131, 194, 153, 0.20)' : 'rgba(88, 139, 107, 0.14)');
+    batGradient.addColorStop(1, 'rgba(88, 139, 107, 0.0)');
 
     this.chart = new Chart(ctx, {
       type: 'line',
@@ -1666,10 +1661,10 @@ class AppController {
         labels: [],
         datasets: [
           {
-            // 0: Sıcaklık
+            // 0: Sıcaklık (Pastel Coral)
             label: 'Sıcaklık',
             data: [],
-            borderColor: isDark ? '#60a5fa' : '#0b57d0',
+            borderColor: isDark ? '#f09985' : '#d97757',
             backgroundColor: tempGradient,
             borderWidth: 2,
             fill: true,
@@ -1679,16 +1674,16 @@ class AppController {
             pointRadius: 0,
             pointHoverRadius: 5,
             pointHitRadius: 14,
-            pointBackgroundColor: isDark ? '#60a5fa' : '#0b57d0',
+            pointBackgroundColor: isDark ? '#f09985' : '#d97757',
             pointBorderColor: '#ffffff',
             pointBorderWidth: 1.5,
             yAxisID: 'yTemp'
           },
           {
-            // 1: Bağıl Nem
+            // 1: Bağıl Nem (Pastel Teal)
             label: 'Bağıl Nem',
             data: [],
-            borderColor: '#0284c7',
+            borderColor: isDark ? '#76beb7' : '#4a908a',
             backgroundColor: humGradient,
             borderWidth: 2,
             fill: true,
@@ -1698,16 +1693,16 @@ class AppController {
             pointRadius: 0,
             pointHoverRadius: 5,
             pointHitRadius: 14,
-            pointBackgroundColor: '#0284c7',
+            pointBackgroundColor: isDark ? '#76beb7' : '#4a908a',
             pointBorderColor: '#ffffff',
             pointBorderWidth: 1.5,
             yAxisID: 'yHum'
           },
           {
-            // 2: Pil Voltajı (V)
+            // 2: Pil Voltajı (Pastel Sage)
             label: 'Pil Voltajı (V)',
             data: [],
-            borderColor: '#10b981',
+            borderColor: isDark ? '#83c299' : '#588b6b',
             backgroundColor: batGradient,
             borderWidth: 2,
             fill: true,
@@ -1717,7 +1712,7 @@ class AppController {
             pointRadius: 0,
             pointHoverRadius: 5,
             pointHitRadius: 14,
-            pointBackgroundColor: '#10b981',
+            pointBackgroundColor: isDark ? '#83c299' : '#588b6b',
             pointBorderColor: '#ffffff',
             pointBorderWidth: 1.5,
             yAxisID: 'yBat'
@@ -1740,13 +1735,13 @@ class AppController {
           tooltip: {
             enabled: true,
             animation: false,
-            backgroundColor: isDark ? 'rgba(12, 19, 28, 0.96)' : 'rgba(255, 255, 255, 0.98)',
-            borderColor: isDark ? 'rgba(168, 199, 250, 0.25)' : 'rgba(11, 87, 208, 0.2)',
-            borderWidth: 1.5,
-            titleColor: isDark ? '#f8fafd' : '#041e49',
-            bodyColor: isDark ? '#cbd5e1' : '#334155',
-            padding: 10,
-            cornerRadius: 12,
+            backgroundColor: isDark ? 'rgba(24, 28, 34, 0.98)' : 'rgba(255, 255, 255, 0.98)',
+            borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#e2e6eb',
+            borderWidth: 1,
+            titleColor: isDark ? '#f0f2f5' : '#2d3139',
+            bodyColor: isDark ? '#c5cbd4' : '#525a66',
+            padding: 8,
+            cornerRadius: 10,
             boxPadding: 4,
             usePointStyle: true,
             bodyFont: { family: 'Parkinsans', size: 12, weight: 500 },
@@ -1780,12 +1775,12 @@ class AppController {
         scales: {
           x: {
             grid: {
-              color: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
+              color: isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.03)',
               borderDash: [3, 3],
               drawBorder: false
             },
             ticks: {
-              color: isDark ? '#64748b' : '#94a3b8',
+              color: isDark ? '#7a828e' : '#8e96a3',
               font: { family: 'Parkinsans', size: isMobile ? 10 : 11, weight: 600 },
               maxTicksLimit: isMobile ? 5 : 9
             }
@@ -1795,12 +1790,12 @@ class AppController {
             display: true,
             position: 'left',
             grid: {
-              color: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
+              color: isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.03)',
               borderDash: [3, 3],
               drawBorder: false
             },
             ticks: {
-              color: isDark ? '#a8c7fa' : '#0b57d0',
+              color: isDark ? '#f09985' : '#d97757',
               font: { family: 'Parkinsans', size: isMobile ? 10 : 11, weight: 600 },
               callback: (v) => `${Number(v).toFixed(1)}°`
             },
@@ -1812,7 +1807,7 @@ class AppController {
             position: 'right',
             grid: { drawOnChartArea: false },
             ticks: {
-              color: '#0284c7',
+              color: isDark ? '#76beb7' : '#4a908a',
               font: { family: 'Parkinsans', size: isMobile ? 10 : 11, weight: 600 },
               callback: (v) => `%${Number(v).toFixed(0)}`
             },
@@ -1826,7 +1821,7 @@ class AppController {
             position: 'right',
             grid: { drawOnChartArea: false },
             ticks: {
-              color: '#10b981',
+              color: isDark ? '#83c299' : '#588b6b',
               font: { family: 'Parkinsans', size: isMobile ? 10 : 11, weight: 600 },
               callback: (v) => `${Number(v).toFixed(2)} V`
             },
@@ -1843,18 +1838,22 @@ class AppController {
     if (!this.chart) return;
     const isDark = this.currentTheme === 'dark';
 
-    this.chart.options.plugins.tooltip.backgroundColor = isDark ? 'rgba(12, 19, 28, 0.96)' : 'rgba(255, 255, 255, 0.98)';
-    this.chart.options.plugins.tooltip.borderColor = isDark ? 'rgba(168, 199, 250, 0.25)' : 'rgba(11, 87, 208, 0.2)';
-    this.chart.options.plugins.tooltip.titleColor = isDark ? '#f8fafd' : '#041e49';
-    this.chart.options.plugins.tooltip.bodyColor = isDark ? '#cbd5e1' : '#334155';
+    this.chart.options.plugins.tooltip.backgroundColor = isDark ? 'rgba(24, 28, 34, 0.98)' : 'rgba(255, 255, 255, 0.98)';
+    this.chart.options.plugins.tooltip.borderColor = isDark ? 'rgba(255, 255, 255, 0.08)' : '#e2e6eb';
+    this.chart.options.plugins.tooltip.titleColor = isDark ? '#f0f2f5' : '#2d3139';
+    this.chart.options.plugins.tooltip.bodyColor = isDark ? '#c5cbd4' : '#525a66';
 
-    this.chart.options.scales.x.grid.color = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
-    this.chart.options.scales.yTemp.grid.color = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
-    this.chart.options.scales.x.ticks.color = isDark ? '#64748b' : '#94a3b8';
-    this.chart.options.scales.yTemp.ticks.color = isDark ? '#a8c7fa' : '#0b57d0';
+    this.chart.options.scales.x.grid.color = isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.03)';
+    this.chart.options.scales.yTemp.grid.color = isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.03)';
+    this.chart.options.scales.x.ticks.color = isDark ? '#7a828e' : '#8e96a3';
+    this.chart.options.scales.yTemp.ticks.color = isDark ? '#f09985' : '#d97757';
 
-    this.chart.data.datasets[0].borderColor = isDark ? '#60a5fa' : '#0b57d0';
-    this.chart.data.datasets[0].pointBackgroundColor = isDark ? '#60a5fa' : '#0b57d0';
+    this.chart.data.datasets[0].borderColor = isDark ? '#f09985' : '#d97757';
+    this.chart.data.datasets[0].pointBackgroundColor = isDark ? '#f09985' : '#d97757';
+    this.chart.data.datasets[1].borderColor = isDark ? '#76beb7' : '#4a908a';
+    this.chart.data.datasets[1].pointBackgroundColor = isDark ? '#76beb7' : '#4a908a';
+    this.chart.data.datasets[2].borderColor = isDark ? '#83c299' : '#588b6b';
+    this.chart.data.datasets[2].pointBackgroundColor = isDark ? '#83c299' : '#588b6b';
 
     this.chart.update('none');
   }
@@ -2011,13 +2010,13 @@ class AppController {
       html.classList.remove('light');
       if (this.dom.themeIcon) this.dom.themeIcon.setAttribute('data-lucide', 'sun');
       const meta = document.getElementById('metaThemeColor');
-      if (meta) meta.setAttribute('content', '#0c131c');
+      if (meta) meta.setAttribute('content', '#121519');
     } else {
       html.classList.remove('dark');
       html.classList.add('light');
       if (this.dom.themeIcon) this.dom.themeIcon.setAttribute('data-lucide', 'moon');
       const meta = document.getElementById('metaThemeColor');
-      if (meta) meta.setAttribute('content', '#f8fafc');
+      if (meta) meta.setAttribute('content', '#fbfbfa');
     }
 
     lucide.createIcons();
@@ -2026,16 +2025,15 @@ class AppController {
 
   showToast(message, type = 'info') {
     if (!this.dom.toastContainer) return;
-    // Bildirimlerin ekranda basamak gibi üst üste yığılmasını engelle
     this.dom.toastContainer.innerHTML = '';
 
     const toast = document.createElement('div');
     const colors = {
-      success: 'bg-emerald-600 text-white',
-      error: 'bg-rose-600 text-white',
-      info: 'bg-slate-900 dark:bg-slate-800 text-white'
+      success: 'bg-[#4a7c59] text-[#f2f9f5] border border-[#588b6b]/30',
+      error: 'bg-[#a3534d] text-[#fdf3f2] border border-[#c26d66]/30',
+      info: 'bg-[#3f4d5e] text-[#f0f3f6] border border-[#546e7a]/30'
     };
-    toast.className = `p-3 rounded-2xl shadow-lg text-xs font-semibold flex items-center justify-between gap-2 pointer-events-auto ${colors[type] || colors.info}`;
+    toast.className = `p-3 rounded-2xl shadow-sm text-xs font-semibold flex items-center justify-between gap-2 pointer-events-auto ${colors[type] || colors.info}`;
     toast.textContent = message;
 
     this.dom.toastContainer.appendChild(toast);

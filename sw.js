@@ -4,7 +4,7 @@
  * Bluetooth BLE sensor telemetry operates locally via Web Bluetooth API.
  */
 
-const CACHE_NAME = 'xiaomi-smarttemp-v4.3';
+const CACHE_NAME = 'xiaomi-smarttemp-v4.4';
 
 const PRECACHE_ASSETS = [
   './',
@@ -46,7 +46,7 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// 3. Fetch: Cache-First strategy with background revalidation
+// 3. Fetch: Clean Cache-First Strategy with Zero Unnecessary Background Network Calls
 self.addEventListener('fetch', (event) => {
   const request = event.request;
 
@@ -57,22 +57,11 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(request).then((cachedResponse) => {
       if (cachedResponse) {
-        // Return instantly from cache for 0ms offline latency
-        // Revalidate in background if online to update cache silently
-        fetch(request).then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(request, networkResponse.clone());
-            });
-          }
-        }).catch(() => {
-          // Device is offline; cachedResponse handles the request flawlessly
-        });
-
+        // Return instantly from cache for 0ms offline latency with zero redundant background network traffic
         return cachedResponse;
       }
 
-      // If not in cache yet, fetch from network and store in cache
+      // If not in cache, fetch from network and store in cache
       return fetch(request).then((networkResponse) => {
         if (!networkResponse || networkResponse.status !== 200) {
           return networkResponse;
