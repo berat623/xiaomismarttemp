@@ -396,26 +396,15 @@ class UniversalBleManager {
 
     this.onStatus('connecting', `${devName} bağlanıyor...`);
 
-    // Önceki bağlantı kalıntısını temizle
-    if (this.device.gatt && this.device.gatt.connected) {
-      try {
-        this.device.gatt.disconnect();
-        await new Promise(r => setTimeout(r, 200));
-      } catch (e) {}
-    }
-
+    // Önceki bağlantı dinleyicisini temizle
     this.device.removeEventListener?.('gattserverdisconnected', this._boundDisconnect);
     this._boundDisconnect = () => this.handleDisconnect();
     this.device.addEventListener('gattserverdisconnected', this._boundDisconnect);
 
-    // GATT Bağlantısını kur (Telink uyku durumuna karşı 3 kez güvenli deneme)
+    // Hızlı doğrudan GATT bağlantısı (Gereksiz bekleme ve döngüler kaldırıldı)
     let lastError = null;
-    for (let attempt = 1; attempt <= 3; attempt++) {
+    for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        if (attempt > 1) {
-          this.onStatus('connecting', `${devName} bağlanıyor (${attempt}/3)...`);
-          await new Promise(r => setTimeout(r, 450));
-        }
         this.server = await this.device.gatt.connect();
         if (this.server && this.server.connected) {
           break;
@@ -430,10 +419,10 @@ class UniversalBleManager {
       this.isConnected = false;
       this.isConnecting = false;
       this.onStatus('disconnected', 'GATT bağlantısı kurulamadı.');
-      throw (lastError || new Error('Cihaza bağlanılamadı. Lütfen cihazın yakınında olduğundan emin olun.'));
+      throw (lastError || new Error('Cihaza bağlanılamadı.'));
     }
 
-    // GATT Servislerini Keşfet ve Karakteristikleri Bağla
+    // GATT Servislerini Keşfet ve Karakteristikleri Anında Bağla
     await this.setupGattProfiles();
 
     this.isConnected = true;
@@ -449,9 +438,7 @@ class UniversalBleManager {
   }
 
   async setupGattProfiles() {
-    let bound = false;
-
-    // 1. ATC / PVVX Custom Control Servisini (0x1F10 -> 0x1F1F) Keşfet
+    // 1. ATC / PVVX Custom Control Servisini (0x1F10 -> 0x1F1F) Keşfet (En hızlı ve birincil profil)
     try {
       const atcService = await this.server.getPrimaryService('00001f10-0000-1000-8000-00805f9b34fb')
         .catch(() => this.server.getPrimaryService(0x1f10)).catch(() => null);
@@ -468,7 +455,7 @@ class UniversalBleManager {
           });
           await atcChar.startNotifications().catch(() => {});
 
-          // RTC senkronizasyonu (0x23 + uint32 epoch)
+          // RTC donanım saat senkronizasyonu (0x23 + uint32 epoch)
           const nowSec = Math.floor(Date.now() / 1000);
           const timeCmd = new Uint8Array([
             0x23,
@@ -479,22 +466,19 @@ class UniversalBleManager {
           ]);
           await this.sendAtcCommand(timeCmd).catch(() => {});
 
-          // Konfigürasyon ve flaş belleği hazırla (0x55)
-          await new Promise(r => setTimeout(r, 100));
-          await this.sendAtcCommand(new Uint8Array([0x55])).catch(() => {});
-
-          // Canlı telemetri akışını başlat (0x33, 0x01)
-          await new Promise(r => setTimeout(r, 100));
+          // Canlı telemetri akışını başlat (0x33, 0x01) — pil voltajı, sıcaklık ve nemi tek pakette gecikmesiz getirir
           await this.sendAtcCommand(new Uint8Array([0x33, 0x01])).catch(() => {});
 
-          bound = true;
+          // ATC firmware bağlandı! Olmayan 0x180F pil servisini arayıp 2.5 sn timeout beklemeyi engelle ve hemen çık.
+          return;
         }
       }
     } catch (e) {
       console.warn('ATC GATT servisi başlatılamadı:', e);
     }
 
-    // 2. Standart Pil Servisini (0x180F) Oku
+    // 2. Standart Pil Servisini (0x180F) Oku (Yalnızca ATC servisi yoksa fallback olarak)
+    let bound = false;
     await this.readBatterySafely();
 
     // 3. Standart Çevre Algılama Servisi (0x181A)
@@ -1074,15 +1058,12 @@ class AppController {
       valTemp: document.getElementById('valTemp'),
       lblTempUnit: document.getElementById('lblTempUnit'),
       btnToggleUnit: document.getElementById('btnToggleUnit'),
-      tempProgressBar: document.getElementById('tempProgressBar'),
 
       valHum: document.getElementById('valHum'),
       humidityStatusBadge: document.getElementById('humidityStatusBadge'),
-      humProgressBar: document.getElementById('humProgressBar'),
 
       valBattery: document.getElementById('valBattery'),
       valVoltageBadge: document.getElementById('valVoltageBadge'),
-      batteryProgressBar: document.getElementById('batteryProgressBar'),
 
       // Chart
       chartCard: document.getElementById('chartCard'),
@@ -1498,29 +1479,22 @@ class AppController {
     }
     if (this.dom.valTemp) this.dom.valTemp.textContent = displayTemp.toFixed(2);
     if (this.dom.lblTempUnit) this.dom.lblTempUnit.textContent = `°${this.currentUnit}`;
-    if (this.dom.tempProgressBar) {
-      const tempPct = Math.min(100, Math.max(5, ((rawTemp + 5) / 50) * 100));
-      this.dom.tempProgressBar.style.width = `${tempPct}%`;
-    }
 
     // 2. Bağıl Nem Kartı (Pastel Teal)
     const humNum = Number(data.humidity);
     const humFormatted = !isNaN(humNum) ? humNum.toFixed(2) : data.humidity;
     if (this.dom.valHum) this.dom.valHum.textContent = humFormatted;
-    if (this.dom.humProgressBar) {
-      this.dom.humProgressBar.style.width = `${Math.min(100, Math.max(0, humNum))}%`;
-    }
 
     if (this.dom.humidityStatusBadge) {
       if (humNum < 30) {
         this.dom.humidityStatusBadge.textContent = 'Kuru';
-        this.dom.humidityStatusBadge.className = 'text-[11px] px-2 py-0.5 rounded-full bg-[#fcf5ec] text-[#9c6a28] dark:bg-[#2b2419] dark:text-[#e4b97a] border border-[#f5e3cc] dark:border-[#3e3322] font-medium';
+        this.dom.humidityStatusBadge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-[#fcf5ec] text-[#9c6a28] dark:bg-[#2b2419] dark:text-[#e4b97a] border border-[#f5e3cc] dark:border-[#3e3322] font-medium';
       } else if (humNum > 60) {
         this.dom.humidityStatusBadge.textContent = 'Yüksek Nem';
-        this.dom.humidityStatusBadge.className = 'text-[11px] px-2 py-0.5 rounded-full bg-[#eef4fb] text-[#3d6896] dark:bg-[#182433] dark:text-[#86b0de] border border-[#d5e4f5] dark:border-[#23354a] font-medium';
+        this.dom.humidityStatusBadge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-[#eef4fb] text-[#3d6896] dark:bg-[#182433] dark:text-[#86b0de] border border-[#d5e4f5] dark:border-[#23354a] font-medium';
       } else {
         this.dom.humidityStatusBadge.textContent = 'İdeal';
-        this.dom.humidityStatusBadge.className = 'text-[11px] px-2 py-0.5 rounded-full bg-[#edf6f5] text-[#387671] dark:bg-[#1a2928] dark:text-[#88cec7] border border-[#d8ebe8] dark:border-[#243b39] font-medium';
+        this.dom.humidityStatusBadge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-[#edf6f5] text-[#387671] dark:bg-[#1a2928] dark:text-[#88cec7] border border-[#d8ebe8] dark:border-[#243b39] font-medium';
       }
     }
 
@@ -1538,38 +1512,21 @@ class AppController {
         : '--.--';
     }
 
-    // Sağ üst rozet
+    // Sağ üst voltaj rozeti
     if (this.dom.valVoltageBadge) {
       if (effectiveVoltage != null && !isNaN(effectiveVoltage)) {
         const mv = Math.round(effectiveVoltage * 1000);
         const stateLabel = effectiveVoltage >= 2.75 ? 'İyi' : (effectiveVoltage >= 2.45 ? 'Orta' : 'Düşük');
         this.dom.valVoltageBadge.textContent = `${mv} mV · ${stateLabel}`;
         if (effectiveVoltage < 2.45) {
-          this.dom.valVoltageBadge.className = 'text-[11px] font-mono font-medium px-2 py-0.5 rounded-full bg-[#faeceb] text-[#9e433e] dark:bg-[#2b1c1b] dark:text-[#e88d88] border border-[#f2d8d6] dark:border-[#3d2726]';
+          this.dom.valVoltageBadge.className = 'text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-[#faeceb] text-[#9e433e] dark:bg-[#2b1c1b] dark:text-[#e88d88] border border-[#f2d8d6] dark:border-[#3d2726]';
         } else if (effectiveVoltage < 2.75) {
-          this.dom.valVoltageBadge.className = 'text-[11px] font-mono font-medium px-2 py-0.5 rounded-full bg-[#fcf5ec] text-[#9c6a28] dark:bg-[#2b2419] dark:text-[#e4b97a] border border-[#f5e3cc] dark:border-[#3e3322]';
+          this.dom.valVoltageBadge.className = 'text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-[#fcf5ec] text-[#9c6a28] dark:bg-[#2b2419] dark:text-[#e4b97a] border border-[#f5e3cc] dark:border-[#3e3322]';
         } else {
-          this.dom.valVoltageBadge.className = 'text-[11px] font-mono font-medium px-2 py-0.5 rounded-full bg-[#eef5f0] text-[#436e53] dark:bg-[#1c2921] dark:text-[#97d0ab] border border-[#d9ebd8] dark:border-[#283b2f]';
+          this.dom.valVoltageBadge.className = 'text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-[#eef5f0] text-[#436e53] dark:bg-[#1c2921] dark:text-[#97d0ab] border border-[#d9ebd8] dark:border-[#283b2f]';
         }
       } else {
         this.dom.valVoltageBadge.textContent = '-- mV';
-      }
-    }
-
-    // Voltaj çubuğu
-    if (this.dom.batteryProgressBar) {
-      if (effectiveVoltage != null && !isNaN(effectiveVoltage)) {
-        const voltPct = Math.min(100, Math.max(5, Math.round(((effectiveVoltage - 2.1) / 1.0) * 100)));
-        this.dom.batteryProgressBar.style.width = `${voltPct}%`;
-        if (effectiveVoltage < 2.45) {
-          this.dom.batteryProgressBar.className = 'h-full bg-[#c26d66] dark:bg-[#e88d88] rounded-full';
-        } else if (effectiveVoltage < 2.75) {
-          this.dom.batteryProgressBar.className = 'h-full bg-[#d99b43] dark:bg-[#e4b97a] rounded-full';
-        } else {
-          this.dom.batteryProgressBar.className = 'h-full bg-[#588b6b] dark:bg-[#83c299] rounded-full';
-        }
-      } else {
-        this.dom.batteryProgressBar.style.width = '0%';
       }
     }
   }
