@@ -396,13 +396,13 @@ class AladinService {
   }
 
   async fetchSingleStep(step, tarihParam) {
-    const queryParams = `enlem=${this.enlem}&boylam=${this.boylam}&tarih=${tarihParam}&step=${step}`;
+    const queryParams = `enlem=${this.enlem}&boylam=${this.boylam}&tarih=${tarihParam}&step=${step}&_t=${Date.now()}`;
     const targetUrl = `https://modelservis.mgm.gov.tr/web/modeltahmin/lokasyon/light3?${queryParams}`;
 
     // 1. Yerel Node.js Server Proxy (node server.js ile çalıştırılıyorsa)
     try {
       const localUrl = `/api/aladin?${queryParams}`;
-      const res = await fetch(localUrl, { signal: AbortSignal.timeout(3000) });
+      const res = await fetch(localUrl, { signal: AbortSignal.timeout(3500) });
       if (res.ok) {
         const json = await res.json();
         if (Array.isArray(json) && json.length > 0 && json[0].sicaklik !== undefined) {
@@ -421,7 +421,7 @@ class AladinService {
           'Origin': 'https://www.mgm.gov.tr',
           'Referer': 'https://www.mgm.gov.tr/'
         },
-        signal: AbortSignal.timeout(4000)
+        signal: AbortSignal.timeout(4500)
       });
 
       if (res.status === 403) {
@@ -441,22 +441,24 @@ class AladinService {
   }
 
   async fetchFullForecast(onProgress) {
-    if (this.isFetching) return this.records;
+    if (this.isFetching) {
+      return { success: false, count: 0, isNewData: false, records: this.records, error: 'Sorgulama işlemi sürüyor' };
+    }
     this.isFetching = true;
 
     try {
       const now = new Date();
       const tarihParam = this.getFormattedModelDate(now);
 
-      const maxHours = 72; // ALADIN sayısal model çıktısı (72 saate kadar veri üretir)
+      const maxHours = 58; // MGM ALADIN model çıktısı maksimum 58 saate kadar tahmin üretir
       const hours = Array.from({ length: maxHours }, (_, i) => i + 1);
       const results = [];
-      const batchSize = 10;
+      const batchSize = 6;
 
       let emptyConsecutiveCount = 0;
 
       for (let i = 0; i < hours.length; i += batchSize) {
-        if (emptyConsecutiveCount >= 3) break;
+        if (emptyConsecutiveCount >= 2) break;
 
         const batch = hours.slice(i, i + batchSize);
         const batchPromises = batch.map(h => this.fetchSingleStep(h * 60, tarihParam));
@@ -464,7 +466,7 @@ class AladinService {
 
         for (let b = 0; b < batchResults.length; b++) {
           const item = batchResults[b];
-          if (item) {
+          if (item && item.sicaklik !== undefined) {
             results.push(item);
             emptyConsecutiveCount = 0;
           } else {
@@ -478,14 +480,19 @@ class AladinService {
         }
       }
 
+      // Sadece sunucudan sahiden yeni ve dolu veri geldiyse güncelle ve kaydet
       if (results.length > 0) {
         results.sort((a, b) => new Date(a.yolSaati || a.tarih) - new Date(b.yolSaati || b.tarih));
         this.records = results;
         this.lastUpdated = new Date();
         this.saveCache();
+        return { success: true, count: results.length, isNewData: true, records: results };
       }
 
-      return this.records;
+      // Yeni veri çekilemediyse: Asla lastUpdated zamanını yenileme, sahte güncelleme yapma!
+      return { success: false, count: 0, isNewData: false, records: this.records, error: 'MGM API yanıt vermedi veya CORS engeli var' };
+    } catch (err) {
+      return { success: false, count: 0, isNewData: false, records: this.records, error: err.message };
     } finally {
       this.isFetching = false;
     }
@@ -930,21 +937,48 @@ class AladinUIController {
 
   async refreshData(isSilent = false) {
     if (this.service.isFetching) return;
-    if (this.dom.refreshSpinner) this.dom.refreshSpinner.classList.remove('hidden');
+
+    if (this.dom.btnRefresh) {
+      this.dom.btnRefresh.disabled = true;
+      this.dom.btnRefresh.classList.add('opacity-75', 'cursor-not-allowed');
+    }
+    if (this.dom.refreshSpinner) {
+      this.dom.refreshSpinner.classList.remove('hidden');
+      this.dom.refreshSpinner.classList.add('animate-spin');
+    }
 
     try {
-      const records = await this.service.fetchFullForecast();
+      const result = await this.service.fetchFullForecast();
 
-      if (records && records.length > 0) {
+      if (result && result.success && result.count > 0) {
+        // Gerçek ve doğrulanmış güncel veri sunucudan başarıyla çekildi
         this.render();
         if (!isSilent && window.app && window.app.showToast) {
-          window.app.showToast(`MGM ALADIN: ${records.length} saatlik tahmin güncellendi.`, 'success');
+          window.app.showToast(`MGM ALADIN: ${result.count} saatlik güncel model verisi başarıyla yüklendi.`, 'success');
+        }
+      } else {
+        // Sunucudan yeni veri gelmedi: Asla "güncellendi" gibi yapma, son güncelleme saatini değiştirme!
+        if (!isSilent && window.app && window.app.showToast) {
+          if (this.service.needsCorsDemo) {
+            window.app.showToast('MGM API doğrudan erişimi kısıtladı. Lütfen yukarıdaki "İzin Ver (corsdemo)" butonuna tıklayın.', 'error');
+          } else {
+            window.app.showToast('MGM sunucusundan güncel veri alınamadı. Önceki veriler korunuyor.', 'error');
+          }
         }
       }
     } catch (e) {
-      console.warn('ALADIN canlı güncelleme denemesi:', e);
+      console.warn('ALADIN canlı güncelleme hatası:', e);
+      if (!isSilent && window.app && window.app.showToast) {
+        window.app.showToast('Güncelleme sırasında hata oluştu. Önceki veriler korunuyor.', 'error');
+      }
     } finally {
-      if (this.dom.refreshSpinner) this.dom.refreshSpinner.classList.add('hidden');
+      if (this.dom.refreshSpinner) {
+        this.dom.refreshSpinner.classList.remove('animate-spin');
+      }
+      if (this.dom.btnRefresh) {
+        this.dom.btnRefresh.disabled = false;
+        this.dom.btnRefresh.classList.remove('opacity-75', 'cursor-not-allowed');
+      }
       this.render();
     }
   }
@@ -962,10 +996,10 @@ class AladinUIController {
       }
     }
 
-    // Son Güncelleme Metni
+    // Son Güncelleme Metni (Sadece doğrulanmış güncelleme zamanını gösterir)
     if (this.dom.lastUpdateText) {
       const lu = this.service.lastUpdated || new Date();
-      this.dom.lastUpdateText.textContent = `Son Güncelleme: ${lu.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
+      this.dom.lastUpdateText.textContent = `Son Güncelleme: ${lu.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
     }
 
     // Hero Card Render (İlk / Güncel Saat)
@@ -1013,21 +1047,20 @@ class AladinUIController {
       const dayStr = d.toLocaleDateString('tr-TR', { weekday: 'short' });
       const isNight = d.getHours() < 6 || d.getHours() >= 20;
       const isSelected = i === this.currentRecordIndex;
-      const windDir = getCompassDirection(r.ruzgarYonu);
 
       return `
-        <div class="hourly-chip flex-shrink-0 flex flex-col items-center justify-between p-2 sm:p-2.5 rounded-xl border cursor-pointer select-none transition-none ${isSelected ? 'bg-[#546e7a]/15 border-[#546e7a] dark:bg-[#38bdf8]/15 dark:border-[#38bdf8]' : 'bg-[#ffffff] dark:bg-[#181c22] border-[#eceeef] dark:border-[#222831] hover:bg-[#f6f8fa] dark:hover:bg-[#20252e]'}" data-index="${i}" style="min-width: 82px;">
-          <div class="text-[10px] text-[#7a828e] dark:text-[#8f96a3] font-medium">${dayStr} ${hourStr}</div>
+        <div class="hourly-chip flex-shrink-0 flex flex-col items-center justify-between p-2.5 rounded-xl border cursor-pointer select-none transition-none ${isSelected ? 'bg-[#2563eb]/15 border-[#2563eb] dark:bg-[#60a5fa]/20 dark:border-[#60a5fa]' : 'bg-[#edf2f7] dark:bg-[#171e29] border-[#cbd5e1] dark:border-[#283343] hover:bg-[#dae2eb] dark:hover:bg-[#1f2837]'}" data-index="${i}" style="min-width: 84px;">
+          <div class="text-[10px] text-[#334155] dark:text-[#cbd5e1] font-bold">${dayStr} ${hourStr}</div>
           <div class="my-1.5 flex items-center justify-center">
             ${Meteocons.getSvg(hInfo.type, 36, isNight)}
           </div>
-          <div class="text-sm font-bold text-[#1e293b] dark:text-[#f1f5f9] font-mono">${Math.round(r.sicaklik)}°</div>
-          <div class="text-[10px] font-medium text-[#7a828e] dark:text-[#8f96a3] truncate max-w-[70px]">${hInfo.name}</div>
-          <div class="mt-1 flex items-center gap-1 text-[10px] font-semibold text-[#546e7a] dark:text-[#38bdf8]">
+          <div class="text-sm font-black text-[#0f172a] dark:text-[#f8fafc] font-mono">${Math.round(r.sicaklik)}°</div>
+          <div class="text-[10px] font-bold text-[#334155] dark:text-[#cbd5e1] truncate max-w-[72px]">${hInfo.name}</div>
+          <div class="mt-1 flex items-center gap-1 text-[10px] font-extrabold text-[#15803d] dark:text-[#4ade80]">
             <span class="inline-block transform" style="transform: rotate(${r.ruzgarYonu}deg);">➤</span>
             <span>${r.ruzgarHizi}k</span>
           </div>
-          ${r.saatlikToplamYagis > 0 ? `<div class="mt-0.5 text-[9px] font-bold text-[#0284c7] dark:text-[#38bdf8]">${r.saatlikToplamYagis}mm</div>` : ''}
+          ${r.saatlikToplamYagis > 0 ? `<div class="mt-0.5 text-[9px] font-black text-[#2563eb] dark:text-[#60a5fa]">${r.saatlikToplamYagis}mm</div>` : ''}
         </div>
       `;
     }).join('');
@@ -1049,7 +1082,7 @@ class AladinUIController {
       this.dom.tableSummary.textContent = `${recs.length} saatlik tahmin`;
     }
 
-    // 1. BİLGİSAYAR GÖRÜNÜMÜ: 9 Sütunlu Tam Tablo
+    // 1. BİLGİSAYAR GÖRÜNÜMÜ: 9 Sütunlu Tam Tablo (Ultra Okunabilir & Kalın)
     if (this.dom.tableBody) {
       this.dom.tableBody.innerHTML = recs.map(r => {
         const hInfo = getHadiseInfo(r.hadise);
@@ -1059,32 +1092,32 @@ class AladinUIController {
         const windDir = getCompassDirection(r.ruzgarYonu);
 
         return `
-          <tr class="hover:bg-[#f6f8fa]/70 dark:hover:bg-[#1e232c]/60 transition-colors">
-            <td class="py-2.5 px-3 text-[#525a66] dark:text-[#a1abb8] font-mono text-[11px] whitespace-nowrap">${timeStr}</td>
+          <tr class="hover:bg-[#dae2eb]/60 dark:hover:bg-[#1f2837]/60 border-b border-[#cbd5e1]/70 dark:border-[#283343]">
+            <td class="py-2.5 px-3 text-[#0f172a] dark:text-[#f8fafc] font-mono text-[11px] font-bold whitespace-nowrap">${timeStr}</td>
             <td class="py-2.5 px-3 whitespace-nowrap">
-              <div class="flex items-center gap-1.5">
+              <div class="flex items-center gap-1.5 font-bold text-[#0f172a] dark:text-[#f8fafc]">
                 ${Meteocons.getSvg(hInfo.type, 22, isNight)}
-                <span class="font-medium text-[#2d3139] dark:text-[#e4e7eb]">${hInfo.name}</span>
+                <span>${hInfo.name}</span>
               </div>
             </td>
-            <td class="py-2.5 px-3 font-bold text-[#ef4444] dark:text-[#f87171] font-mono">${Math.round(r.sicaklik)}°C</td>
-            <td class="py-2.5 px-3 text-[#f59e0b] dark:text-[#fbbf24] font-mono">${Math.round(r.hissedilenSicaklik)}°C</td>
-            <td class="py-2.5 px-3 font-semibold ${r.saatlikToplamYagis > 0 ? 'text-[#0284c7] dark:text-[#38bdf8]' : 'text-[#7a828e]'} font-mono">${r.saatlikToplamYagis} mm</td>
+            <td class="py-2.5 px-3 font-extrabold text-[#e11d48] dark:text-[#fb7185] font-mono">${Math.round(r.sicaklik)}°C</td>
+            <td class="py-2.5 px-3 font-bold text-[#d97706] dark:text-[#fbbf24] font-mono">${Math.round(r.hissedilenSicaklik)}°C</td>
+            <td class="py-2.5 px-3 font-extrabold ${r.saatlikToplamYagis > 0 ? 'text-[#2563eb] dark:text-[#60a5fa]' : 'text-[#64748b] dark:text-[#94a3b8]'} font-mono">${r.saatlikToplamYagis} mm</td>
             <td class="py-2.5 px-3 whitespace-nowrap">
-              <div class="flex items-center gap-1.5 font-mono text-[#10b981] dark:text-[#34d399] font-semibold">
+              <div class="flex items-center gap-1.5 font-mono text-[#15803d] dark:text-[#4ade80] font-extrabold">
                 <span class="inline-block transform text-xs" style="transform: rotate(${r.ruzgarYonu}deg);">➤</span>
                 <span>${r.ruzgarHizi} km/h (${windDir})</span>
               </div>
             </td>
-            <td class="py-2.5 px-3 text-[#0d9488] dark:text-[#2dd4bf] font-mono">%${r.nem}</td>
-            <td class="py-2.5 px-3 text-[#9333ea] dark:text-[#c084fc] font-mono">${r.basinc} hPa</td>
-            <td class="py-2.5 px-3 text-[#64748b] dark:text-[#94a3b8] font-mono">%${r.bulutKapaliligi}</td>
+            <td class="py-2.5 px-3 font-extrabold text-[#0f766e] dark:text-[#2dd4bf] font-mono">%${r.nem}</td>
+            <td class="py-2.5 px-3 font-extrabold text-[#7e22ce] dark:text-[#c084fc] font-mono">${r.basinc} hPa</td>
+            <td class="py-2.5 px-3 font-bold text-[#475569] dark:text-[#94a3b8] font-mono">%${r.bulutKapaliligi}</td>
           </tr>
         `;
       }).join('');
     }
 
-    // 2. TELEFON GÖRÜNÜMÜ: Telefonlara Tam Uyumlu & Hızlı Kart Listesi
+    // 2. TELEFON GÖRÜNÜMÜ: Telefonlara Tam Uyumlu & Hızlı Kart Listesi (Pastel Gri & Kalın Yazılar)
     if (this.dom.mobileList) {
       this.dom.mobileList.innerHTML = recs.map(r => {
         const hInfo = getHadiseInfo(r.hadise);
@@ -1095,37 +1128,37 @@ class AladinUIController {
         const isNight = d.getHours() < 6 || d.getHours() >= 20;
 
         return `
-          <div class="p-2.5 rounded-xl bg-[#ffffff] dark:bg-[#181c22] border border-[#eceeef] dark:border-[#222831] space-y-2">
+          <div class="p-3 rounded-2xl bg-[#edf2f7] dark:bg-[#171e29] border border-[#cbd5e1] dark:border-[#283343] space-y-2.5 shadow-sm">
             <div class="flex items-center justify-between">
-              <div class="flex items-center gap-2">
+              <div class="flex items-center gap-2.5">
                 <div class="w-8 h-8 flex items-center justify-center shrink-0">
                   ${Meteocons.getSvg(hInfo.type, 28, isNight)}
                 </div>
                 <div>
-                  <div class="text-xs font-bold text-[#0f172a] dark:text-[#f8fafc] font-mono">
-                    ${timeStr} <span class="text-[10px] font-sans font-medium text-[#64748b] dark:text-[#94a3b8]">· ${dayStr} ${dateStr}</span>
+                  <div class="text-xs font-black text-[#0f172a] dark:text-[#f8fafc] font-mono">
+                    ${timeStr} <span class="text-[10px] font-sans font-bold text-[#334155] dark:text-[#cbd5e1]">· ${dayStr} ${dateStr}</span>
                   </div>
-                  <div class="text-[11px] font-medium text-[#546e7a] dark:text-[#38bdf8]">${hInfo.name}</div>
+                  <div class="text-[11px] font-extrabold text-[#2563eb] dark:text-[#60a5fa]">${hInfo.name}</div>
                 </div>
               </div>
               <div class="text-right">
-                <div class="text-base font-extrabold text-[#ef4444] dark:text-[#f87171] font-mono leading-none">${Math.round(r.sicaklik)}°C</div>
-                <div class="text-[10px] text-[#f59e0b] dark:text-[#fbbf24] font-mono mt-0.5">His: ${Math.round(r.hissedilenSicaklik)}°C</div>
+                <div class="text-base font-black text-[#e11d48] dark:text-[#fb7185] font-mono leading-none">${Math.round(r.sicaklik)}°C</div>
+                <div class="text-[10px] font-bold text-[#d97706] dark:text-[#fbbf24] font-mono mt-0.5">His: ${Math.round(r.hissedilenSicaklik)}°C</div>
               </div>
             </div>
 
-            <div class="grid grid-cols-4 gap-1.5 pt-1.5 border-t border-[#f1f3f5] dark:border-[#222831] text-[10px] font-mono text-center">
-              <div class="flex items-center justify-center gap-1 bg-[#f8fafc] dark:bg-[#1e232c] px-1.5 py-1 rounded-lg text-[#10b981] dark:text-[#34d399] font-semibold" title="Rüzgar Hızı ve Yönü">
+            <div class="grid grid-cols-4 gap-1.5 pt-2 border-t border-[#cbd5e1] dark:border-[#283343] text-[10px] font-mono text-center">
+              <div class="flex items-center justify-center gap-1 bg-[#e2e8f0] dark:bg-[#1f2837] border border-[#cbd5e1]/60 dark:border-[#283343] px-1.5 py-1 rounded-lg text-[#15803d] dark:text-[#4ade80] font-extrabold" title="Rüzgar Hızı ve Yönü">
                 <span class="inline-block transform text-[9px]" style="transform: rotate(${r.ruzgarYonu}deg);">➤</span>
                 <span>${r.ruzgarHizi}k</span>
               </div>
-              <div class="flex items-center justify-center gap-0.5 bg-[#f8fafc] dark:bg-[#1e232c] px-1.5 py-1 rounded-lg ${r.saatlikToplamYagis > 0 ? 'text-[#0284c7] dark:text-[#38bdf8] font-bold' : 'text-[#64748b] dark:text-[#94a3b8]'}" title="Yağış Miktarı">
+              <div class="flex items-center justify-center gap-0.5 bg-[#e2e8f0] dark:bg-[#1f2837] border border-[#cbd5e1]/60 dark:border-[#283343] px-1.5 py-1 rounded-lg ${r.saatlikToplamYagis > 0 ? 'text-[#2563eb] dark:text-[#60a5fa] font-black' : 'text-[#475569] dark:text-[#94a3b8] font-bold'}" title="Yağış Miktarı">
                 <span>💧${r.saatlikToplamYagis}</span>
               </div>
-              <div class="flex items-center justify-center gap-0.5 bg-[#f8fafc] dark:bg-[#1e232c] px-1.5 py-1 rounded-lg text-[#0d9488] dark:text-[#2dd4bf]" title="Bağıl Nem">
+              <div class="flex items-center justify-center gap-0.5 bg-[#e2e8f0] dark:bg-[#1f2837] border border-[#cbd5e1]/60 dark:border-[#283343] px-1.5 py-1 rounded-lg text-[#0f766e] dark:text-[#2dd4bf] font-extrabold" title="Bağıl Nem">
                 <span>%${r.nem}</span>
               </div>
-              <div class="flex items-center justify-center gap-0.5 bg-[#f8fafc] dark:bg-[#1e232c] px-1.5 py-1 rounded-lg text-[#9333ea] dark:text-[#c084fc]" title="Hava Basıncı">
+              <div class="flex items-center justify-center gap-0.5 bg-[#e2e8f0] dark:bg-[#1f2837] border border-[#cbd5e1]/60 dark:border-[#283343] px-1.5 py-1 rounded-lg text-[#7e22ce] dark:text-[#c084fc] font-extrabold" title="Hava Basıncı">
                 <span>${r.basinc}h</span>
               </div>
             </div>
@@ -1155,16 +1188,16 @@ class AladinUIController {
     }
 
     this.dom.dictList.innerHTML = entries.map(item => `
-      <div class="p-2.5 rounded-xl border border-[#eceeef] dark:border-[#222831] bg-[#f8fafc] dark:bg-[#1b2027] flex items-center gap-3">
+      <div class="p-2.5 rounded-xl border border-[#cbd5e1] dark:border-[#283343] bg-[#e2e8f0] dark:bg-[#1f2837] flex items-center gap-3">
         <div class="w-10 h-10 flex-shrink-0 flex items-center justify-center">
           ${Meteocons.getSvg(item.type, 32, false)}
         </div>
         <div class="min-w-0 flex-1">
           <div class="flex items-center gap-1.5">
-            <span class="font-bold text-xs text-[#0f172a] dark:text-[#f8fafc] font-mono px-1.5 py-0.5 rounded bg-[#e2e8f0] dark:bg-[#20252e]">${item.code}</span>
-            <span class="text-xs font-semibold text-[#546e7a] dark:text-[#38bdf8] truncate">· ${item.name}</span>
+            <span class="font-extrabold text-xs text-[#0f172a] dark:text-[#f8fafc] font-mono px-1.5 py-0.5 rounded bg-[#dae2eb] dark:bg-[#283446]">${item.code}</span>
+            <span class="text-xs font-bold text-[#2563eb] dark:text-[#60a5fa] truncate">· ${item.name}</span>
           </div>
-          <p class="text-[11px] text-[#64748b] dark:text-[#94a3b8] leading-tight mt-0.5">${item.desc}</p>
+          <p class="text-[11px] font-semibold text-[#334155] dark:text-[#cbd5e1] leading-tight mt-0.5">${item.desc}</p>
         </div>
       </div>
     `).join('');
