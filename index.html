@@ -53,18 +53,18 @@
       <!-- Left: Navigation Tab Switcher (Sensör BLE / ALADIN Model) -->
       <div class="flex items-center gap-2 min-w-0">
         <div class="inline-flex rounded-full bg-[#f0f2f5] dark:bg-[#20252e] p-0.5 border border-[#e4e7eb] dark:border-[#2b333f] text-xs shrink-0">
-          <button id="btnTabSensor" class="nav-tab-btn active text-xs font-semibold flex items-center gap-1.5 cursor-pointer" title="Sensör BLE Telemetrisi">
+          <button id="btnTabSensor" class="nav-tab-btn text-xs font-semibold flex items-center gap-1.5 cursor-pointer" title="Sensör BLE Telemetrisi">
             <i data-lucide="radio" class="w-3.5 h-3.5"></i>
             <span>Sensör</span>
           </button>
-          <button id="btnTabAladin" class="nav-tab-btn text-xs font-semibold flex items-center gap-1.5 cursor-pointer" title="MGM ALADIN Sayısal Tahmin Modeli">
+          <button id="btnTabAladin" class="nav-tab-btn active text-xs font-semibold flex items-center gap-1.5 cursor-pointer" title="MGM ALADIN Sayısal Tahmin Modeli">
             <i data-lucide="cloud-sun" class="w-3.5 h-3.5"></i>
             <span>ALADIN</span>
           </button>
         </div>
 
         <!-- Sensor Hardware Clock (Visible on Sensor Tab) -->
-        <div id="sensorClockContainer" class="flex items-center gap-1.5 min-w-0">
+        <div id="sensorClockContainer" class="hidden flex items-center gap-1.5 min-w-0">
           <span id="sensorClockPulse" class="w-2 h-2 rounded-full bg-[#a1abb8] flex-shrink-0"></span>
           <span id="liveClockTime" class="text-xs sm:text-sm font-extrabold font-mono tracking-tight text-[#2d3139] dark:text-[#f0f2f5] tabular-nums">--:--:--</span>
         </div>
@@ -74,13 +74,13 @@
       <div class="flex items-center gap-1.5 flex-shrink-0">
         
         <!-- BLE Action: Fetch Records Button -->
-        <button id="btnFetchHistory" class="px-2.5 sm:px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 bg-[#f0f2f5] hover:bg-[#e4e7eb] text-[#3d4b60] dark:bg-[#232933] dark:hover:bg-[#2c3340] dark:text-[#cfd6e0] border border-[#dde3ed] dark:border-[#2f3744] cursor-pointer" title="Sensör flaş belleğindeki kayıtları çek">
+        <button id="btnFetchHistory" class="hidden px-2.5 sm:px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 bg-[#f0f2f5] hover:bg-[#e4e7eb] text-[#3d4b60] dark:bg-[#232933] dark:hover:bg-[#2c3340] dark:text-[#cfd6e0] border border-[#dde3ed] dark:border-[#2f3744] cursor-pointer" title="Sensör flaş belleğindeki kayıtları çek">
           <i data-lucide="download-cloud" class="w-3.5 h-3.5 shrink-0 text-[#546e7a] dark:text-[#a1abb8]"></i>
           <span class="hidden xs:inline">Kayıtlar</span>
         </button>
 
         <!-- BLE Action: Connect / Disconnect Button -->
-        <button id="btnConnect" class="px-3 sm:px-3.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 bg-[#546e7a] hover:bg-[#455a64] text-white cursor-pointer">
+        <button id="btnConnect" class="hidden px-3 sm:px-3.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 bg-[#546e7a] hover:bg-[#455a64] text-white cursor-pointer">
           <i data-lucide="bluetooth" class="w-3.5 h-3.5 shrink-0"></i>
           <span id="btnConnectLabel">Bağlan</span>
         </button>
@@ -101,7 +101,7 @@
     <!-- ============================================================== -->
     <!-- VIEW 1: SENSÖR BLE TELEMETRİ GÖRÜNÜMÜ                          -->
     <!-- ============================================================== -->
-    <div id="viewSensor" class="space-y-2.5 sm:space-y-3.5">
+    <div id="viewSensor" class="hidden space-y-2.5 sm:space-y-3.5">
 
       <!-- Progress Notification Banner (Visible only during memory sync) -->
       <div id="syncProgressBanner" class="hidden p-2.5 rounded-xl bg-[#eef1f6] dark:bg-[#1f252e] border border-[#dde3ed] dark:border-[#2b333f]">
@@ -274,7 +274,7 @@
     <!-- ============================================================== -->
     <!-- VIEW 2: MGM ALADIN SAYISAL HAVA TAHMİN MODELİ GÖRÜNÜMÜ          -->
     <!-- ============================================================== -->
-    <div id="viewAladin" class="hidden font-poppins space-y-3">
+    <div id="viewAladin" class="font-poppins space-y-3">
 
       <!-- Top Action & Status Bar -->
       <div class="flex flex-wrap items-center justify-between gap-2 bg-[#ffffff] dark:bg-[#181c22] p-3 rounded-2xl border border-[#eceeef] dark:border-[#222831]">
@@ -397,49 +397,6 @@
 
       </div>
 
-      <!-- HOURLY FORECAST CAROUSEL STRIP (Yatay Kaydırılabilir Şerit) -->
-      <div class="m3-card p-2.5 sm:p-3 space-y-1.5">
-        <div class="flex items-center justify-between px-1">
-          <span class="text-xs font-bold text-[#0f172a] dark:text-[#f8fafc] flex items-center gap-1.5">
-            <i data-lucide="clock" class="w-3.5 h-3.5 text-[#0284c7]"></i>
-            <span>Saatlik ALADIN Tahmin Şeridi (72 Saate Kadar)</span>
-          </span>
-          <span class="text-[10px] text-[#64748b] dark:text-[#94a3b8]">Sağa kaydırılabilir ➔</span>
-        </div>
-        <div id="aladinHourlyTrack" class="flex items-center gap-2 overflow-x-auto py-1 scroll-smooth">
-          <!-- Saatlik kartlar dinamik olarak buraya eklenecek -->
-        </div>
-      </div>
-
-      <!-- MODERN & PREMIUM CHART.JS GRAPH (POPPINS FONT) - SADECE BİLGİSAYARDA GÖZÜKÜR -->
-      <div id="aladinChartCard" class="hidden md:block m3-card p-3 sm:p-4 space-y-2.5">
-        <div class="flex flex-wrap items-center justify-between gap-1.5 border-b border-[#eceeef] dark:border-[#222831] pb-2">
-          
-          <div class="flex items-center justify-between w-full sm:w-auto gap-2">
-            <h2 class="text-xs font-bold text-[#0f172a] dark:text-[#f8fafc] flex items-center gap-1.5 shrink-0">
-              <i data-lucide="trending-up" class="w-3.5 h-3.5 text-[#0284c7]"></i>
-              <span>ALADIN Model Eğrileri</span>
-            </h2>
-          </div>
-
-          <!-- Mode Selectors (Sıcaklık, Yağış, Rüzgar, Nem/Bulut, Basınç, Tümü) -->
-          <div class="inline-flex w-full sm:w-auto flex-wrap gap-1 rounded-full bg-[#f0f2f5] dark:bg-[#20252e] p-0.5 border border-[#e4e7eb] dark:border-[#2b333f] text-[10px] sm:text-xs">
-            <button class="aladin-mode-btn active px-2.5 py-0.5 font-semibold cursor-pointer" data-aladin-mode="temp">Sıcaklık</button>
-            <button class="aladin-mode-btn px-2.5 py-0.5 font-semibold cursor-pointer" data-aladin-mode="rain">Yağış & Kar</button>
-            <button class="aladin-mode-btn px-2.5 py-0.5 font-semibold cursor-pointer" data-aladin-mode="wind">Rüzgar (km/h)</button>
-            <button class="aladin-mode-btn px-2.5 py-0.5 font-semibold cursor-pointer" data-aladin-mode="hum_cloud">Nem & Bulut</button>
-            <button class="aladin-mode-btn px-2.5 py-0.5 font-semibold cursor-pointer" data-aladin-mode="pressure">Basınç</button>
-            <button class="aladin-mode-btn px-2.5 py-0.5 font-semibold cursor-pointer" data-aladin-mode="all">Tümü</button>
-          </div>
-
-        </div>
-
-        <!-- Chart Canvas Container -->
-        <div id="aladinChartCanvasContainer" class="relative w-full h-64 sm:h-72 lg:h-80">
-          <canvas id="aladinTelemetryChart"></canvas>
-        </div>
-      </div>
-
       <!-- DETAILED HOURLY FORECAST: DESKTOP TABLE & MOBILE LIST -->
       <div class="m3-card p-3 sm:p-4 space-y-3">
         <div class="flex items-center justify-between gap-2 border-b border-[#eceeef] dark:border-[#222831] pb-2">
@@ -533,6 +490,7 @@
       const btnConnect = document.getElementById('btnConnect');
 
       function switchTab(tab) {
+        const sensorClock = document.getElementById('sensorClockContainer');
         if (tab === 'aladin') {
           btnTabSensor.classList.remove('active');
           btnTabAladin.classList.add('active');
@@ -540,13 +498,10 @@
           viewAladin.classList.remove('hidden');
           btnFetchHistory.classList.add('hidden');
           btnConnect.classList.add('hidden');
+          if (sensorClock) sensorClock.classList.add('hidden');
 
-          // ALADIN grafiklerini ekrana oturt ve ikonları tazele
           if (window.aladinUI) {
             window.aladinUI.render();
-            if (window.aladinUI.chartManager && window.aladinUI.chartManager.chart) {
-              window.aladinUI.chartManager.chart.resize();
-            }
           }
           if (typeof lucide !== 'undefined' && lucide.createIcons) {
             lucide.createIcons();
@@ -558,15 +513,22 @@
           viewSensor.classList.remove('hidden');
           btnFetchHistory.classList.remove('hidden');
           btnConnect.classList.remove('hidden');
+          if (sensorClock) sensorClock.classList.remove('hidden');
 
           if (window.app && window.app.chart) {
             window.app.chart.resize();
+          }
+          if (typeof lucide !== 'undefined' && lucide.createIcons) {
+            lucide.createIcons();
           }
         }
       }
 
       btnTabSensor.addEventListener('click', () => switchTab('sensor'));
       btnTabAladin.addEventListener('click', () => switchTab('aladin'));
+
+      // Site ilk açıldığında doğrudan ALADIN görünümü ile açılsın
+      switchTab('aladin');
     })();
   </script>
 </body>

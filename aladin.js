@@ -838,7 +838,9 @@ class AladinUIController {
 
   init() {
     this.cacheDom();
-    this.chartManager = new AladinChartManager('aladinTelemetryChart');
+    if (document.getElementById('aladinTelemetryChart')) {
+      this.chartManager = new AladinChartManager('aladinTelemetryChart');
+    }
     this.bindEvents();
     this.render();
 
@@ -992,15 +994,7 @@ class AladinUIController {
     if (this.dom.heroPressure) this.dom.heroPressure.textContent = `${cur.basinc} hPa`;
     if (this.dom.heroCloud) this.dom.heroCloud.textContent = `%${cur.bulutKapaliligi}`;
 
-    // Timeline / Carousel Strip
-    this.renderHourlyTrack();
-
-    // Chart.js Güncellemesi
-    if (this.chartManager) {
-      this.chartManager.update(recs);
-    }
-
-    // Tablo Güncellemesi
+    // Tablo ve Mobil Liste Güncellemesi
     this.renderTable();
 
     if (window.lucide && window.lucide.createIcons) {
