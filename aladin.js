@@ -8,38 +8,112 @@
 // 1. MGM HADİSE SÖZLÜĞÜ (WEATHER EVENT CODES)
 // ==========================================
 const MGM_HADİSE_DICT = {
+  // 1. Gökyüzü ve Bulutluluk Durumları
   'A': { code: 'A', name: 'Açık', desc: 'Gökyüzü tamamen açık, bulutsuz veya çok az bulutlu.', type: 'sun' },
+  'G': { code: 'G', name: 'Güneşli', desc: 'Gündüz saatlerinde pırıl pırıl güneşli açık hava.', type: 'sun' },
   'AB': { code: 'AB', name: 'Az Bulutlu', desc: 'Gökyüzünün 1/8 ile 2/8\'i bulutlarla kaplı.', type: 'few-clouds' },
   'PB': { code: 'PB', name: 'Parçalı Bulutlu', desc: 'Gökyüzünün 3/8 ile 5/8\'i bulutlarla kaplı.', type: 'partly-cloudy' },
   'CB': { code: 'CB', name: 'Çok Bulutlu', desc: 'Gökyüzünün 6/8 veya daha fazlası bulutlarla kaplı.', type: 'cloudy' },
-  'Y': { code: 'Y', name: 'Yağışlı', desc: 'Genel yağış, aralıklı yağmur.', type: 'rain' },
+  'KB': { code: 'KB', name: 'Kapalı', desc: 'Gökyüzünün tamamı (8/8) gri bulut tabakasıyla kaplı.', type: 'cloudy' },
+  'B': { code: 'B', name: 'Bulutlu', desc: 'Genel bulutlu gökyüzü tabakası.', type: 'cloudy' },
+  'YAB': { code: 'YAB', name: 'Yer Yer Az Bulutlu', desc: 'Bölgesel olarak açık ve az bulutlu geçişler.', type: 'few-clouds' },
+  'YPB': { code: 'YPB', name: 'Yer Yer Parçalı Bulutlu', desc: 'Bölgesel olarak değişen parçalı bulutluluk.', type: 'partly-cloudy' },
+  'YCB': { code: 'YCB', name: 'Yer Yer Çok Bulutlu', desc: 'Bölgesel olarak yoğunlaşan kapalı bulut kümeleri.', type: 'cloudy' },
+
+  // 2. Sıvı Yağışlar ve Sağanaklar
+  'Y': { code: 'Y', name: 'Yağışlı', desc: 'Genel yağış, aralıklı veya sürekli yağmur.', type: 'rain' },
   'HY': { code: 'HY', name: 'Hafif Yağmurlu', desc: 'Hafif çiseleyen veya ince taneli yağmur.', type: 'light-rain' },
+  'ÇIS': { code: 'ÇIS', name: 'Çiseleme', desc: 'Görünmez kadar ince damlacıklı hafif yağış serpintisi.', type: 'light-rain' },
   'SY': { code: 'SY', name: 'Sağanak Yağışlı', desc: 'Kısa süreli, ani başlayan ve duran sağanak yağış.', type: 'heavy-rain' },
-  'KSY': { code: 'KSY', name: 'Kuvvetli Sağanak', desc: 'Şiddetli ve yoğun sağanak yağış.', type: 'storm-rain' },
-  'GY': { code: 'GY', name: 'Gökgürültülü Yağmur', desc: 'Şimşek ve gökgürültüsü eşliğinde yağmur.', type: 'thunderstorm' },
+  'KSY': { code: 'KSY', name: 'Kuvvetli Sağanak', desc: 'Su baskını riski taşıyan şiddetli ve yoğun sağanak yağış.', type: 'storm-rain' },
+  'ÇSY': { code: 'ÇSY', name: 'Çok Şiddetli Sağanak', desc: 'Afet ve sel riski barındıran aşırı sağanak yağış.', type: 'storm-rain' },
+  'MSY': { code: 'MSY', name: 'Mevzi Sağanak', desc: 'Yerel ve bölgesel kısa süreli sağanak yağmur geçişleri.', type: 'heavy-rain' },
+
+  // 3. Konvektif ve Gökgürültülü Hadiseler
+  'GY': { code: 'GY', name: 'Gökgürültülü Sağanak', desc: 'Şimşek ve gökgürültüsü eşliğinde sağanak yağış.', type: 'thunderstorm' },
   'KGY': { code: 'KGY', name: 'Kuvvetli Gökgürültülü Yağmur', desc: 'Şiddetli gökgürültüsü, yıldırım ve kuvvetli yağış.', type: 'severe-thunderstorm' },
-  'MSY': { code: 'MSY', name: 'Mevzi Sağanak', desc: 'Yerel ve bölgesel kısa süreli sağanak yağmur.', type: 'heavy-rain' },
-  'K': { code: 'K', name: 'Karlı', desc: 'Kar yağışı etkili.', type: 'snow' },
+  'ÇKGY': { code: 'ÇKGY', name: 'Çok Kuvvetli Gökgürültülü', desc: 'Yıkıcı yıldırım ve sel riski taşıyan şiddetli fırtına.', type: 'severe-thunderstorm' },
+  'YGY': { code: 'YGY', name: 'Yer Yer Gökgürültülü', desc: 'Lokal aralıklarla meydana gelen gökgürültülü yağışlar.', type: 'thunderstorm' },
+  'GŞ': { code: 'GŞ', name: 'Gökgürültülü Şimşekli', desc: 'Gökyüzünde yoğun şimşek ve gökgürültüsü aktivitesi.', type: 'thunderstorm' },
+  'ŞM': { code: 'ŞM', name: 'Şimşek', desc: 'Yağışsız veya uzakta gerçekleşen elektriksel şimşek deşarjı.', type: 'thunderstorm' },
+
+  // 4. Katı Yağışlar: Kar, Dolu ve Sulu Kar
+  'K': { code: 'K', name: 'Karlı', desc: 'Lapa lapa standart kar yağışı.', type: 'snow' },
   'HK': { code: 'HK', name: 'Hafif Karlı', desc: 'Hafif kar serpintisi veya ince taneli kar.', type: 'light-snow' },
-  'YK': { code: 'YK', name: 'Yoğun Karlı', desc: 'Tipi ve görüşü kısıtlayan yoğun kar yağışı.', type: 'heavy-snow' },
-  'KY': { code: 'KY', name: 'Karla Karışık Yağmurlu', desc: 'Yağmur ve kar taneleri birlikte yağıyor.', type: 'sleet' },
-  'HKY': { code: 'HKY', name: 'Hafif Karla Karışık', desc: 'Hafif sulu kar yağışı.', type: 'light-sleet' },
-  'YKY': { code: 'YKY', name: 'Yoğun Karla Karışık', desc: 'Kuvvetli sulu sepken ve sulu kar.', type: 'heavy-sleet' },
-  'S': { code: 'S', name: 'Sisli', desc: 'Görüş mesafesini 1 km\'nin altına düşüren yoğun sis.', type: 'fog' },
-  'P': { code: 'P', name: 'Puslu', desc: 'Görüşü hafif kısıtlayan pus tabakası.', type: 'fog' },
-  'D': { code: 'D', name: 'Dumanlı', desc: 'Atmosferde asılı duran duman ve partiküller.', type: 'fog' },
-  'R': { code: 'R', name: 'Rüzgarlı', desc: 'Kuvvetli ve hissedilir rüzgar.', type: 'wind' },
-  'KF': { code: 'KF', name: 'Kum / Toz Fırtınası', desc: 'Kuvvetli rüzgarla taşınan yoğun toz veya kum fırtınası.', type: 'wind' },
-  'G': { code: 'G', name: 'Güneşli', desc: 'Gündüz saatlerinde pırıl pırıl güneşli hava.', type: 'sun' },
-  'DY': { code: 'DY', name: 'Dolu Yağışlı', desc: 'Sert buz küreleri şeklinde dolu yağışı.', type: 'hail' },
+  'YK': { code: 'YK', name: 'Yoğun Karlı', desc: 'Görüşü kısıtlayan ve kalın örtü bırakan yoğun kar.', type: 'heavy-snow' },
+  'TİPİ': { code: 'TİPİ', name: 'Tipi', desc: 'Kuvvetli fırtına ile savrulan dondurucu kar fırtınası.', type: 'heavy-snow' },
+  'SAVK': { code: 'SAVK', name: 'Savrulan Kar', desc: 'Yerdeki kar örtüsünün kuvvetli rüzgarla savrulması.', type: 'light-snow' },
+  'KY': { code: 'KY', name: 'Karla Karışık Yağmurlu', desc: 'Yağmur ve kar taneleri birlikte yağıyor (sulusepken).', type: 'sleet' },
+  'HKY': { code: 'HKY', name: 'Hafif Karla Karışık', desc: 'Hafif şiddette sulu kar yağışı.', type: 'light-sleet' },
+  'YKY': { code: 'YKY', name: 'Yoğun Karla Karışık', desc: 'Zeminde sulu kar birikintisi oluşturan yoğun sulusepken.', type: 'heavy-sleet' },
+  'DY': { code: 'DY', name: 'Dolu Yağışlı', desc: 'Sert buz küreleri şeklinde düşen dolu yağışı.', type: 'hail' },
+  'KDY': { code: 'KDY', name: 'Kuvvetli Dolu', desc: 'İri taneli, araç ve tarıma zarar verebilecek dolu.', type: 'hail' },
+
+  // 5. Görüş Mesafesi ve Atmosferik Askı Hadiseleri
+  'S': { code: 'S', name: 'Sisli', desc: 'Yatay görüş mesafesini 1 km\'nin altına düşüren yoğun sis.', type: 'fog' },
+  'YS': { code: 'YS', name: 'Yoğun Sis', desc: 'Görüş mesafesini 50 metreye kadar düşüren tehlikeli sis.', type: 'fog' },
+  'P': { code: 'P', name: 'Puslu', desc: 'Görüş mesafesini 1-5 km arasına düşüren hafif pus tabakası.', type: 'fog' },
+  'D': { code: 'D', name: 'Dumanlı', desc: 'Atmosferde asılı duran sanayi/yangın dumanı ve partiküller.', type: 'fog' },
+  'TOZ': { code: 'TOZ', name: 'Toz Taşınımı', desc: 'Atmosferin üst katmanlarından taşınan çöl kökenli mineral toz.', type: 'fog' },
+  'KF': { code: 'KF', name: 'Kum / Toz Fırtınası', desc: 'Kuvvetli rüzgarla kalkan yoğun çöl tozu veya kum fırtınası.', type: 'wind' },
+
+  // 6. Rüzgar, Fırtına ve Girdap Hadiseleri
+  'R': { code: 'R', name: 'Rüzgarlı', desc: 'Belirgin ve hissedilir kuvvette rüzgar akımı.', type: 'wind' },
+  'FIR': { code: 'FIR', name: 'Fırtına', desc: 'Bofor 8 ve üzeri (62-74 km/h) kuvvetli fırtına.', type: 'wind' },
+  'KFIR': { code: 'KFIR', name: 'Kuvvetli Fırtına', desc: 'Bofor 9-10 (75-102 km/h) çatı uçuran şiddetli fırtına.', type: 'wind' },
+  'TFIR': { code: 'TFIR', name: 'Tam Fırtına', desc: 'Bofor 11+ (103 km/h üzeri) afet boyutunda fırtına.', type: 'wind' },
+  'HORT': { code: 'HORT', name: 'Hortum', desc: 'Buluttan yere uzanan şiddetli dönen hava hortumu girdabı.', type: 'wind' },
+
+  // 7. Sıcaklık, Don ve Zirai / Dağcılık Hadiseleri
+  'DON': { code: 'DON', name: 'Don Hadisesi', desc: 'Hava sıcaklığının 0°C altına inmesiyle oluşan dondurucu soğuk.', type: 'snow' },
+  'BDON': { code: 'BDON', name: 'Buzlanma ve Don', desc: 'Yollarda gizli buzlanma ve şiddetli don tehlikesi.', type: 'snow' },
+  'KIR': { code: 'KIR', name: 'Kırağı', desc: 'Havadaki su buharının soğuk zeminlerde beyaz kristalleşmesi.', type: 'snow' },
+  'KIRÇ': { code: 'KIRÇ', name: 'Kırç', desc: 'Aşırı soğuk sis damlacıklarının tellere ve dallara yapışıp donması.', type: 'snow' },
+  'ÇİY': { code: 'ÇİY', name: 'Çiy', desc: 'Gece yüzeylerde yoğuşan berrak su damlacıkları.', type: 'light-rain' },
   'SCK': { code: 'SCK', name: 'Sıcak', desc: 'Mevsim normallerinin üzerinde aşırı sıcak hava.', type: 'sun' },
-  'SGK': { code: 'SGK', name: 'Soğuk', desc: 'Mevsim normallerinin altında dondurucu soğuk.', type: 'snow' },
-  'YGY': { code: 'YGY', name: 'Yer Yer Gökgürültülü', desc: 'Lokal gökgürültülü sağanak geçişleri.', type: 'thunderstorm' }
+  'ASCK': { code: 'ASCK', name: 'Aşırı Sıcak', desc: 'Sağlığı tehdit eden 38°C üzeri aşırı sıcak hava dalgası.', type: 'sun' },
+  'SGK': { code: 'SGK', name: 'Soğuk', desc: 'Mevsim normallerinin altında dondurucu soğuk hava.', type: 'snow' },
+  'ASGK': { code: 'ASGK', name: 'Aşırı Soğuk', desc: 'Sıfırın altında ekstrem kutup kökenli dondurucu hava.', type: 'snow' },
+  'ÇIĞ': { code: 'ÇIĞ', name: 'Çığ Tehlikesi', desc: 'Eğimli yamaçlarda biriken kar kütlesinin kayma riski.', type: 'heavy-snow' }
+};
+
+const HADİSE_ALIASES = {
+  'TIPI': 'TİPİ',
+  'KIRC': 'KIRÇ',
+  'KIRCI': 'KIRÇ',
+  'CIG': 'ÇIĞ',
+  'CIS': 'ÇIS',
+  'CISELEME': 'ÇIS',
+  'GSY': 'GY',
+  'FIRTINA': 'FIR',
+  'ACIK': 'A',
+  'GUNESLI': 'G',
+  'PARCALI': 'PB',
+  'BULUTLU': 'B',
+  'KAPALI': 'KB',
+  'YAGMUR': 'Y',
+  'YAGMURLU': 'Y',
+  'SAGANAK': 'SY',
+  'KAR': 'K',
+  'KARLI': 'K',
+  'SIS': 'S',
+  'SISLI': 'S',
+  'PUS': 'P',
+  'PUSLU': 'P',
+  'DUMAN': 'D',
+  'RUZGAR': 'R',
+  'RUZGARLI': 'R',
+  'DOLU': 'DY',
+  'SICAK': 'SCK',
+  'SOGUK': 'SGK'
 };
 
 function getHadiseInfo(rawCode) {
   if (!rawCode) return { code: 'A', name: 'Açık', desc: 'Açık hava', type: 'sun' };
-  const upper = String(rawCode).trim().toUpperCase();
+  let upper = String(rawCode).trim().toLocaleUpperCase('tr-TR');
+  if (HADİSE_ALIASES[upper]) {
+    upper = HADİSE_ALIASES[upper];
+  }
   return MGM_HADİSE_DICT[upper] || { code: upper, name: upper, desc: 'Hava Durumu', type: 'cloudy' };
 }
 
@@ -805,7 +879,8 @@ class AladinUIController {
       btnOpenDict: document.getElementById('btnOpenAladinDict'),
       btnCloseDict: document.getElementById('btnCloseAladinDict'),
       modalDict: document.getElementById('modalAladinDict'),
-      dictList: document.getElementById('aladinDictList')
+      dictList: document.getElementById('aladinDictList'),
+      dictSearch: document.getElementById('aladinDictSearch')
     };
   }
 
@@ -833,6 +908,7 @@ class AladinUIController {
 
     if (this.dom.btnOpenDict && this.dom.modalDict) {
       this.dom.btnOpenDict.addEventListener('click', () => {
+        if (this.dom.dictSearch) this.dom.dictSearch.value = '';
         this.renderDictionary();
         this.dom.modalDict.classList.remove('hidden');
       });
@@ -840,6 +916,12 @@ class AladinUIController {
     if (this.dom.btnCloseDict && this.dom.modalDict) {
       this.dom.btnCloseDict.addEventListener('click', () => {
         this.dom.modalDict.classList.add('hidden');
+      });
+    }
+
+    if (this.dom.dictSearch) {
+      this.dom.dictSearch.addEventListener('input', (e) => {
+        this.renderDictionary(e.target.value);
       });
     }
   }
@@ -1059,9 +1141,25 @@ class AladinUIController {
     }
   }
 
-  renderDictionary() {
+  renderDictionary(filter = '') {
     if (!this.dom.dictList) return;
-    const entries = Object.values(MGM_HADİSE_DICT);
+    const q = (filter || '').trim().toLocaleLowerCase('tr-TR');
+    const entries = Object.values(MGM_HADİSE_DICT).filter(item => {
+      if (!q) return true;
+      return item.code.toLowerCase().includes(q) ||
+             item.name.toLocaleLowerCase('tr-TR').includes(q) ||
+             item.desc.toLocaleLowerCase('tr-TR').includes(q);
+    });
+
+    if (entries.length === 0) {
+      this.dom.dictList.innerHTML = `
+        <div class="p-6 text-center text-xs text-[#64748b] dark:text-[#94a3b8]">
+          Aradığınız kritere uygun hadise kodu bulunamadı.
+        </div>
+      `;
+      return;
+    }
+
     this.dom.dictList.innerHTML = entries.map(item => `
       <div class="p-2.5 rounded-xl border border-[#eceeef] dark:border-[#222831] bg-[#f8fafc] dark:bg-[#1b2027] flex items-center gap-3">
         <div class="w-10 h-10 flex-shrink-0 flex items-center justify-center">
@@ -1069,10 +1167,10 @@ class AladinUIController {
         </div>
         <div class="min-w-0 flex-1">
           <div class="flex items-center gap-1.5">
-            <span class="font-bold text-xs text-[#0f172a] dark:text-[#f8fafc] font-mono">${item.code}</span>
+            <span class="font-bold text-xs text-[#0f172a] dark:text-[#f8fafc] font-mono px-1.5 py-0.5 rounded bg-[#e2e8f0] dark:bg-[#20252e]">${item.code}</span>
             <span class="text-xs font-semibold text-[#546e7a] dark:text-[#38bdf8] truncate">· ${item.name}</span>
           </div>
-          <p class="text-[11px] text-[#64748b] dark:text-[#94a3b8] leading-tight mt-0.5 line-clamp-2">${item.desc}</p>
+          <p class="text-[11px] text-[#64748b] dark:text-[#94a3b8] leading-tight mt-0.5">${item.desc}</p>
         </div>
       </div>
     `).join('');
