@@ -1,0 +1,19 @@
+{
+  "name": "xiaomi-smarttemp-aladin",
+  "version": "5.0.0",
+  "description": "Xiaomi Mijia BLE Termometre ve MGM ALADIN Sayısal Hava Tahmin Modeli İstasyonu",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "xiaomi",
+    "ble",
+    "bluetooth",
+    "weather",
+    "mgm",
+    "aladin"
+  ],
+  "author": "",
+  "license": "MIT"
+}

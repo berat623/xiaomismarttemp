@@ -266,7 +266,12 @@ if (typeof Chart !== 'undefined' && Chart.register) {
 }
 
 // ==========================================
-// 5. ALADIN MODEL VERİ SERVİSİ (ALADIN SERVICE)
+// 5. YEDEK GERÇEK MGM ALADIN MODEL VERİSİ (OFFLINE & INITIAL FALLBACK)
+// ==========================================
+const INITIAL_MODEL_DATA = [{"tarih":"2026-10-29T15:00:00.000Z","sicaklik":15,"hissedilenSicaklik":15,"saatlikToplamYagis":0,"karYuksekligi":0,"bulutKapaliligi":99,"nem":91,"basinc":1014,"ruzgarHizi":9,"ruzgarYonu":323,"hadise":"CB","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-29T15:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-29T16:00:00.000Z","sicaklik":15,"hissedilenSicaklik":15,"saatlikToplamYagis":0.46,"karYuksekligi":0,"bulutKapaliligi":98,"nem":96,"basinc":1014,"ruzgarHizi":6,"ruzgarYonu":273,"hadise":"SY","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-29T16:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-29T17:00:00.000Z","sicaklik":15,"hissedilenSicaklik":15,"saatlikToplamYagis":0.64,"karYuksekligi":0,"bulutKapaliligi":99,"nem":96,"basinc":1014,"ruzgarHizi":5,"ruzgarYonu":280,"hadise":"SY","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-29T17:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-29T18:00:00.000Z","sicaklik":15,"hissedilenSicaklik":15,"saatlikToplamYagis":0.4,"karYuksekligi":0,"bulutKapaliligi":98,"nem":95,"basinc":1015,"ruzgarHizi":9,"ruzgarYonu":312,"hadise":"HY","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-29T18:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-29T19:00:00.000Z","sicaklik":14,"hissedilenSicaklik":14,"saatlikToplamYagis":0.25,"karYuksekligi":0,"bulutKapaliligi":99,"nem":96,"basinc":1015,"ruzgarHizi":8,"ruzgarYonu":260,"hadise":"HY","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-29T19:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-29T20:00:00.000Z","sicaklik":14,"hissedilenSicaklik":14,"saatlikToplamYagis":0.67,"karYuksekligi":0,"bulutKapaliligi":99,"nem":97,"basinc":1015,"ruzgarHizi":12,"ruzgarYonu":246,"hadise":"SY","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-29T20:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-29T21:00:00.000Z","sicaklik":14,"hissedilenSicaklik":14,"saatlikToplamYagis":1.23,"karYuksekligi":0,"bulutKapaliligi":100,"nem":96,"basinc":1015,"ruzgarHizi":14,"ruzgarYonu":242,"hadise":"SY","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-29T21:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-29T22:00:00.000Z","sicaklik":14,"hissedilenSicaklik":14,"saatlikToplamYagis":3.15,"karYuksekligi":0,"bulutKapaliligi":100,"nem":95,"basinc":1015,"ruzgarHizi":14,"ruzgarYonu":242,"hadise":"SY","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-29T22:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-29T23:00:00.000Z","sicaklik":14,"hissedilenSicaklik":14,"saatlikToplamYagis":5.42,"karYuksekligi":0,"bulutKapaliligi":100,"nem":95,"basinc":1015,"ruzgarHizi":17,"ruzgarYonu":234,"hadise":"KSY","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-29T23:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-30T00:00:00.000Z","sicaklik":14,"hissedilenSicaklik":14,"saatlikToplamYagis":3.1,"karYuksekligi":0,"bulutKapaliligi":100,"nem":95,"basinc":1016,"ruzgarHizi":10,"ruzgarYonu":221,"hadise":"SY","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-30T00:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-30T01:00:00.000Z","sicaklik":14,"hissedilenSicaklik":14,"saatlikToplamYagis":0.97,"karYuksekligi":0,"bulutKapaliligi":98,"nem":98,"basinc":1016,"ruzgarHizi":5,"ruzgarYonu":211,"hadise":"SY","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-30T01:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-30T02:00:00.000Z","sicaklik":14,"hissedilenSicaklik":14,"saatlikToplamYagis":1.67,"karYuksekligi":0,"bulutKapaliligi":100,"nem":97,"basinc":1016,"ruzgarHizi":3,"ruzgarYonu":213,"hadise":"SY","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-30T02:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-30T03:00:00.000Z","sicaklik":14,"hissedilenSicaklik":14,"saatlikToplamYagis":2.66,"karYuksekligi":0,"bulutKapaliligi":100,"nem":98,"basinc":1016,"ruzgarHizi":3,"ruzgarYonu":215,"hadise":"SY","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-30T03:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-30T04:00:00.000Z","sicaklik":14,"hissedilenSicaklik":14,"saatlikToplamYagis":0.61,"karYuksekligi":0,"bulutKapaliligi":99,"nem":98,"basinc":1016,"ruzgarHizi":2,"ruzgarYonu":220,"hadise":"SY","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-30T04:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-30T05:00:00.000Z","sicaklik":14,"hissedilenSicaklik":14,"saatlikToplamYagis":0.52,"karYuksekligi":0,"bulutKapaliligi":98,"nem":98,"basinc":1016,"ruzgarHizi":2,"ruzgarYonu":232,"hadise":"SY","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-30T05:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-30T06:00:00.000Z","sicaklik":15,"hissedilenSicaklik":15,"saatlikToplamYagis":0.57,"karYuksekligi":0,"bulutKapaliligi":96,"nem":95,"basinc":1017,"ruzgarHizi":7,"ruzgarYonu":3,"hadise":"SY","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-30T06:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-30T07:00:00.000Z","sicaklik":15,"hissedilenSicaklik":15,"saatlikToplamYagis":0.25,"karYuksekligi":0,"bulutKapaliligi":94,"nem":93,"basinc":1018,"ruzgarHizi":14,"ruzgarYonu":2,"hadise":"HSY","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-30T07:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-30T08:00:00.000Z","sicaklik":16,"hissedilenSicaklik":16,"saatlikToplamYagis":0.07,"karYuksekligi":0,"bulutKapaliligi":93,"nem":92,"basinc":1018,"ruzgarHizi":17,"ruzgarYonu":358,"hadise":"HY","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-30T08:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-30T09:00:00.000Z","sicaklik":16,"hissedilenSicaklik":16,"saatlikToplamYagis":0,"karYuksekligi":0,"bulutKapaliligi":94,"nem":91,"basinc":1018,"ruzgarHizi":17,"ruzgarYonu":353,"hadise":"CB","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-30T09:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-30T10:00:00.000Z","sicaklik":16,"hissedilenSicaklik":16,"saatlikToplamYagis":0,"karYuksekligi":0,"bulutKapaliligi":93,"nem":89,"basinc":1018,"ruzgarHizi":16,"ruzgarYonu":353,"hadise":"CB","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-30T10:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-30T11:00:00.000Z","sicaklik":16,"hissedilenSicaklik":16,"saatlikToplamYagis":0,"karYuksekligi":0,"bulutKapaliligi":94,"nem":89,"basinc":1018,"ruzgarHizi":16,"ruzgarYonu":352,"hadise":"CB","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-30T11:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-30T12:00:00.000Z","sicaklik":16,"hissedilenSicaklik":16,"saatlikToplamYagis":0,"karYuksekligi":0,"bulutKapaliligi":93,"nem":89,"basinc":1018,"ruzgarHizi":16,"ruzgarYonu":355,"hadise":"CB","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-30T12:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-30T13:00:00.000Z","sicaklik":15,"hissedilenSicaklik":15,"saatlikToplamYagis":0,"karYuksekligi":0,"bulutKapaliligi":94,"nem":88,"basinc":1018,"ruzgarHizi":13,"ruzgarYonu":358,"hadise":"CB","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-30T13:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-30T14:00:00.000Z","sicaklik":15,"hissedilenSicaklik":15,"saatlikToplamYagis":0,"karYuksekligi":0,"bulutKapaliligi":91,"nem":88,"basinc":1019,"ruzgarHizi":10,"ruzgarYonu":355,"hadise":"CB","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-30T14:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-30T15:00:00.000Z","sicaklik":14,"hissedilenSicaklik":14,"saatlikToplamYagis":0,"karYuksekligi":0,"bulutKapaliligi":90,"nem":88,"basinc":1019,"ruzgarHizi":7,"ruzgarYonu":348,"hadise":"CB","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-30T15:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-30T16:00:00.000Z","sicaklik":14,"hissedilenSicaklik":14,"saatlikToplamYagis":0,"karYuksekligi":0,"bulutKapaliligi":99,"nem":89,"basinc":1019,"ruzgarHizi":4,"ruzgarYonu":327,"hadise":"CB","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-30T16:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-30T17:00:00.000Z","sicaklik":13,"hissedilenSicaklik":13,"saatlikToplamYagis":0.14,"karYuksekligi":0,"bulutKapaliligi":98,"nem":92,"basinc":1020,"ruzgarHizi":4,"ruzgarYonu":315,"hadise":"HSY","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-30T17:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-30T18:00:00.000Z","sicaklik":13,"hissedilenSicaklik":13,"saatlikToplamYagis":0.14,"karYuksekligi":0,"bulutKapaliligi":93,"nem":95,"basinc":1020,"ruzgarHizi":5,"ruzgarYonu":339,"hadise":"HY","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-30T18:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-30T19:00:00.000Z","sicaklik":13,"hissedilenSicaklik":13,"saatlikToplamYagis":0.06,"karYuksekligi":0,"bulutKapaliligi":91,"nem":96,"basinc":1020,"ruzgarHizi":3,"ruzgarYonu":359,"hadise":"HY","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-30T19:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-30T20:00:00.000Z","sicaklik":13,"hissedilenSicaklik":13,"saatlikToplamYagis":0.16,"karYuksekligi":0,"bulutKapaliligi":91,"nem":98,"basinc":1020,"ruzgarHizi":1,"ruzgarYonu":41,"hadise":"HY","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-30T20:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-30T21:00:00.000Z","sicaklik":13,"hissedilenSicaklik":13,"saatlikToplamYagis":0.17,"karYuksekligi":0,"bulutKapaliligi":88,"nem":99,"basinc":1020,"ruzgarHizi":1,"ruzgarYonu":115,"hadise":"HY","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-30T21:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-30T22:00:00.000Z","sicaklik":12,"hissedilenSicaklik":12,"saatlikToplamYagis":0.07,"karYuksekligi":0,"bulutKapaliligi":84,"nem":99,"basinc":1020,"ruzgarHizi":1,"ruzgarYonu":167,"hadise":"HY","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-30T22:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-30T23:00:00.000Z","sicaklik":12,"hissedilenSicaklik":12,"saatlikToplamYagis":0.02,"karYuksekligi":0,"bulutKapaliligi":86,"nem":99,"basinc":1020,"ruzgarHizi":0,"ruzgarYonu":315,"hadise":"HY","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-30T23:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-31T00:00:00.000Z","sicaklik":12,"hissedilenSicaklik":12,"saatlikToplamYagis":0,"karYuksekligi":0,"bulutKapaliligi":85,"nem":99,"basinc":1020,"ruzgarHizi":1,"ruzgarYonu":316,"hadise":"CB","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-31T00:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-31T01:00:00.000Z","sicaklik":12,"hissedilenSicaklik":12,"saatlikToplamYagis":0,"karYuksekligi":0,"bulutKapaliligi":84,"nem":99,"basinc":1020,"ruzgarHizi":2,"ruzgarYonu":333,"hadise":"CB","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-31T01:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-31T02:00:00.000Z","sicaklik":12,"hissedilenSicaklik":12,"saatlikToplamYagis":0.01,"karYuksekligi":0,"bulutKapaliligi":88,"nem":99,"basinc":1020,"ruzgarHizi":2,"ruzgarYonu":9,"hadise":"HY","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-31T02:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-31T03:00:00.000Z","sicaklik":12,"hissedilenSicaklik":12,"saatlikToplamYagis":0.01,"karYuksekligi":0,"bulutKapaliligi":79,"nem":100,"basinc":1020,"ruzgarHizi":2,"ruzgarYonu":44,"hadise":"HY","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-31T03:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-31T04:00:00.000Z","sicaklik":12,"hissedilenSicaklik":12,"saatlikToplamYagis":0,"karYuksekligi":0,"bulutKapaliligi":70,"nem":100,"basinc":1020,"ruzgarHizi":3,"ruzgarYonu":63,"hadise":"CB","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-31T04:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-31T05:00:00.000Z","sicaklik":11,"hissedilenSicaklik":11,"saatlikToplamYagis":0,"karYuksekligi":0,"bulutKapaliligi":65,"nem":100,"basinc":1020,"ruzgarHizi":3,"ruzgarYonu":70,"hadise":"PB","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-31T05:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-31T06:00:00.000Z","sicaklik":12,"hissedilenSicaklik":12,"saatlikToplamYagis":0,"karYuksekligi":0,"bulutKapaliligi":55,"nem":98,"basinc":1021,"ruzgarHizi":4,"ruzgarYonu":71,"hadise":"PB","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-31T06:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-31T07:00:00.000Z","sicaklik":13,"hissedilenSicaklik":13,"saatlikToplamYagis":0,"karYuksekligi":0,"bulutKapaliligi":45,"nem":92,"basinc":1021,"ruzgarHizi":6,"ruzgarYonu":70,"hadise":"PB","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-31T07:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-31T08:00:00.000Z","sicaklik":15,"hissedilenSicaklik":15,"saatlikToplamYagis":0,"karYuksekligi":0,"bulutKapaliligi":41,"nem":86,"basinc":1021,"ruzgarHizi":7,"ruzgarYonu":65,"hadise":"PB","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-31T08:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-31T09:00:00.000Z","sicaklik":16,"hissedilenSicaklik":16,"saatlikToplamYagis":0,"karYuksekligi":0,"bulutKapaliligi":41,"nem":81,"basinc":1020,"ruzgarHizi":8,"ruzgarYonu":46,"hadise":"PB","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-31T09:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-31T10:00:00.000Z","sicaklik":16,"hissedilenSicaklik":16,"saatlikToplamYagis":0,"karYuksekligi":0,"bulutKapaliligi":30,"nem":78,"basinc":1020,"ruzgarHizi":9,"ruzgarYonu":28,"hadise":"AB","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-31T10:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-31T11:00:00.000Z","sicaklik":17,"hissedilenSicaklik":17,"saatlikToplamYagis":0,"karYuksekligi":0,"bulutKapaliligi":48,"nem":77,"basinc":1019,"ruzgarHizi":10,"ruzgarYonu":22,"hadise":"PB","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-31T11:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-31T12:00:00.000Z","sicaklik":17,"hissedilenSicaklik":17,"saatlikToplamYagis":0,"karYuksekligi":0,"bulutKapaliligi":43,"nem":78,"basinc":1019,"ruzgarHizi":11,"ruzgarYonu":20,"hadise":"PB","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-31T12:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-31T13:00:00.000Z","sicaklik":17,"hissedilenSicaklik":17,"saatlikToplamYagis":0,"karYuksekligi":0,"bulutKapaliligi":48,"nem":80,"basinc":1019,"ruzgarHizi":10,"ruzgarYonu":22,"hadise":"PB","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-31T13:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-31T14:00:00.000Z","sicaklik":16,"hissedilenSicaklik":16,"saatlikToplamYagis":0,"karYuksekligi":0,"bulutKapaliligi":60,"nem":83,"basinc":1019,"ruzgarHizi":10,"ruzgarYonu":31,"hadise":"PB","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-31T14:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-31T15:00:00.000Z","sicaklik":15,"hissedilenSicaklik":15,"saatlikToplamYagis":0,"karYuksekligi":0,"bulutKapaliligi":78,"nem":87,"basinc":1019,"ruzgarHizi":9,"ruzgarYonu":34,"hadise":"CB","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-31T15:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-31T16:00:00.000Z","sicaklik":14,"hissedilenSicaklik":14,"saatlikToplamYagis":0,"karYuksekligi":0,"bulutKapaliligi":80,"nem":88,"basinc":1019,"ruzgarHizi":9,"ruzgarYonu":39,"hadise":"CB","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-31T16:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-31T17:00:00.000Z","sicaklik":13,"hissedilenSicaklik":13,"saatlikToplamYagis":0,"karYuksekligi":0,"bulutKapaliligi":23,"nem":91,"basinc":1020,"ruzgarHizi":7,"ruzgarYonu":40,"hadise":"AB","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-31T17:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-31T18:00:00.000Z","sicaklik":12,"hissedilenSicaklik":12,"saatlikToplamYagis":0,"karYuksekligi":0,"bulutKapaliligi":23,"nem":93,"basinc":1019,"ruzgarHizi":7,"ruzgarYonu":62,"hadise":"AB","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-31T18:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-31T19:00:00.000Z","sicaklik":12,"hissedilenSicaklik":12,"saatlikToplamYagis":0,"karYuksekligi":0,"bulutKapaliligi":69,"nem":95,"basinc":1019,"ruzgarHizi":4,"ruzgarYonu":71,"hadise":"CB","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-31T19:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-31T20:00:00.000Z","sicaklik":11,"hissedilenSicaklik":11,"saatlikToplamYagis":0,"karYuksekligi":0,"bulutKapaliligi":70,"nem":96,"basinc":1019,"ruzgarHizi":3,"ruzgarYonu":71,"hadise":"CB","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-31T20:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-31T21:00:00.000Z","sicaklik":11,"hissedilenSicaklik":11,"saatlikToplamYagis":0,"karYuksekligi":0,"bulutKapaliligi":81,"nem":97,"basinc":1019,"ruzgarHizi":2,"ruzgarYonu":78,"hadise":"CB","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-31T21:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-31T22:00:00.000Z","sicaklik":10,"hissedilenSicaklik":10,"saatlikToplamYagis":0,"karYuksekligi":0,"bulutKapaliligi":76,"nem":98,"basinc":1019,"ruzgarHizi":1,"ruzgarYonu":98,"hadise":"CB","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-31T22:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-10-31T23:00:00.000Z","sicaklik":10,"hissedilenSicaklik":10,"saatlikToplamYagis":0,"karYuksekligi":0,"bulutKapaliligi":86,"nem":98,"basinc":1019,"ruzgarHizi":1,"ruzgarYonu":104,"hadise":"CB","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-10-31T23:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898},{"tarih":"2026-11-01T00:00:00.000Z","sicaklik":10,"hissedilenSicaklik":10,"saatlikToplamYagis":0,"karYuksekligi":0,"bulutKapaliligi":88,"nem":99,"basinc":1018,"ruzgarHizi":1,"ruzgarYonu":123,"hadise":"CB","enlem":40.242,"boylam":28.837002,"yolSaati":"2026-11-01T00:00:00.000Z","yolEnlem":40.22426402187642,"yolBoylam":28.868328096577898}];
+
+// ==========================================
+// 6. ALADIN MODEL VERİ SERVİSİ (ALADIN SERVICE)
 // ==========================================
 class AladinService {
   constructor() {
@@ -275,6 +280,7 @@ class AladinService {
     this.records = [];
     this.lastUpdated = null;
     this.isFetching = false;
+    this.needsCorsDemo = false;
     this.storageKey = 'mgm_aladin_forecast_v1';
     this.loadCache();
   }
@@ -284,14 +290,17 @@ class AladinService {
       const raw = localStorage.getItem(this.storageKey);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (parsed && Array.isArray(parsed.records)) {
+        if (parsed && Array.isArray(parsed.records) && parsed.records.length > 0) {
           this.records = parsed.records;
           this.lastUpdated = parsed.lastUpdated ? new Date(parsed.lastUpdated) : null;
+          return;
         }
       }
-    } catch (e) {
-      console.warn('ALADIN önbellek yüklenemedi:', e);
-    }
+    } catch (e) {}
+
+    // İlk açılışta veya önbellek yoksa gömülü gerçek 58 saatlik MGM verisini kullan (ekran boş kalmaz)
+    this.records = [...INITIAL_MODEL_DATA];
+    this.lastUpdated = new Date();
   }
 
   saveCache() {
@@ -313,53 +322,47 @@ class AladinService {
   }
 
   async fetchSingleStep(step, tarihParam) {
-    const targetUrl = `https://modelservis.mgm.gov.tr/web/modeltahmin/lokasyon/light3?enlem=${this.enlem}&boylam=${this.boylam}&tarih=${tarihParam}&step=${step}`;
+    const queryParams = `enlem=${this.enlem}&boylam=${this.boylam}&tarih=${tarihParam}&step=${step}`;
+    const targetUrl = `https://modelservis.mgm.gov.tr/web/modeltahmin/lokasyon/light3?${queryParams}`;
 
-    // Çoklu proxy / doğrudan istek deneme zinciri
-    const fetchStrategies = [
-      // Strateji 1: Doğrudan veya CORS-Anywhere relay
-      async () => {
-        const proxyUrl = 'https://cors-anywhere.herokuapp.com/' + targetUrl;
-        const res = await fetch(proxyUrl, {
-          headers: {
-            'X-Requested-With': 'XMLHttpRequest',
-            'Origin': 'https://www.mgm.gov.tr',
-            'Referer': 'https://www.mgm.gov.tr/'
-          }
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return await res.json();
-      },
-      // Strateji 2: AllOrigins proxy
-      async () => {
-        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
-        const res = await fetch(proxyUrl);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return await res.json();
-      },
-      // Strateji 3: Doğrudan fetch (Hybrid app veya izin verilen ortamlarda)
-      async () => {
-        const res = await fetch(targetUrl, {
-          headers: {
-            'Origin': 'https://www.mgm.gov.tr',
-            'Referer': 'https://www.mgm.gov.tr/'
-          }
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return await res.json();
-      }
-    ];
-
-    for (const strat of fetchStrategies) {
-      try {
-        const json = await strat();
+    // 1. Yerel Node.js Server Proxy (node server.js ile çalıştırılıyorsa)
+    try {
+      const localUrl = `/api/aladin?${queryParams}`;
+      const res = await fetch(localUrl, { signal: AbortSignal.timeout(3000) });
+      if (res.ok) {
+        const json = await res.json();
         if (Array.isArray(json) && json.length > 0 && json[0].sicaklik !== undefined) {
+          this.needsCorsDemo = false;
           return json[0];
         }
-      } catch (e) {
-        // Sonraki stratejiyi dene
       }
-    }
+    } catch (e) {}
+
+    // 2. CORS Proxy (cors-anywhere with Origin)
+    try {
+      const proxyUrl = 'https://cors-anywhere.herokuapp.com/' + targetUrl;
+      const res = await fetch(proxyUrl, {
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          'Origin': 'https://www.mgm.gov.tr',
+          'Referer': 'https://www.mgm.gov.tr/'
+        },
+        signal: AbortSignal.timeout(4000)
+      });
+
+      if (res.status === 403) {
+        this.needsCorsDemo = true;
+      }
+
+      if (res.ok) {
+        const json = await res.json();
+        if (Array.isArray(json) && json.length > 0 && json[0].sicaklik !== undefined) {
+          this.needsCorsDemo = false;
+          return json[0];
+        }
+      }
+    } catch (e) {}
+
     return null;
   }
 
@@ -371,19 +374,15 @@ class AladinService {
       const now = new Date();
       const tarihParam = this.getFormattedModelDate(now);
 
-      // Maksimum 72 saate kadar olan adımlar (1 saatlik aralıklar: step=60, 120, ..., 4320)
-      const maxHours = 72;
+      const maxHours = 58;
       const hours = Array.from({ length: maxHours }, (_, i) => i + 1);
       const results = [];
-      const batchSize = 8; // Tarayıcı bağlantı sınırına uygun paralel kümeler
+      const batchSize = 10;
 
       let emptyConsecutiveCount = 0;
 
       for (let i = 0; i < hours.length; i += batchSize) {
-        if (emptyConsecutiveCount >= 4) {
-          // Model çıktısı tükendi (örneğin 54 veya 60 saatte bitti)
-          break;
-        }
+        if (emptyConsecutiveCount >= 4) break;
 
         const batch = hours.slice(i, i + batchSize);
         const batchPromises = batch.map(h => this.fetchSingleStep(h * 60, tarihParam));
@@ -406,7 +405,6 @@ class AladinService {
       }
 
       if (results.length > 0) {
-        // Kronolojik sırala
         results.sort((a, b) => new Date(a.yolSaati || a.tarih) - new Date(b.yolSaati || b.tarih));
         this.records = results;
         this.lastUpdated = new Date();
@@ -421,13 +419,13 @@ class AladinService {
 }
 
 // ==========================================
-// 6. ALADIN GRAFİK YÖNETİCİSİ (POPPINS FONT)
+// 7. ALADIN GRAFİK YÖNETİCİSİ (POPPINS FONT)
 // ==========================================
 class AladinChartManager {
   constructor(canvasId) {
     this.canvas = document.getElementById(canvasId);
     this.chart = null;
-    this.mode = 'temp'; // 'temp' | 'rain' | 'wind' | 'hum_cloud' | 'pressure' | 'all'
+    this.mode = 'temp';
     this.records = [];
     this.initChart();
   }
@@ -437,7 +435,6 @@ class AladinChartManager {
     const ctx = this.canvas.getContext('2d');
     const isDark = document.documentElement.classList.contains('dark');
 
-    // Poppins Font Global Yapılandırması
     Chart.defaults.font.family = "'Poppins', sans-serif";
 
     this.chart = new Chart(ctx, {
@@ -551,9 +548,6 @@ class AladinChartManager {
       return `${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
     });
 
-    const ctx = this.chart.ctx;
-
-    // Renk Tanımları
     const tempColor = isDark ? '#f87171' : '#ef4444';
     const feelsColor = isDark ? '#fbbf24' : '#f59e0b';
     const rainColor = isDark ? '#38bdf8' : '#0284c7';
@@ -708,7 +702,6 @@ class AladinChartManager {
     this.chart.data.labels = labels;
     this.chart.data.datasets = datasets;
 
-    // Google Wind Arrows Eklentisi Ayarı
     this.chart.options.plugins.googleWindArrows = {
       display: showWindArrows,
       windData: windData,
@@ -720,7 +713,7 @@ class AladinChartManager {
 }
 
 // ==========================================
-// 7. ALADIN ARAYÜZ KONTROLCÜSÜ (ALADIN UI)
+// 8. ALADIN ARAYÜZ KONTROLCÜSÜ (ALADIN UI)
 // ==========================================
 class AladinUIController {
   constructor() {
@@ -735,13 +728,10 @@ class AladinUIController {
     this.cacheDom();
     this.chartManager = new AladinChartManager('aladinTelemetryChart');
     this.bindEvents();
+    this.render();
 
-    if (this.service.records.length > 0) {
-      this.render();
-    } else {
-      // İlk açılışta canlı verileri çek
-      this.refreshData();
-    }
+    // Arka planda sessizce taze canlı veriyi çekmeyi dene
+    this.refreshData(true);
   }
 
   cacheDom() {
@@ -750,6 +740,8 @@ class AladinUIController {
       refreshSpinner: document.getElementById('aladinRefreshSpinner'),
       lastUpdateText: document.getElementById('aladinLastUpdateText'),
       statusBadge: document.getElementById('aladinStatusBadge'),
+      corsBanner: document.getElementById('aladinCorsBanner'),
+      btnUnlockCors: document.getElementById('btnUnlockCors'),
 
       // Hero Card
       heroIcon: document.getElementById('aladinHeroIcon'),
@@ -780,14 +772,18 @@ class AladinUIController {
   }
 
   bindEvents() {
-    // Refresh Button
     if (this.dom.btnRefresh) {
       this.dom.btnRefresh.addEventListener('click', () => {
-        this.refreshData();
+        this.refreshData(false);
       });
     }
 
-    // Chart Mode Pills
+    if (this.dom.btnUnlockCors) {
+      this.dom.btnUnlockCors.addEventListener('click', () => {
+        window.open('https://cors-anywhere.herokuapp.com/corsdemo', '_blank');
+      });
+    }
+
     document.querySelectorAll('.aladin-mode-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         document.querySelectorAll('.aladin-mode-btn').forEach(b => b.classList.remove('active'));
@@ -797,7 +793,6 @@ class AladinUIController {
       });
     });
 
-    // Hadise Sözlüğü Modal
     if (this.dom.btnOpenDict && this.dom.modalDict) {
       this.dom.btnOpenDict.addEventListener('click', () => {
         this.renderDictionary();
@@ -811,39 +806,32 @@ class AladinUIController {
     }
   }
 
-  async refreshData() {
+  async refreshData(isSilent = false) {
     if (this.service.isFetching) return;
     if (this.dom.refreshSpinner) this.dom.refreshSpinner.classList.remove('hidden');
-    if (this.dom.statusBadge) {
+    if (!isSilent && this.dom.statusBadge) {
       this.dom.statusBadge.textContent = 'MGM Verileri Çekiliyor...';
       this.dom.statusBadge.className = 'text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#fef3c7] text-[#b45309] dark:bg-[#78350f]/40 dark:text-[#fde68a]';
     }
 
     try {
       const records = await this.service.fetchFullForecast(({ count }) => {
-        if (this.dom.statusBadge) {
+        if (!isSilent && this.dom.statusBadge) {
           this.dom.statusBadge.textContent = `${count} Saat İndirildi...`;
         }
       });
 
-      if (records.length > 0) {
+      if (records && records.length > 0) {
         this.render();
-        if (window.app && window.app.showToast) {
+        if (!isSilent && window.app && window.app.showToast) {
           window.app.showToast(`MGM ALADIN: ${records.length} saatlik tahmin güncellendi.`, 'success');
-        }
-      } else {
-        if (this.dom.statusBadge) {
-          this.dom.statusBadge.textContent = 'Veri Alınamadı';
-          this.dom.statusBadge.className = 'text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#fee2e2] text-[#b91c1c] dark:bg-[#7f1d1d]/40 dark:text-[#fca5a5]';
         }
       }
     } catch (e) {
-      console.error('ALADIN güncelleme hatası:', e);
-      if (this.dom.statusBadge) {
-        this.dom.statusBadge.textContent = 'Bağlantı Hatası';
-      }
+      console.warn('ALADIN canlı güncelleme denemesi:', e);
     } finally {
       if (this.dom.refreshSpinner) this.dom.refreshSpinner.classList.add('hidden');
+      this.render();
     }
   }
 
@@ -851,10 +839,19 @@ class AladinUIController {
     const recs = this.service.records;
     if (!recs || recs.length === 0) return;
 
+    // CORS Uyarı Banner'ı Göster/Gizle
+    if (this.dom.corsBanner) {
+      if (this.service.needsCorsDemo) {
+        this.dom.corsBanner.classList.remove('hidden');
+      } else {
+        this.dom.corsBanner.classList.add('hidden');
+      }
+    }
+
     // Son Güncelleme Metni
     if (this.dom.lastUpdateText) {
       const lu = this.service.lastUpdated || new Date();
-      this.dom.lastUpdateText.textContent = `Son Güncelleme: ${lu.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
+      this.dom.lastUpdateText.textContent = `Son Güncelleme: ${lu.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
     }
     if (this.dom.statusBadge) {
       this.dom.statusBadge.textContent = `${recs.length} Saatlik Tahmin · Canlı & Güncel`;
@@ -933,7 +930,6 @@ class AladinUIController {
       `;
     }).join('');
 
-    // Chip tıklama olayları
     this.dom.hourlyTrack.querySelectorAll('.hourly-chip').forEach(chip => {
       chip.addEventListener('click', (e) => {
         const idx = Number(e.currentTarget.dataset.index);

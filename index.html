@@ -312,6 +312,17 @@
         </div>
       </div>
 
+      <!-- CORS Yardım / İzin Bannerı (Yalnızca doğrudan tarayıcı isteklerinde proxy gerekirse görünür) -->
+      <div id="aladinCorsBanner" class="hidden p-3 rounded-2xl bg-[#fffbeb] dark:bg-[#78350f]/20 border border-[#fef3c7] dark:border-[#92400e]/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs text-[#92400e] dark:text-[#fde68a]">
+        <div class="flex items-center gap-2">
+          <i data-lucide="info" class="w-4 h-4 shrink-0 text-[#d97706]"></i>
+          <span>MGM API doğrudan tarayıcı isteklerine CORS güvenlik kısıtlaması uygular. Canlı güncelleme için 1 tıkla geçici izni açabilir veya yerel <code>node server.js</code> kullanabilirsiniz.</span>
+        </div>
+        <button id="btnUnlockCors" class="px-3 py-1 rounded-full bg-[#d97706] hover:bg-[#b45309] text-white font-semibold text-xs shrink-0 cursor-pointer shadow-sm transition-colors">
+          İzin Ver (corsdemo)
+        </button>
+      </div>
+
       <!-- HERO FORECAST CARD (Meteocons + Güncel Değerler) -->
       <div class="m3-card p-3.5 sm:p-5 flex flex-col md:flex-row items-center justify-between gap-4">
         
@@ -518,9 +529,15 @@
           btnFetchHistory.classList.add('hidden');
           btnConnect.classList.add('hidden');
 
-          // ALADIN grafiklerini ekrana oturt
-          if (window.aladinUI && window.aladinUI.chartManager && window.aladinUI.chartManager.chart) {
-            window.aladinUI.chartManager.chart.resize();
+          // ALADIN grafiklerini ekrana oturt ve ikonları tazele
+          if (window.aladinUI) {
+            window.aladinUI.render();
+            if (window.aladinUI.chartManager && window.aladinUI.chartManager.chart) {
+              window.aladinUI.chartManager.chart.resize();
+            }
+          }
+          if (typeof lucide !== 'undefined' && lucide.createIcons) {
+            lucide.createIcons();
           }
         } else {
           btnTabAladin.classList.remove('active');
