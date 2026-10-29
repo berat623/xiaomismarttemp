@@ -30,28 +30,68 @@
   src: url('fonts/parkinsans-800.ttf') format('truetype');
 }
 
-/* Universal Font Enforcement & Absolute Zero Animation for Maximum Speed */
+/* Local Offline Fonts: Poppins (MGM ALADIN Model Entegrasyonu) */
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('fonts/poppins-400.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('fonts/poppins-500.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('fonts/poppins-600.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('fonts/poppins-700.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url('fonts/poppins-800.ttf') format('truetype');
+}
+
+/* Universal Base Settings */
 *, *::before, *::after {
   -webkit-tap-highlight-color: transparent;
   box-sizing: border-box;
-  font-family: 'Parkinsans', sans-serif !important;
-  transition: none !important;
-  animation: none !important;
 }
 
 html {
   -webkit-text-size-adjust: 100%;
   touch-action: manipulation;
   scroll-behavior: auto !important;
-  font-family: 'Parkinsans', sans-serif !important;
+  font-family: 'Parkinsans', sans-serif;
 }
 
 body {
-  font-family: 'Parkinsans', sans-serif !important;
+  font-family: 'Parkinsans', sans-serif;
   font-weight: 500;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+}
+
+/* Poppins Font Kapsayıcısı */
+.font-poppins, .font-poppins *,
+#viewAladin, #viewAladin * {
+  font-family: 'Poppins', sans-serif !important;
 }
 
 /* Font Weights */
@@ -99,7 +139,7 @@ h1, h2, h3, h4, th, .font-bold {
 }
 
 /* Mode Tabs with Soft Pastel Accents */
-.mode-btn {
+.mode-btn, .aladin-mode-btn {
   color: #64748b;
   font-weight: 600;
   border-radius: 9999px;
@@ -107,26 +147,51 @@ h1, h2, h3, h4, th, .font-bold {
   white-space: nowrap;
   border: 1px solid transparent;
 }
-.mode-btn:hover {
+.mode-btn:hover, .aladin-mode-btn:hover {
   color: #334155;
   background-color: rgba(84, 110, 122, 0.08);
 }
-.mode-btn.active {
+.mode-btn.active, .aladin-mode-btn.active {
   background-color: #546e7a;
   color: #ffffff;
   font-weight: 700;
 }
 
-.dark .mode-btn {
+.dark .mode-btn, .dark .aladin-mode-btn {
   color: #94a3b8;
 }
-.dark .mode-btn:hover {
+.dark .mode-btn:hover, .dark .aladin-mode-btn:hover {
   color: #e2e8f0;
   background-color: rgba(255, 255, 255, 0.06);
 }
-.dark .mode-btn.active {
+.dark .mode-btn.active, .dark .aladin-mode-btn.active {
   background-color: #3d4d5e;
   color: #f1f5f9;
+  font-weight: 700;
+}
+
+/* Navigation Segmented Tab Switcher */
+.nav-tab-btn {
+  font-weight: 600;
+  border-radius: 9999px;
+  touch-action: manipulation;
+  white-space: nowrap;
+  padding: 4px 12px;
+  color: #64748b;
+  background: transparent;
+  cursor: pointer;
+}
+.nav-tab-btn.active {
+  background: #546e7a;
+  color: #ffffff;
+  font-weight: 700;
+}
+.dark .nav-tab-btn {
+  color: #94a3b8;
+}
+.dark .nav-tab-btn.active {
+  background: #38bdf8;
+  color: #0f172a;
   font-weight: 700;
 }
 
@@ -188,8 +253,70 @@ table th, table td {
   background: #121519 !important;
 }
 
-.chart-fullscreen #chartCanvasContainer {
+.chart-fullscreen #chartCanvasContainer,
+.chart-fullscreen #aladinChartCanvasContainer {
   flex: 1 1 0% !important;
   height: 100% !important;
   min-height: 0 !important;
+}
+
+/* ==========================================
+   METEOCONS HAREKETLİ SVG ANİMASYONLARI
+   ========================================== */
+@keyframes meteo-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes meteo-drift {
+  0% { transform: translateX(-2.5px); }
+  100% { transform: translateX(3px); }
+}
+@keyframes meteo-rain {
+  0% { transform: translateY(-4px); opacity: 0; }
+  50% { opacity: 1; }
+  100% { transform: translateY(8px); opacity: 0; }
+}
+@keyframes meteo-flash {
+  0%, 100% { opacity: 0; }
+  8%, 14% { opacity: 1; }
+  10% { opacity: 0.15; }
+}
+@keyframes meteo-snow {
+  0% { transform: translateY(-4px) rotate(0deg); opacity: 0; }
+  50% { opacity: 1; }
+  100% { transform: translateY(7px) rotate(180deg); opacity: 0; }
+}
+@keyframes meteo-star-twinkle {
+  0%, 100% { opacity: 0.2; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
+.meteo-sun-rays {
+  transform-origin: center;
+  animation: meteo-spin 18s linear infinite;
+}
+.meteo-cloud-drift {
+  animation: meteo-drift 4s ease-in-out infinite alternate;
+}
+.meteo-raindrop-1 {
+  animation: meteo-rain 1.1s linear infinite;
+}
+.meteo-raindrop-2 {
+  animation: meteo-rain 1.1s linear infinite 0.35s;
+}
+.meteo-raindrop-3 {
+  animation: meteo-rain 1.1s linear infinite 0.7s;
+}
+.meteo-lightning {
+  animation: meteo-flash 2.8s ease-in-out infinite;
+}
+.meteo-snowflake-1 {
+  animation: meteo-snow 2.2s linear infinite;
+}
+.meteo-snowflake-2 {
+  animation: meteo-snow 2.2s linear infinite 0.8s;
+}
+.meteo-star {
+  animation: meteo-star-twinkle 2.5s ease-in-out infinite;
+  transform-origin: center;
 }

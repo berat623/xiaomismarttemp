@@ -4,13 +4,14 @@
  * Bluetooth BLE sensor telemetry operates locally via Web Bluetooth API.
  */
 
-const CACHE_NAME = 'xiaomi-smarttemp-v4.5';
+const CACHE_NAME = 'xiaomi-smarttemp-v5.0';
 
 const PRECACHE_ASSETS = [
   './',
   './index.html',
   './style.css',
   './app.js',
+  './aladin.js',
   './manifest.webmanifest',
   './icon.svg',
   './vendor/tailwind.js',
@@ -19,7 +20,12 @@ const PRECACHE_ASSETS = [
   './fonts/parkinsans-500.ttf',
   './fonts/parkinsans-600.ttf',
   './fonts/parkinsans-700.ttf',
-  './fonts/parkinsans-800.ttf'
+  './fonts/parkinsans-800.ttf',
+  './fonts/poppins-400.ttf',
+  './fonts/poppins-500.ttf',
+  './fonts/poppins-600.ttf',
+  './fonts/poppins-700.ttf',
+  './fonts/poppins-800.ttf'
 ];
 
 // 1. Install: Pre-cache all core app shell, vendor scripts, and offline fonts

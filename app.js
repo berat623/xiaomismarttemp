@@ -1978,6 +1978,9 @@ class AppController {
 
     lucide.createIcons();
     this.adaptChartTheme();
+    if (window.aladinUI && window.aladinUI.chartManager) {
+      window.aladinUI.chartManager.update();
+    }
   }
 
   showToast(message, type = 'info') {
