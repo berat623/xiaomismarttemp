@@ -1058,9 +1058,9 @@ class AladinUIController {
           <div class="text-[10px] font-bold text-[#334155] dark:text-[#cbd5e1] truncate max-w-[72px]">${hInfo.name}</div>
           <div class="mt-1 flex items-center gap-1 text-[10px] font-extrabold text-[#15803d] dark:text-[#4ade80]">
             <span class="inline-block transform" style="transform: rotate(${r.ruzgarYonu}deg);">➤</span>
-            <span>${r.ruzgarHizi}k</span>
+            <span>${r.ruzgarHizi} km/h</span>
           </div>
-          ${r.saatlikToplamYagis > 0 ? `<div class="mt-0.5 text-[9px] font-black text-[#2563eb] dark:text-[#60a5fa]">${r.saatlikToplamYagis}mm</div>` : ''}
+          ${r.saatlikToplamYagis > 0 ? `<div class="mt-0.5 text-[9px] font-black text-[#2563eb] dark:text-[#60a5fa]">${r.saatlikToplamYagis} mm</div>` : ''}
         </div>
       `;
     }).join('');
@@ -1148,18 +1148,18 @@ class AladinUIController {
             </div>
 
             <div class="grid grid-cols-4 gap-1.5 pt-2 border-t border-[#cbd5e1] dark:border-[#283343] text-[10px] font-mono text-center">
-              <div class="flex items-center justify-center gap-1 bg-[#e2e8f0] dark:bg-[#1f2837] border border-[#cbd5e1]/60 dark:border-[#283343] px-1.5 py-1 rounded-lg text-[#15803d] dark:text-[#4ade80] font-extrabold" title="Rüzgar Hızı ve Yönü">
+              <div class="flex items-center justify-center gap-1 bg-[#e2e8f0] dark:bg-[#1f2837] border border-[#cbd5e1]/60 dark:border-[#283343] px-1 py-1 rounded-lg text-[#15803d] dark:text-[#4ade80] font-extrabold" title="Rüzgar Hızı ve Yönü">
                 <span class="inline-block transform text-[9px]" style="transform: rotate(${r.ruzgarYonu}deg);">➤</span>
-                <span>${r.ruzgarHizi}k</span>
+                <span>${r.ruzgarHizi} km/h</span>
               </div>
-              <div class="flex items-center justify-center gap-0.5 bg-[#e2e8f0] dark:bg-[#1f2837] border border-[#cbd5e1]/60 dark:border-[#283343] px-1.5 py-1 rounded-lg ${r.saatlikToplamYagis > 0 ? 'text-[#2563eb] dark:text-[#60a5fa] font-black' : 'text-[#475569] dark:text-[#94a3b8] font-bold'}" title="Yağış Miktarı">
-                <span>💧${r.saatlikToplamYagis}</span>
+              <div class="flex items-center justify-center gap-0.5 bg-[#e2e8f0] dark:bg-[#1f2837] border border-[#cbd5e1]/60 dark:border-[#283343] px-1 py-1 rounded-lg ${r.saatlikToplamYagis > 0 ? 'text-[#2563eb] dark:text-[#60a5fa] font-black' : 'text-[#475569] dark:text-[#94a3b8] font-bold'}" title="Yağış Miktarı">
+                <span>💧${r.saatlikToplamYagis} mm</span>
               </div>
-              <div class="flex items-center justify-center gap-0.5 bg-[#e2e8f0] dark:bg-[#1f2837] border border-[#cbd5e1]/60 dark:border-[#283343] px-1.5 py-1 rounded-lg text-[#0f766e] dark:text-[#2dd4bf] font-extrabold" title="Bağıl Nem">
+              <div class="flex items-center justify-center gap-0.5 bg-[#e2e8f0] dark:bg-[#1f2837] border border-[#cbd5e1]/60 dark:border-[#283343] px-1 py-1 rounded-lg text-[#0f766e] dark:text-[#2dd4bf] font-extrabold" title="Bağıl Nem">
                 <span>%${r.nem}</span>
               </div>
-              <div class="flex items-center justify-center gap-0.5 bg-[#e2e8f0] dark:bg-[#1f2837] border border-[#cbd5e1]/60 dark:border-[#283343] px-1.5 py-1 rounded-lg text-[#7e22ce] dark:text-[#c084fc] font-extrabold" title="Hava Basıncı">
-                <span>${r.basinc}h</span>
+              <div class="flex items-center justify-center gap-0.5 bg-[#e2e8f0] dark:bg-[#1f2837] border border-[#cbd5e1]/60 dark:border-[#283343] px-1 py-1 rounded-lg text-[#7e22ce] dark:text-[#c084fc] font-extrabold" title="Hava Basıncı">
+                <span>${r.basinc} hPa</span>
               </div>
             </div>
           </div>
