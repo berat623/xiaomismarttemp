@@ -374,7 +374,7 @@ class AladinService {
       const now = new Date();
       const tarihParam = this.getFormattedModelDate(now);
 
-      const maxHours = 58;
+      const maxHours = 72; // ALADIN sayısal model çıktısı (72 saate kadar veri üretir)
       const hours = Array.from({ length: maxHours }, (_, i) => i + 1);
       const results = [];
       const batchSize = 10;
@@ -382,7 +382,7 @@ class AladinService {
       let emptyConsecutiveCount = 0;
 
       for (let i = 0; i < hours.length; i += batchSize) {
-        if (emptyConsecutiveCount >= 4) break;
+        if (emptyConsecutiveCount >= 3) break;
 
         const batch = hours.slice(i, i + batchSize);
         const batchPromises = batch.map(h => this.fetchSingleStep(h * 60, tarihParam));
@@ -540,6 +540,9 @@ class AladinChartManager {
     if (records) this.records = records;
     if (!this.chart || this.records.length === 0) return;
 
+    // Telefon görünümünde (hidden md:block) grafik gizli olduğu için hesaplama ve render yapma
+    if (this.canvas.offsetParent === null) return;
+
     const isDark = document.documentElement.classList.contains('dark');
     const recs = this.records;
 
@@ -557,22 +560,40 @@ class AladinChartManager {
     const cloudColor = isDark ? '#94a3b8' : '#64748b';
     const pressureColor = isDark ? '#c084fc' : '#9333ea';
 
+    // Modern Akıcı Lineer Gradyan Fonksiyonu
+    const makeGradient = (rgbStr, topAlpha, midAlpha, botAlpha) => {
+      return (context) => {
+        const chart = context.chart;
+        const { ctx, chartArea } = chart;
+        if (!chartArea) return `rgba(${rgbStr}, ${topAlpha})`;
+        const g = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+        g.addColorStop(0, `rgba(${rgbStr}, ${topAlpha})`);
+        g.addColorStop(0.65, `rgba(${rgbStr}, ${midAlpha})`);
+        g.addColorStop(1, `rgba(${rgbStr}, ${botAlpha})`);
+        return g;
+      };
+    };
+
     let datasets = [];
     let showWindArrows = false;
     let windData = [];
 
     if (this.mode === 'temp') {
+      const tempRgb = isDark ? '248, 113, 113' : '239, 68, 68';
       datasets = [
         {
           label: 'Sıcaklık (°C)',
           data: recs.map(r => r.sicaklik),
           borderColor: tempColor,
-          backgroundColor: isDark ? 'rgba(248, 113, 113, 0.12)' : 'rgba(239, 68, 68, 0.1)',
+          backgroundColor: makeGradient(tempRgb, 0.32, 0.08, 0.0),
           fill: true,
-          tension: 0.25,
-          borderWidth: 2.5,
-          pointRadius: recs.length > 30 ? 1 : 3,
-          pointBackgroundColor: tempColor
+          tension: 0.38,
+          borderWidth: 2.75,
+          pointRadius: 0,
+          pointHoverRadius: 6.5,
+          pointHoverBackgroundColor: '#ffffff',
+          pointHoverBorderWidth: 3,
+          pointHoverBorderColor: tempColor
         },
         {
           label: 'Hissedilen (°C)',
@@ -580,9 +601,13 @@ class AladinChartManager {
           borderColor: feelsColor,
           borderDash: [4, 4],
           fill: false,
-          tension: 0.25,
+          tension: 0.38,
           borderWidth: 2,
-          pointRadius: 0
+          pointRadius: 0,
+          pointHoverRadius: 5.5,
+          pointHoverBackgroundColor: '#ffffff',
+          pointHoverBorderWidth: 2.5,
+          pointHoverBorderColor: feelsColor
         }
       ];
       this.chart.options.scales.y.ticks.callback = (v) => `${v}°C`;
@@ -592,53 +617,61 @@ class AladinChartManager {
           label: 'Saatlik Yağış (mm)',
           data: recs.map(r => r.saatlikToplamYagis),
           borderColor: rainColor,
-          backgroundColor: isDark ? 'rgba(56, 189, 248, 0.25)' : 'rgba(2, 132, 199, 0.2)',
+          backgroundColor: isDark ? 'rgba(56, 189, 248, 0.35)' : 'rgba(2, 132, 199, 0.28)',
           fill: true,
           type: 'bar',
           borderWidth: 1.5,
-          borderRadius: 4
+          borderRadius: 6
         },
         {
           label: 'Kar Yüksekliği (cm)',
           data: recs.map(r => r.karYuksekligi),
           borderColor: snowColor,
-          backgroundColor: isDark ? 'rgba(165, 180, 252, 0.25)' : 'rgba(99, 102, 241, 0.2)',
+          backgroundColor: isDark ? 'rgba(165, 180, 252, 0.35)' : 'rgba(99, 102, 241, 0.28)',
           fill: true,
           type: 'bar',
           borderWidth: 1.5,
-          borderRadius: 4
+          borderRadius: 6
         }
       ];
       this.chart.options.scales.y.ticks.callback = (v) => `${v} mm`;
     } else if (this.mode === 'wind') {
       showWindArrows = true;
       windData = recs.map(r => ({ speed: r.ruzgarHizi, direction: r.ruzgarYonu }));
+      const windRgb = isDark ? '52, 211, 153' : '16, 185, 129';
       datasets = [
         {
           label: 'Rüzgar Hızı (km/h)',
           data: recs.map(r => r.ruzgarHizi),
           borderColor: windColor,
-          backgroundColor: isDark ? 'rgba(52, 211, 153, 0.12)' : 'rgba(16, 185, 129, 0.1)',
+          backgroundColor: makeGradient(windRgb, 0.30, 0.08, 0.0),
           fill: true,
-          tension: 0.2,
-          borderWidth: 2.5,
-          pointRadius: 3.5,
-          pointHoverRadius: 6,
-          pointBackgroundColor: windColor
+          tension: 0.35,
+          borderWidth: 2.75,
+          pointRadius: 3,
+          pointHoverRadius: 7,
+          pointHoverBackgroundColor: '#ffffff',
+          pointHoverBorderWidth: 3,
+          pointHoverBorderColor: windColor
         }
       ];
       this.chart.options.scales.y.ticks.callback = (v) => `${v} km/h`;
     } else if (this.mode === 'hum_cloud') {
+      const humRgb = isDark ? '45, 212, 191' : '13, 148, 136';
       datasets = [
         {
           label: 'Bağıl Nem (%)',
           data: recs.map(r => r.nem),
           borderColor: humColor,
-          backgroundColor: isDark ? 'rgba(45, 212, 191, 0.12)' : 'rgba(13, 148, 136, 0.1)',
+          backgroundColor: makeGradient(humRgb, 0.26, 0.06, 0.0),
           fill: true,
-          tension: 0.2,
-          borderWidth: 2,
-          pointRadius: 0
+          tension: 0.38,
+          borderWidth: 2.5,
+          pointRadius: 0,
+          pointHoverRadius: 6,
+          pointHoverBackgroundColor: '#ffffff',
+          pointHoverBorderWidth: 3,
+          pointHoverBorderColor: humColor
         },
         {
           label: 'Bulut Kapalılığı (%)',
@@ -646,24 +679,29 @@ class AladinChartManager {
           borderColor: cloudColor,
           borderDash: [3, 3],
           fill: false,
-          tension: 0.2,
+          tension: 0.38,
           borderWidth: 2,
-          pointRadius: 0
+          pointRadius: 0,
+          pointHoverRadius: 5
         }
       ];
       this.chart.options.scales.y.ticks.callback = (v) => `%${v}`;
     } else if (this.mode === 'pressure') {
+      const pressRgb = isDark ? '192, 132, 252' : '147, 51, 234';
       datasets = [
         {
           label: 'Hava Basıncı (hPa)',
           data: recs.map(r => r.basinc),
           borderColor: pressureColor,
-          backgroundColor: isDark ? 'rgba(192, 132, 252, 0.12)' : 'rgba(147, 51, 234, 0.1)',
+          backgroundColor: makeGradient(pressRgb, 0.28, 0.07, 0.0),
           fill: true,
-          tension: 0.25,
-          borderWidth: 2.5,
-          pointRadius: recs.length > 30 ? 1 : 3,
-          pointBackgroundColor: pressureColor
+          tension: 0.38,
+          borderWidth: 2.75,
+          pointRadius: 0,
+          pointHoverRadius: 6.5,
+          pointHoverBackgroundColor: '#ffffff',
+          pointHoverBorderWidth: 3,
+          pointHoverBorderColor: pressureColor
         }
       ];
       this.chart.options.scales.y.ticks.callback = (v) => `${v} hPa`;
@@ -674,25 +712,25 @@ class AladinChartManager {
           label: 'Sıcaklık (°C)',
           data: recs.map(r => r.sicaklik),
           borderColor: tempColor,
-          borderWidth: 2,
-          tension: 0.2,
+          borderWidth: 2.25,
+          tension: 0.38,
           pointRadius: 0
         },
         {
           label: 'Rüzgar (km/h)',
           data: recs.map(r => r.ruzgarHizi),
           borderColor: windColor,
-          borderWidth: 2,
-          tension: 0.2,
+          borderWidth: 2.25,
+          tension: 0.35,
           pointRadius: 0
         },
         {
           label: 'Nem (%)',
           data: recs.map(r => r.nem),
           borderColor: humColor,
-          borderWidth: 1.5,
+          borderWidth: 1.75,
           borderDash: [3, 3],
-          tension: 0.2,
+          tension: 0.38,
           pointRadius: 0
         }
       ];
@@ -739,7 +777,6 @@ class AladinUIController {
       btnRefresh: document.getElementById('btnAladinRefresh'),
       refreshSpinner: document.getElementById('aladinRefreshSpinner'),
       lastUpdateText: document.getElementById('aladinLastUpdateText'),
-      statusBadge: document.getElementById('aladinStatusBadge'),
       corsBanner: document.getElementById('aladinCorsBanner'),
       btnUnlockCors: document.getElementById('btnUnlockCors'),
 
@@ -759,8 +796,9 @@ class AladinUIController {
       // Timeline / Carousel
       hourlyTrack: document.getElementById('aladinHourlyTrack'),
 
-      // Table
+      // Desktop Table & Mobile List
       tableBody: document.getElementById('aladinTableBody'),
+      mobileList: document.getElementById('aladinMobileList'),
       tableSummary: document.getElementById('aladinTableSummary'),
 
       // Dictionary Modal
@@ -809,17 +847,9 @@ class AladinUIController {
   async refreshData(isSilent = false) {
     if (this.service.isFetching) return;
     if (this.dom.refreshSpinner) this.dom.refreshSpinner.classList.remove('hidden');
-    if (!isSilent && this.dom.statusBadge) {
-      this.dom.statusBadge.textContent = 'MGM Verileri Çekiliyor...';
-      this.dom.statusBadge.className = 'text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#fef3c7] text-[#b45309] dark:bg-[#78350f]/40 dark:text-[#fde68a]';
-    }
 
     try {
-      const records = await this.service.fetchFullForecast(({ count }) => {
-        if (!isSilent && this.dom.statusBadge) {
-          this.dom.statusBadge.textContent = `${count} Saat İndirildi...`;
-        }
-      });
+      const records = await this.service.fetchFullForecast();
 
       if (records && records.length > 0) {
         this.render();
@@ -852,10 +882,6 @@ class AladinUIController {
     if (this.dom.lastUpdateText) {
       const lu = this.service.lastUpdated || new Date();
       this.dom.lastUpdateText.textContent = `Son Güncelleme: ${lu.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
-    }
-    if (this.dom.statusBadge) {
-      this.dom.statusBadge.textContent = `${recs.length} Saatlik Tahmin · Canlı & Güncel`;
-      this.dom.statusBadge.className = 'text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#dcfce7] text-[#15803d] dark:bg-[#14532d]/40 dark:text-[#86efac]';
     }
 
     // Hero Card Render (İlk / Güncel Saat)
@@ -940,44 +966,97 @@ class AladinUIController {
   }
 
   renderTable() {
-    if (!this.dom.tableBody) return;
     const recs = this.service.records;
+    if (!recs || recs.length === 0) return;
 
     if (this.dom.tableSummary) {
-      this.dom.tableSummary.textContent = `${recs.length} saatlik tahmin kaydı`;
+      this.dom.tableSummary.textContent = `${recs.length} saatlik tahmin`;
     }
 
-    this.dom.tableBody.innerHTML = recs.map(r => {
-      const hInfo = getHadiseInfo(r.hadise);
-      const d = new Date(r.yolSaati || r.tarih);
-      const timeStr = `${d.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })} ${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
-      const isNight = d.getHours() < 6 || d.getHours() >= 20;
-      const windDir = getCompassDirection(r.ruzgarYonu);
+    // 1. BİLGİSAYAR GÖRÜNÜMÜ: 9 Sütunlu Tam Tablo
+    if (this.dom.tableBody) {
+      this.dom.tableBody.innerHTML = recs.map(r => {
+        const hInfo = getHadiseInfo(r.hadise);
+        const d = new Date(r.yolSaati || r.tarih);
+        const timeStr = `${d.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })} ${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
+        const isNight = d.getHours() < 6 || d.getHours() >= 20;
+        const windDir = getCompassDirection(r.ruzgarYonu);
 
-      return `
-        <tr class="hover:bg-[#f6f8fa]/60 dark:hover:bg-[#1e232c]/50">
-          <td class="py-2 px-2.5 text-[#525a66] dark:text-[#a1abb8] font-mono text-[11px] whitespace-nowrap">${timeStr}</td>
-          <td class="py-2 px-2 whitespace-nowrap">
-            <div class="flex items-center gap-1.5">
-              ${Meteocons.getSvg(hInfo.type, 22, isNight)}
-              <span class="font-medium text-[#2d3139] dark:text-[#e4e7eb]">${hInfo.name}</span>
+        return `
+          <tr class="hover:bg-[#f6f8fa]/70 dark:hover:bg-[#1e232c]/60 transition-colors">
+            <td class="py-2.5 px-3 text-[#525a66] dark:text-[#a1abb8] font-mono text-[11px] whitespace-nowrap">${timeStr}</td>
+            <td class="py-2.5 px-3 whitespace-nowrap">
+              <div class="flex items-center gap-1.5">
+                ${Meteocons.getSvg(hInfo.type, 22, isNight)}
+                <span class="font-medium text-[#2d3139] dark:text-[#e4e7eb]">${hInfo.name}</span>
+              </div>
+            </td>
+            <td class="py-2.5 px-3 font-bold text-[#ef4444] dark:text-[#f87171] font-mono">${Math.round(r.sicaklik)}°C</td>
+            <td class="py-2.5 px-3 text-[#f59e0b] dark:text-[#fbbf24] font-mono">${Math.round(r.hissedilenSicaklik)}°C</td>
+            <td class="py-2.5 px-3 font-semibold ${r.saatlikToplamYagis > 0 ? 'text-[#0284c7] dark:text-[#38bdf8]' : 'text-[#7a828e]'} font-mono">${r.saatlikToplamYagis} mm</td>
+            <td class="py-2.5 px-3 whitespace-nowrap">
+              <div class="flex items-center gap-1.5 font-mono text-[#10b981] dark:text-[#34d399] font-semibold">
+                <span class="inline-block transform text-xs" style="transform: rotate(${r.ruzgarYonu}deg);">➤</span>
+                <span>${r.ruzgarHizi} km/h (${windDir})</span>
+              </div>
+            </td>
+            <td class="py-2.5 px-3 text-[#0d9488] dark:text-[#2dd4bf] font-mono">%${r.nem}</td>
+            <td class="py-2.5 px-3 text-[#9333ea] dark:text-[#c084fc] font-mono">${r.basinc} hPa</td>
+            <td class="py-2.5 px-3 text-[#64748b] dark:text-[#94a3b8] font-mono">%${r.bulutKapaliligi}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // 2. TELEFON GÖRÜNÜMÜ: Telefonlara Tam Uyumlu & Hızlı Kart Listesi
+    if (this.dom.mobileList) {
+      this.dom.mobileList.innerHTML = recs.map(r => {
+        const hInfo = getHadiseInfo(r.hadise);
+        const d = new Date(r.yolSaati || r.tarih);
+        const dayStr = d.toLocaleDateString('tr-TR', { weekday: 'short' });
+        const timeStr = d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+        const dateStr = d.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' });
+        const isNight = d.getHours() < 6 || d.getHours() >= 20;
+
+        return `
+          <div class="p-2.5 rounded-xl bg-[#ffffff] dark:bg-[#181c22] border border-[#eceeef] dark:border-[#222831] space-y-2">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <div class="w-8 h-8 flex items-center justify-center shrink-0">
+                  ${Meteocons.getSvg(hInfo.type, 28, isNight)}
+                </div>
+                <div>
+                  <div class="text-xs font-bold text-[#0f172a] dark:text-[#f8fafc] font-mono">
+                    ${timeStr} <span class="text-[10px] font-sans font-medium text-[#64748b] dark:text-[#94a3b8]">· ${dayStr} ${dateStr}</span>
+                  </div>
+                  <div class="text-[11px] font-medium text-[#546e7a] dark:text-[#38bdf8]">${hInfo.name}</div>
+                </div>
+              </div>
+              <div class="text-right">
+                <div class="text-base font-extrabold text-[#ef4444] dark:text-[#f87171] font-mono leading-none">${Math.round(r.sicaklik)}°C</div>
+                <div class="text-[10px] text-[#f59e0b] dark:text-[#fbbf24] font-mono mt-0.5">His: ${Math.round(r.hissedilenSicaklik)}°C</div>
+              </div>
             </div>
-          </td>
-          <td class="py-2 px-2 font-bold text-[#ef4444] dark:text-[#f87171] font-mono">${Math.round(r.sicaklik)}°C</td>
-          <td class="py-2 px-2 text-[#f59e0b] dark:text-[#fbbf24] font-mono">${Math.round(r.hissedilenSicaklik)}°C</td>
-          <td class="py-2 px-2 font-semibold ${r.saatlikToplamYagis > 0 ? 'text-[#0284c7] dark:text-[#38bdf8]' : 'text-[#7a828e]'} font-mono">${r.saatlikToplamYagis} mm</td>
-          <td class="py-2 px-2 whitespace-nowrap">
-            <div class="flex items-center gap-1 font-mono text-[#10b981] dark:text-[#34d399] font-semibold">
-              <span class="inline-block transform text-xs" style="transform: rotate(${r.ruzgarYonu}deg);">➤</span>
-              <span>${r.ruzgarHizi} km/h (${windDir})</span>
+
+            <div class="grid grid-cols-4 gap-1.5 pt-1.5 border-t border-[#f1f3f5] dark:border-[#222831] text-[10px] font-mono text-center">
+              <div class="flex items-center justify-center gap-1 bg-[#f8fafc] dark:bg-[#1e232c] px-1.5 py-1 rounded-lg text-[#10b981] dark:text-[#34d399] font-semibold" title="Rüzgar Hızı ve Yönü">
+                <span class="inline-block transform text-[9px]" style="transform: rotate(${r.ruzgarYonu}deg);">➤</span>
+                <span>${r.ruzgarHizi}k</span>
+              </div>
+              <div class="flex items-center justify-center gap-0.5 bg-[#f8fafc] dark:bg-[#1e232c] px-1.5 py-1 rounded-lg ${r.saatlikToplamYagis > 0 ? 'text-[#0284c7] dark:text-[#38bdf8] font-bold' : 'text-[#64748b] dark:text-[#94a3b8]'}" title="Yağış Miktarı">
+                <span>💧${r.saatlikToplamYagis}</span>
+              </div>
+              <div class="flex items-center justify-center gap-0.5 bg-[#f8fafc] dark:bg-[#1e232c] px-1.5 py-1 rounded-lg text-[#0d9488] dark:text-[#2dd4bf]" title="Bağıl Nem">
+                <span>%${r.nem}</span>
+              </div>
+              <div class="flex items-center justify-center gap-0.5 bg-[#f8fafc] dark:bg-[#1e232c] px-1.5 py-1 rounded-lg text-[#9333ea] dark:text-[#c084fc]" title="Hava Basıncı">
+                <span>${r.basinc}h</span>
+              </div>
             </div>
-          </td>
-          <td class="py-2 px-2 text-[#0d9488] dark:text-[#2dd4bf] font-mono">%${r.nem}</td>
-          <td class="py-2 px-2 text-[#9333ea] dark:text-[#c084fc] font-mono">${r.basinc} hPa</td>
-          <td class="py-2 px-2 text-[#64748b] dark:text-[#94a3b8] font-mono">%${r.bulutKapaliligi}</td>
-        </tr>
-      `;
-    }).join('');
+          </div>
+        `;
+      }).join('');
+    }
   }
 
   renderDictionary() {

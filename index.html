@@ -285,9 +285,6 @@
           <div class="min-w-0">
             <div class="flex items-center gap-1.5 flex-wrap">
               <h1 class="text-xs sm:text-sm font-bold text-[#1e293b] dark:text-[#f1f5f9]">MGM ALADIN Modeli</h1>
-              <span id="aladinStatusBadge" class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#dcfce7] text-[#15803d] dark:bg-[#14532d]/40 dark:text-[#86efac]">
-                Yükleniyor...
-              </span>
             </div>
             <div class="text-[10px] text-[#64748b] dark:text-[#94a3b8] flex items-center gap-1 truncate">
               <span>Bursa Nilüfer (40.224°K, 28.868°D)</span>
@@ -414,8 +411,8 @@
         </div>
       </div>
 
-      <!-- MODERN & PREMIUM CHART.JS GRAPH (POPPINS FONT) -->
-      <div id="aladinChartCard" class="m3-card p-2.5 sm:p-4 space-y-2">
+      <!-- MODERN & PREMIUM CHART.JS GRAPH (POPPINS FONT) - SADECE BİLGİSAYARDA GÖZÜKÜR -->
+      <div id="aladinChartCard" class="hidden md:block m3-card p-3 sm:p-4 space-y-2.5">
         <div class="flex flex-wrap items-center justify-between gap-1.5 border-b border-[#eceeef] dark:border-[#222831] pb-2">
           
           <div class="flex items-center justify-between w-full sm:w-auto gap-2">
@@ -427,47 +424,49 @@
 
           <!-- Mode Selectors (Sıcaklık, Yağış, Rüzgar, Nem/Bulut, Basınç, Tümü) -->
           <div class="inline-flex w-full sm:w-auto flex-wrap gap-1 rounded-full bg-[#f0f2f5] dark:bg-[#20252e] p-0.5 border border-[#e4e7eb] dark:border-[#2b333f] text-[10px] sm:text-xs">
-            <button class="aladin-mode-btn active px-2 sm:px-2.5 py-0.5 font-semibold cursor-pointer" data-aladin-mode="temp">Sıcaklık</button>
-            <button class="aladin-mode-btn px-2 sm:px-2.5 py-0.5 font-semibold cursor-pointer" data-aladin-mode="rain">Yağış & Kar</button>
-            <button class="aladin-mode-btn px-2 sm:px-2.5 py-0.5 font-semibold cursor-pointer" data-aladin-mode="wind">Rüzgar (km/h)</button>
-            <button class="aladin-mode-btn px-2 sm:px-2.5 py-0.5 font-semibold cursor-pointer" data-aladin-mode="hum_cloud">Nem & Bulut</button>
-            <button class="aladin-mode-btn px-2 sm:px-2.5 py-0.5 font-semibold cursor-pointer" data-aladin-mode="pressure">Basınç</button>
-            <button class="aladin-mode-btn px-2 sm:px-2.5 py-0.5 font-semibold cursor-pointer" data-aladin-mode="all">Tümü</button>
+            <button class="aladin-mode-btn active px-2.5 py-0.5 font-semibold cursor-pointer" data-aladin-mode="temp">Sıcaklık</button>
+            <button class="aladin-mode-btn px-2.5 py-0.5 font-semibold cursor-pointer" data-aladin-mode="rain">Yağış & Kar</button>
+            <button class="aladin-mode-btn px-2.5 py-0.5 font-semibold cursor-pointer" data-aladin-mode="wind">Rüzgar (km/h)</button>
+            <button class="aladin-mode-btn px-2.5 py-0.5 font-semibold cursor-pointer" data-aladin-mode="hum_cloud">Nem & Bulut</button>
+            <button class="aladin-mode-btn px-2.5 py-0.5 font-semibold cursor-pointer" data-aladin-mode="pressure">Basınç</button>
+            <button class="aladin-mode-btn px-2.5 py-0.5 font-semibold cursor-pointer" data-aladin-mode="all">Tümü</button>
           </div>
 
         </div>
 
         <!-- Chart Canvas Container -->
-        <div id="aladinChartCanvasContainer" class="relative w-full h-56 sm:h-64 lg:h-72">
+        <div id="aladinChartCanvasContainer" class="relative w-full h-64 sm:h-72 lg:h-80">
           <canvas id="aladinTelemetryChart"></canvas>
         </div>
       </div>
 
-      <!-- DETAILED HOURLY FORECAST TABLE -->
-      <div class="m3-card p-2.5 sm:p-4 space-y-2">
+      <!-- DETAILED HOURLY FORECAST: DESKTOP TABLE & MOBILE LIST -->
+      <div class="m3-card p-3 sm:p-4 space-y-3">
         <div class="flex items-center justify-between gap-2 border-b border-[#eceeef] dark:border-[#222831] pb-2">
           <div class="flex items-center gap-2">
             <h2 class="text-xs font-bold text-[#0f172a] dark:text-[#f8fafc] flex items-center gap-1.5">
-              <i data-lucide="table" class="w-3.5 h-3.5 text-[#0284c7]"></i>
-              <span>Detaylı Model Çıktısı Tablosu</span>
+              <i data-lucide="calendar" class="w-3.5 h-3.5 text-[#0284c7]"></i>
+              <span>Saatlik Model Dökümü</span>
             </h2>
             <span id="aladinTableSummary" class="text-[10px] font-mono text-[#64748b] dark:text-[#94a3b8]">0 saat</span>
           </div>
+          <span class="text-[10px] text-[#94a3b8] dark:text-[#64748b] hidden sm:inline">Tüm parametreler</span>
         </div>
 
-        <div class="overflow-x-auto rounded-lg border border-[#eceeef] dark:border-[#222831]">
+        <!-- 1. BİLGİSAYAR GÖRÜNÜMÜ: 9 Sütunlu Geniş Tablo (Yalnızca Desktop/Tablet) -->
+        <div class="hidden md:block overflow-x-auto rounded-xl border border-[#eceeef] dark:border-[#222831]">
           <table class="w-full text-left text-xs text-[#2d3139] dark:text-[#e4e7eb]">
             <thead class="bg-[#f8fafc] dark:bg-[#1b2027] uppercase font-mono text-[10px] text-[#64748b] dark:text-[#94a3b8] border-b border-[#eceeef] dark:border-[#222831]">
               <tr>
-                <th scope="col" class="py-1.5 px-2.5">Zaman</th>
-                <th scope="col" class="py-1.5 px-2">Hadise</th>
-                <th scope="col" class="py-1.5 px-2">Sıcaklık</th>
-                <th scope="col" class="py-1.5 px-2">Hissedilen</th>
-                <th scope="col" class="py-1.5 px-2">Yağış</th>
-                <th scope="col" class="py-1.5 px-2">Rüzgar (km/h)</th>
-                <th scope="col" class="py-1.5 px-2">Nem</th>
-                <th scope="col" class="py-1.5 px-2">Basınç</th>
-                <th scope="col" class="py-1.5 px-2">Bulut</th>
+                <th scope="col" class="py-2.5 px-3">Zaman</th>
+                <th scope="col" class="py-2.5 px-3">Hadise</th>
+                <th scope="col" class="py-2.5 px-3">Sıcaklık</th>
+                <th scope="col" class="py-2.5 px-3">Hissedilen</th>
+                <th scope="col" class="py-2.5 px-3">Yağış</th>
+                <th scope="col" class="py-2.5 px-3">Rüzgar (km/h)</th>
+                <th scope="col" class="py-2.5 px-3">Nem</th>
+                <th scope="col" class="py-2.5 px-3">Basınç</th>
+                <th scope="col" class="py-2.5 px-3">Bulut</th>
               </tr>
             </thead>
             <tbody id="aladinTableBody" class="divide-y divide-[#eceeef] dark:divide-[#222831] text-[11px]">
@@ -478,6 +477,13 @@
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- 2. TELEFON GÖRÜNÜMÜ: Kart/Liste Yapısı (Ultra Uyumlu & Hızlı) -->
+        <div id="aladinMobileList" class="md:hidden space-y-2">
+          <div class="p-4 text-center text-xs text-[#7a828e] dark:text-[#8f96a3]">
+            Model verisi yükleniyor...
+          </div>
         </div>
       </div>
 
