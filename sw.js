@@ -4,7 +4,7 @@
  * Bluetooth BLE sensor telemetry operates locally via Web Bluetooth API.
  */
 
-const CACHE_NAME = 'xiaomi-smarttemp-v5.6';
+const CACHE_NAME = 'xiaomi-smarttemp-v5.7';
 
 const PRECACHE_ASSETS = [
   './',
@@ -12,6 +12,7 @@ const PRECACHE_ASSETS = [
   './style.css',
   './app.js',
   './aladin.js',
+  './data/aladin.json',
   './manifest.webmanifest',
   './icon.svg',
   './vendor/tailwind.js',
@@ -59,6 +60,20 @@ self.addEventListener('fetch', (event) => {
   // Only handle HTTP/HTTPS GET requests
   if (request.method !== 'GET') return;
   if (!request.url.startsWith('http')) return;
+
+  // MGM ALADIN Model Verisi ve Proxy İstekleri için Network-First Stratejisi
+  if (request.url.includes('aladin.json') || request.url.includes('/api/aladin')) {
+    event.respondWith(
+      fetch(request).then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
+          const toCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, toCache));
+        }
+        return networkResponse;
+      }).catch(() => caches.match(request))
+    );
+    return;
+  }
 
   event.respondWith(
     caches.match(request).then((cachedResponse) => {

@@ -1,0 +1,35 @@
+name: Güncel MGM ALADIN Model Tahmini Çekici
+
+on:
+  schedule:
+    # Her 2 saatte bir çalışır (00:15, 02:15, 04:15, ..., 22:15 UTC)
+    - cron: '15 */2 * * *'
+  workflow_dispatch: # GitHub web arayüzünden manuel tetikleme desteği
+  push:
+    paths:
+      - 'scripts/fetch-aladin.js'
+
+permissions:
+  contents: write
+
+jobs:
+  update-model-data:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kodu Çek
+        uses: actions/checkout@v4
+
+      - name: Node.js Kur
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: MGM ALADIN Canlı Model Verilerini Çek
+        run: node scripts/fetch-aladin.js
+
+      - name: Değişiklikleri Kaydet ve Push Et
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action [MGM Bot]"
+          git add data/aladin.json
+          git diff --quiet && git diff --staged --quiet || (git commit -m "chore(data): MGM ALADIN 58 saatlik model tahmini guncellendi [skip ci]" && git push)

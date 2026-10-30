@@ -95,8 +95,9 @@ const server = http.createServer((req, res) => {
   });
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`\n🚀 Xiaomi SmartTemp & MGM ALADIN İstasyonu Aktif!`);
-  console.log(`🌐 Yerel Adres: http://localhost:${PORT}`);
-  console.log(`🌦️ MGM Proxy:  http://localhost:${PORT}/api/aladin?...\n`);
+  console.log(`💻 Bilgisayar Yerel Adres: http://localhost:${PORT}`);
+  console.log(`📱 Telefon Wi-Fi Adresi:   http://192.168.1.22:${PORT}`);
+  console.log(`🌦️ MGM ALADIN Canlı Proxy: http://localhost:${PORT}/api/aladin\n`);
 });
