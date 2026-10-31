@@ -22,6 +22,15 @@ const MODEL_CONFIGS = {
     provider: 'open-meteo',
     url: 'https://api.open-meteo.com/v1/forecast?latitude=40.2311&longitude=28.8402&hourly=temperature_2m,relative_humidity_2m,dew_point_2m,apparent_temperature,precipitation_probability,precipitation,rain,showers,snowfall,runoff,visibility,et0_fao_evapotranspiration,potential_evapotranspiration,sunshine_duration,cloud_cover_high,cloud_cover_mid,cloud_cover_low,cloud_cover,pressure_msl,surface_pressure,weather_code,total_column_integrated_water_vapour,convective_inhibition,cape,wind_gusts_10m,wind_direction_200m,wind_direction_100m,wind_direction_10m,wind_speed_200m,wind_speed_100m,wind_speed_10m,surface_temperature,vapour_pressure_deficit,precipitation_type,wet_bulb_temperature_2m,is_day&models=ecmwf_ifs&timezone=auto&forecast_days=15'
   },
+  aifs: {
+    key: 'aifs',
+    name: 'ECMWF AIFS',
+    fullName: 'ECMWF AIFS Yapay Zeka Modeli',
+    badge: 'Avrupa Merkezi Yapay Zeka · ~25 km · 15 Gün (360 Saat)',
+    location: 'Bursa Nilüfer (40.231°K, 28.840°D)',
+    provider: 'open-meteo',
+    url: 'https://api.open-meteo.com/v1/forecast?latitude=40.2311&longitude=28.8402&hourly=temperature_2m,dew_point_2m,relative_humidity_2m,apparent_temperature,precipitation,precipitation_probability,rain,snowfall,showers,runoff,visibility,et0_fao_evapotranspiration,potential_evapotranspiration,sunshine_duration,cloud_cover_high,cloud_cover_low,cloud_cover_mid,cloud_cover,surface_pressure,pressure_msl,weather_code,total_column_integrated_water_vapour,convective_inhibition,wind_gusts_10m,cape,wind_direction_200m,wind_direction_100m,wind_direction_10m,wind_speed_200m,wind_speed_10m,wind_speed_100m,soil_moisture_100_to_255cm,soil_moisture_28_to_100cm,soil_moisture_7_to_28cm,soil_moisture_0_to_7cm,soil_temperature_100_to_255cm,soil_temperature_28_to_100cm,soil_temperature_7_to_28cm,soil_temperature_0_to_7cm,surface_temperature,vapour_pressure_deficit&models=ecmwf_aifs025_single&timezone=auto&forecast_days=15'
+  },
   chmi: {
     key: 'chmi',
     name: 'CZ ALADIN 2km',
@@ -35,10 +44,10 @@ const MODEL_CONFIGS = {
     key: 'ukmo',
     name: 'UKMO 10km',
     fullName: 'UK Met Office Global Deterministic 10km',
-    badge: 'İngiltere Meteoroloji · 10 km · 8 Gün (192 Saat)',
+    badge: 'İngiltere Meteoroloji · 10 km · 7 Gün (168 Saat)',
     location: 'Bursa Nilüfer (40.231°K, 28.840°D)',
     provider: 'open-meteo',
-    url: 'https://api.open-meteo.com/v1/forecast?latitude=40.2311&longitude=28.8402&hourly=temperature_2m,relative_humidity_2m,dew_point_2m,precipitation_probability,apparent_temperature,precipitation,rain,showers,surface_pressure,pressure_msl,visibility,weather_code,snow_depth_water_equivalent,hail,snowfall,cloud_cover_2m,cloud_cover_high,cloud_cover_mid,cloud_cover_low,cloud_cover,vapour_pressure_deficit,et0_fao_evapotranspiration,wind_gusts_10m,wind_direction_10m,wind_speed_10m,is_day,wet_bulb_temperature_2m,convective_inhibition,sunshine_duration,freezing_level_height,cape&models=ukmo_global_deterministic_10km&timezone=auto&forecast_days=8'
+    url: 'https://api.open-meteo.com/v1/forecast?latitude=40.2311&longitude=28.8402&hourly=temperature_2m,relative_humidity_2m,dew_point_2m,precipitation_probability,apparent_temperature,precipitation,rain,showers,surface_pressure,pressure_msl,visibility,weather_code,snow_depth_water_equivalent,hail,snowfall,cloud_cover_2m,cloud_cover_high,cloud_cover_mid,cloud_cover_low,cloud_cover,vapour_pressure_deficit,et0_fao_evapotranspiration,wind_gusts_10m,wind_direction_10m,wind_speed_10m,is_day,wet_bulb_temperature_2m,convective_inhibition,sunshine_duration,freezing_level_height,cape&models=ukmo_global_deterministic_10km&timezone=auto&forecast_days=7'
   },
   gfs: {
     key: 'gfs',
@@ -57,6 +66,15 @@ const MODEL_CONFIGS = {
     location: 'Bursa Nilüfer (40.231°K, 28.840°D)',
     provider: 'open-meteo',
     url: 'https://api.open-meteo.com/v1/forecast?latitude=40.2311&longitude=28.8402&hourly=temperature_2m,snow_depth,snowfall,showers,rain,precipitation,precipitation_probability,apparent_temperature,dew_point_2m,relative_humidity_2m,vapour_pressure_deficit,evapotranspiration,et0_fao_evapotranspiration,visibility,cloud_cover_high,cloud_cover_mid,cloud_cover_low,cloud_cover,surface_pressure,pressure_msl,weather_code,temperature_80m,wind_gusts_10m,wind_direction_80m,wind_direction_10m,wind_speed_80m,wind_speed_10m,surface_temperature,uv_index,is_day,sunshine_duration,wet_bulb_temperature_2m,convective_inhibition,cape&models=ncep_aigfs025&timezone=auto&forecast_days=16'
+  },
+  gem: {
+    key: 'gem',
+    name: 'GEM 15km',
+    fullName: 'CMC GEM GDPS Kanada Modeli',
+    badge: 'Kanada Meteoroloji · ~15 km · 10 Gün (240 Saat)',
+    location: 'Bursa Nilüfer (40.231°K, 28.840°D)',
+    provider: 'open-meteo',
+    url: 'https://api.open-meteo.com/v1/forecast?latitude=40.2311&longitude=28.8402&hourly=temperature_2m,snowfall,showers,rain,precipitation,precipitation_probability,apparent_temperature,dew_point_2m,vapour_pressure_deficit,et0_fao_evapotranspiration,cloud_cover_high,cloud_cover_mid,cloud_cover_low,cloud_cover,surface_pressure,pressure_msl,weather_code,relative_humidity_2m,wind_gusts_10m,wind_direction_120m,wind_direction_80m,wind_direction_40m,wind_direction_10m,wind_speed_120m,wind_speed_80m,wind_speed_40m,wind_speed_10m,soil_moisture_0_to_10cm,soil_temperature_0_to_10cm,temperature_120m,temperature_80m,temperature_40m,sunshine_duration,is_day,wet_bulb_temperature_2m,cape&models=cmc_gem_gdps&timezone=auto&forecast_days=10'
   },
   mgm: {
     key: 'mgm',

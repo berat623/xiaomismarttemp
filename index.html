@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>Models — Sayısal Hava Tahmin Modelleri</title>
-  <meta name="description" content="ECMWF 9km, CZ ALADIN 2km, UKMO 10km, GFS 22km, GFS AI ve MGM ALADIN Sayısal Hava Tahmin Modelleri İstasyonu." />
+  <meta name="description" content="ECMWF 9km, ECMWF AIFS, CZ ALADIN 2km, UKMO 10km, GFS 22km, GFS AI, GEM 15km ve MGM ALADIN Sayısal Hava Tahmin Modelleri İstasyonu." />
   <meta name="theme-color" content="#e2e8f0" id="metaThemeColor" />
 
   <!-- PWA & Mobile Web App Meta Tags -->
@@ -62,10 +62,12 @@
         <!-- Scrollable Model Switcher Segmented Bar -->
         <div id="modelTabsContainer" class="flex items-center gap-1 overflow-x-auto no-scrollbar rounded-full bg-[#e2e8f0] dark:bg-[#1f2837] p-0.5 border border-[#cbd5e1] dark:border-[#283343] text-xs">
           <button data-model="ecmwf" class="model-tab-btn active text-xs font-bold shrink-0">ECMWF 9km</button>
+          <button data-model="aifs" class="model-tab-btn text-xs font-bold shrink-0">ECMWF AIFS</button>
           <button data-model="chmi" class="model-tab-btn text-xs font-bold shrink-0">CZ ALADIN 2km</button>
           <button data-model="ukmo" class="model-tab-btn text-xs font-bold shrink-0">UKMO 10km</button>
           <button data-model="gfs" class="model-tab-btn text-xs font-bold shrink-0">GFS 22km</button>
           <button data-model="aigfs" class="model-tab-btn text-xs font-bold shrink-0">GFS AI</button>
+          <button data-model="gem" class="model-tab-btn text-xs font-bold shrink-0">GEM 15km</button>
           <button data-model="mgm" class="model-tab-btn text-xs font-bold shrink-0">MGM ALADIN</button>
         </div>
       </div>
