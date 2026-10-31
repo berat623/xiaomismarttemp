@@ -581,11 +581,12 @@ if (typeof Chart !== 'undefined') {
 }
 
 // ==========================================
-// 9. MODELS GRAFİK YÖNETİCİSİ (POPPINS FONT)
+// 9. MODELS GRAFİK YÖNETİCİSİ (POPPINS FONT & OPTİMİZE)
 // ==========================================
 class ModelsChartManager {
   constructor(canvasId) {
     this.canvas = document.getElementById(canvasId);
+    this.statPill = document.getElementById('chartStatPill');
     this.chart = null;
     this.mode = 'temp';
     this.records = [];
@@ -606,6 +607,8 @@ class ModelsChartManager {
         responsive: true,
         maintainAspectRatio: false,
         animation: false,
+        normalized: true,
+        spanGaps: true,
         interaction: { mode: 'index', intersect: false },
         plugins: {
           legend: { display: false },
@@ -615,12 +618,12 @@ class ModelsChartManager {
             animation: false,
             backgroundColor: isDark ? 'rgba(23, 30, 41, 0.98)' : 'rgba(255, 255, 255, 0.98)',
             borderColor: isDark ? '#283343' : '#cbd5e1',
-            borderWidth: 1,
+            borderWidth: 1.5,
             titleColor: isDark ? '#f8fafc' : '#0f172a',
             bodyColor: isDark ? '#cbd5e1' : '#334155',
-            padding: 10,
+            padding: { top: 8, bottom: 8, left: 12, right: 12 },
             cornerRadius: 12,
-            boxPadding: 4,
+            boxPadding: 5,
             usePointStyle: true,
             titleFont: { family: 'Poppins', size: 12, weight: 700 },
             bodyFont: { family: 'Poppins', size: 11, weight: 600 },
@@ -632,26 +635,29 @@ class ModelsChartManager {
                 if (rec) {
                   const d = new Date(rec.time);
                   const hName = rec.hadise ? rec.hadise.name : '';
-                  return `${d.toLocaleDateString('tr-TR', { weekday: 'short', day: '2-digit', month: 'short' })} ${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })} · ${hName}`;
+                  const dayStr = d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' });
+                  const timeStr = d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+                  return `${dayStr} ${timeStr} · ${hName}`;
                 }
                 return items[0].label || '';
               },
-              afterBody: (items) => {
-                if (!items || items.length === 0) return '';
-                const idx = items[0].dataIndex;
-                const rec = this.records[idx];
-                if (!rec) return '';
-                const dir = getCompassDirection(rec.ruzgarYonu);
-                const list = [
-                  `💨 Rüzgar: ${rec.ruzgarHizi} km/h (${dir} ${rec.ruzgarYonu}°)${rec.windGust ? ` · Hamle: ${rec.windGust} km/h` : ''}`,
-                  `💧 Nem: %${rec.nem}${rec.dewPoint != null ? ` · Çiy Noktası: ${rec.dewPoint}°C` : ''}`,
-                  `🌧️ Yağış: ${rec.saatlikToplamYagis} mm · Basınç: ${rec.basinc} hPa`
-                ];
-                if (rec.cape != null && rec.cape > 0) {
-                  list.push(`⚡ CAPE: ${rec.cape} J/kg`);
+              label: (context) => {
+                const val = context.parsed.y;
+                if (val === null || val === undefined) return '';
+                const label = context.dataset.label || '';
+                
+                // Rüzgar modunda yön bilgisini de ekle
+                if (this.mode === 'wind' && label.includes('Rüzgar Hızı')) {
+                  const idx = context.dataIndex;
+                  const rec = this.records[idx];
+                  if (rec && rec.ruzgarYonu != null) {
+                    const dir = getCompassDirection(rec.ruzgarYonu);
+                    return ` ${label}: ${val} (${dir} ${rec.ruzgarYonu}°)`;
+                  }
                 }
-                return list;
+                return ` ${label}: ${val}`;
               }
+              // afterBody callback TAMAMEN KALDIRILDI! Ek parametre dökümü yok!
             }
           }
         },
@@ -701,14 +707,18 @@ class ModelsChartManager {
     const isDark = document.documentElement.classList.contains('dark');
     const recs = this.records;
 
+    // Etiketler: Eğer 1 günden az veri varsa saat, aksi halde gün + saat
+    const isSingleDay = recs.length <= 25;
     const labels = recs.map(r => {
       const d = new Date(r.time);
+      if (isSingleDay) {
+        return `${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
+      }
       return `${d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'numeric' })} ${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
     });
 
     const tempColor = isDark ? '#f87171' : '#ef4444';
     const feelsColor = isDark ? '#fbbf24' : '#f59e0b';
-    const dewColor = isDark ? '#38bdf8' : '#0284c7';
     const rainColor = isDark ? '#38bdf8' : '#0284c7';
     const snowColor = isDark ? '#a5b4fc' : '#6366f1';
     const windColor = isDark ? '#34d399' : '#10b981';
@@ -725,7 +735,7 @@ class ModelsChartManager {
         if (!chartArea) return `rgba(${rgbStr}, ${topAlpha})`;
         const g = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
         g.addColorStop(0, `rgba(${rgbStr}, ${topAlpha})`);
-        g.addColorStop(0.65, `rgba(${rgbStr}, ${midAlpha})`);
+        g.addColorStop(0.60, `rgba(${rgbStr}, ${midAlpha})`);
         g.addColorStop(1, `rgba(${rgbStr}, ${botAlpha})`);
         return g;
       };
@@ -734,20 +744,28 @@ class ModelsChartManager {
     let datasets = [];
     let showWindArrows = false;
     let windData = [];
+    let statText = '';
 
     if (this.mode === 'temp') {
       const tempRgb = isDark ? '248, 113, 113' : '239, 68, 68';
+      const temps = recs.map(r => r.sicaklik);
+      const minT = Math.min(...temps);
+      const maxT = Math.max(...temps);
+      const avgT = (temps.reduce((a, b) => a + b, 0) / temps.length).toFixed(1);
+      statText = `Min: ${minT}°C · Maks: ${maxT}°C · Ort: ${avgT}°C`;
+
+      // SADECE Sıcaklık ve Hissedilen Sıcaklık
       datasets = [
         {
           label: 'Sıcaklık (°C)',
-          data: recs.map(r => r.sicaklik),
+          data: temps,
           borderColor: tempColor,
-          backgroundColor: makeGradient(tempRgb, 0.32, 0.08, 0.0),
+          backgroundColor: makeGradient(tempRgb, 0.30, 0.06, 0.0),
           fill: true,
           tension: 0.38,
-          borderWidth: 2.5,
+          borderWidth: 2.75,
           pointRadius: 0,
-          pointHoverRadius: 6,
+          pointHoverRadius: 6.5,
           pointHoverBackgroundColor: '#ffffff',
           pointHoverBorderWidth: 2.5,
           pointHoverBorderColor: tempColor
@@ -759,34 +777,32 @@ class ModelsChartManager {
           borderDash: [4, 4],
           fill: false,
           tension: 0.38,
-          borderWidth: 1.75,
-          pointRadius: 0
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHoverRadius: 5.5,
+          pointHoverBackgroundColor: '#ffffff',
+          pointHoverBorderWidth: 2,
+          pointHoverBorderColor: feelsColor
         }
       ];
-      if (recs.some(r => r.dewPoint != null)) {
-        datasets.push({
-          label: 'Çiy Noktası (°C)',
-          data: recs.map(r => r.dewPoint),
-          borderColor: dewColor,
-          borderDash: [2, 2],
-          fill: false,
-          tension: 0.38,
-          borderWidth: 1.5,
-          pointRadius: 0
-        });
-      }
       this.chart.options.scales.y.ticks.callback = (v) => `${v}°C`;
+
     } else if (this.mode === 'rain') {
+      const rains = recs.map(r => r.saatlikToplamYagis);
+      const totalRain = rains.reduce((a, b) => a + b, 0).toFixed(1);
+      const maxRain = Math.max(...rains);
+      statText = `Toplam Yağış: ${totalRain} mm · Maks Saatlik: ${maxRain} mm`;
+
       datasets = [
         {
           label: 'Saatlik Yağış (mm)',
-          data: recs.map(r => r.saatlikToplamYagis),
+          data: rains,
           borderColor: rainColor,
-          backgroundColor: isDark ? 'rgba(56, 189, 248, 0.35)' : 'rgba(2, 132, 199, 0.28)',
+          backgroundColor: isDark ? 'rgba(56, 189, 248, 0.40)' : 'rgba(2, 132, 199, 0.35)',
           fill: true,
           type: 'bar',
-          borderWidth: 1.25,
-          borderRadius: 4
+          borderWidth: 1.5,
+          borderRadius: 6
         }
       ];
       if (recs.some(r => r.snowfall > 0)) {
@@ -794,29 +810,35 @@ class ModelsChartManager {
           label: 'Kar (cm)',
           data: recs.map(r => r.snowfall),
           borderColor: snowColor,
-          backgroundColor: isDark ? 'rgba(165, 180, 252, 0.35)' : 'rgba(99, 102, 241, 0.28)',
+          backgroundColor: isDark ? 'rgba(165, 180, 252, 0.40)' : 'rgba(99, 102, 241, 0.35)',
           fill: true,
           type: 'bar',
-          borderWidth: 1.25,
-          borderRadius: 4
+          borderWidth: 1.5,
+          borderRadius: 6
         });
       }
       this.chart.options.scales.y.ticks.callback = (v) => `${v} mm`;
+
     } else if (this.mode === 'wind') {
       showWindArrows = true;
       windData = recs.map(r => ({ speed: r.ruzgarHizi, direction: r.ruzgarYonu }));
       const windRgb = isDark ? '52, 211, 153' : '16, 185, 129';
+      const winds = recs.map(r => r.ruzgarHizi);
+      const maxW = Math.max(...winds);
+      const maxGust = Math.max(...recs.map(r => r.windGust || 0));
+      statText = `Maks Rüzgar: ${maxW} km/h${maxGust > 0 ? ` · Maks Hamle: ${maxGust} km/h` : ''}`;
+
       datasets = [
         {
           label: 'Rüzgar Hızı (km/h)',
-          data: recs.map(r => r.ruzgarHizi),
+          data: winds,
           borderColor: windColor,
-          backgroundColor: makeGradient(windRgb, 0.30, 0.08, 0.0),
+          backgroundColor: makeGradient(windRgb, 0.28, 0.06, 0.0),
           fill: true,
           tension: 0.35,
-          borderWidth: 2.5,
+          borderWidth: 2.75,
           pointRadius: recs.length > 100 ? 0 : 2,
-          pointHoverRadius: 6,
+          pointHoverRadius: 6.5,
           pointHoverBackgroundColor: '#ffffff',
           pointHoverBorderWidth: 2.5,
           pointHoverBorderColor: windColor
@@ -835,91 +857,95 @@ class ModelsChartManager {
         });
       }
       this.chart.options.scales.y.ticks.callback = (v) => `${v} km/h`;
+
     } else if (this.mode === 'hum_cloud') {
       const humRgb = isDark ? '45, 212, 191' : '13, 148, 136';
+      const hums = recs.map(r => r.nem);
+      const avgHum = Math.round(hums.reduce((a, b) => a + b, 0) / hums.length);
+      const clouds = recs.map(r => r.bulutKapaliligi);
+      const avgCloud = Math.round(clouds.reduce((a, b) => a + b, 0) / clouds.length);
+      statText = `Ortalama Nem: %${avgHum} · Ortalama Bulut: %${avgCloud}`;
+
       datasets = [
         {
           label: 'Bağıl Nem (%)',
-          data: recs.map(r => r.nem),
+          data: hums,
           borderColor: humColor,
-          backgroundColor: makeGradient(humRgb, 0.26, 0.06, 0.0),
+          backgroundColor: makeGradient(humRgb, 0.25, 0.05, 0.0),
           fill: true,
           tension: 0.38,
-          borderWidth: 2.25,
-          pointRadius: 0
+          borderWidth: 2.5,
+          pointRadius: 0,
+          pointHoverRadius: 6,
+          pointHoverBackgroundColor: '#ffffff',
+          pointHoverBorderWidth: 2.5,
+          pointHoverBorderColor: humColor
         },
         {
           label: 'Bulut Kapalılığı (%)',
-          data: recs.map(r => r.bulutKapaliligi),
+          data: clouds,
           borderColor: cloudColor,
           borderDash: [3, 3],
           fill: false,
           tension: 0.38,
-          borderWidth: 1.75,
+          borderWidth: 2,
           pointRadius: 0
         }
       ];
       this.chart.options.scales.y.ticks.callback = (v) => `%${v}`;
+
     } else if (this.mode === 'pressure') {
       const pressRgb = isDark ? '192, 132, 252' : '147, 51, 234';
+      const pressures = recs.map(r => r.basinc);
+      const minP = Math.min(...pressures);
+      const maxP = Math.max(...pressures);
+      statText = `Basınç Aralığı: ${minP} - ${maxP} hPa`;
+
       datasets = [
         {
-          label: 'Deniz Seviyesi Basıncı (hPa)',
-          data: recs.map(r => r.basinc),
+          label: 'Hava Basıncı (hPa)',
+          data: pressures,
           borderColor: pressureColor,
-          backgroundColor: makeGradient(pressRgb, 0.28, 0.07, 0.0),
+          backgroundColor: makeGradient(pressRgb, 0.28, 0.06, 0.0),
           fill: true,
           tension: 0.38,
-          borderWidth: 2.5,
-          pointRadius: 0
+          borderWidth: 2.75,
+          pointRadius: 0,
+          pointHoverRadius: 6.5,
+          pointHoverBackgroundColor: '#ffffff',
+          pointHoverBorderWidth: 2.5,
+          pointHoverBorderColor: pressureColor
         }
       ];
       this.chart.options.scales.y.ticks.callback = (v) => `${v} hPa`;
+
     } else if (this.mode === 'cape') {
       const capeRgb = isDark ? '251, 146, 60' : '234, 88, 12';
+      const capes = recs.map(r => r.cape || 0);
+      const maxCape = Math.max(...capes);
+      statText = `Maksimum CAPE: ${maxCape} J/kg ${maxCape > 1000 ? '(Aşırı Kararsız)' : (maxCape > 300 ? '(Fırtına Riski)' : '(Düşük Risk)')}`;
+
       datasets = [
         {
           label: 'CAPE (J/kg)',
-          data: recs.map(r => r.cape || 0),
+          data: capes,
           borderColor: capeColor,
-          backgroundColor: makeGradient(capeRgb, 0.35, 0.10, 0.0),
+          backgroundColor: makeGradient(capeRgb, 0.35, 0.08, 0.0),
           fill: true,
           tension: 0.38,
           borderWidth: 2.5,
-          pointRadius: 0
+          pointRadius: 0,
+          pointHoverRadius: 6.5,
+          pointHoverBackgroundColor: '#ffffff',
+          pointHoverBorderWidth: 2.5,
+          pointHoverBorderColor: capeColor
         }
       ];
       this.chart.options.scales.y.ticks.callback = (v) => `${v} J/kg`;
-    } else {
-      // 'all'
-      datasets = [
-        {
-          label: 'Sıcaklık (°C)',
-          data: recs.map(r => r.sicaklik),
-          borderColor: tempColor,
-          borderWidth: 2,
-          tension: 0.38,
-          pointRadius: 0
-        },
-        {
-          label: 'Rüzgar (km/h)',
-          data: recs.map(r => r.ruzgarHizi),
-          borderColor: windColor,
-          borderWidth: 2,
-          tension: 0.35,
-          pointRadius: 0
-        },
-        {
-          label: 'Nem (%)',
-          data: recs.map(r => r.nem),
-          borderColor: humColor,
-          borderWidth: 1.5,
-          borderDash: [3, 3],
-          tension: 0.38,
-          pointRadius: 0
-        }
-      ];
-      this.chart.options.scales.y.ticks.callback = (v) => v;
+    }
+
+    if (this.statPill && statText) {
+      this.statPill.textContent = statText;
     }
 
     this.chart.data.labels = labels;

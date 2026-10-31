@@ -213,12 +213,17 @@
     <!-- MODEL EĞRİLERİ GRAFİK BÖLÜMÜ (Yalnızca Bilgisayar/Tablet: hidden md:block) -->
     <div id="modelsChartSection" class="hidden md:block m3-card p-3 sm:p-4 space-y-2.5">
       <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[#cbd5e1] dark:border-[#283343] pb-2">
-        <h2 class="text-xs font-extrabold text-[#0f172a] dark:text-[#f8fafc] flex items-center gap-1.5">
-          <i data-lucide="line-chart" class="w-4 h-4 text-[#2563eb]"></i>
-          <span>Model Eğrileri</span>
-        </h2>
+        <div class="flex items-center gap-2">
+          <h2 class="text-xs font-extrabold text-[#0f172a] dark:text-[#f8fafc] flex items-center gap-1.5">
+            <i data-lucide="line-chart" class="w-4 h-4 text-[#2563eb]"></i>
+            <span>Model Eğrileri</span>
+          </h2>
+          <span id="chartStatPill" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-[#e2e8f0] dark:bg-[#1f2837] text-[#2563eb] dark:text-[#60a5fa] border border-[#cbd5e1] dark:border-[#283343]">
+            Hesaplanıyor...
+          </span>
+        </div>
 
-        <!-- Mode Buttons -->
+        <!-- Mode Buttons (Tek Tek Parametre Seçici) -->
         <div class="inline-flex rounded-full bg-[#e2e8f0] dark:bg-[#1f2837] p-0.5 border border-[#cbd5e1] dark:border-[#283343] text-xs">
           <button class="models-chart-btn mode-btn active px-3 py-1 font-bold cursor-pointer" data-mode="temp">Sıcaklık</button>
           <button class="models-chart-btn mode-btn px-3 py-1 font-bold cursor-pointer" data-mode="rain">Yağış & Kar</button>
@@ -226,7 +231,6 @@
           <button class="models-chart-btn mode-btn px-3 py-1 font-bold cursor-pointer" data-mode="hum_cloud">Nem & Bulut</button>
           <button class="models-chart-btn mode-btn px-3 py-1 font-bold cursor-pointer" data-mode="pressure">Basınç</button>
           <button class="models-chart-btn mode-btn px-3 py-1 font-bold cursor-pointer" data-mode="cape">CAPE</button>
-          <button class="models-chart-btn mode-btn px-3 py-1 font-bold cursor-pointer" data-mode="all">Tümü</button>
         </div>
       </div>
 
