@@ -165,22 +165,30 @@ function getHadiseInfo(rawCode) {
 // 4. METEOCONS (HAREKETLİ SVG HAVA DURUMU İKONLARI)
 // ==========================================
 const Meteocons = {
-  getSvg(type, size = 48, isNight = false) {
+  getSvg(type, size = 48, isNight = false, isAnimated = false) {
     const s = size;
+    const cRays = isAnimated ? 'meteo-sun-rays' : '';
+    const cPulse = isAnimated ? 'meteo-sun-pulse' : '';
+    const cDrift = isAnimated ? 'meteo-cloud-drift' : '';
+    const cDrop = isAnimated ? 'meteo-rain-drop' : '';
+    const cSnow = isAnimated ? 'meteo-snow-flake' : '';
+    const cLightning = isAnimated ? 'meteo-lightning' : '';
+    const cStar = isAnimated ? 'meteo-star' : '';
+
     switch (type) {
       case 'sun':
         if (isNight) {
           return `
             <svg width="${s}" height="${s}" viewBox="0 0 64 64" fill="none" class="shrink-0">
               <path d="M42 38C42 47.94 33.94 56 24 56C19.14 56 14.73 54.07 11.5 50.95C14.07 51.63 16.76 52 19.55 52C31.95 52 42 41.95 42 29.55C42 21.6 37.89 14.6 31.67 10.6C40.06 13.9 42 24.5 42 38Z" fill="#818cf8"/>
-              <circle cx="48" cy="18" r="2" fill="#e0e7ff" class="meteo-star"/>
-              <circle cx="52" cy="32" r="1.5" fill="#c7d2fe" class="meteo-star" style="animation-delay: 1s"/>
+              <circle cx="48" cy="18" r="2" fill="#e0e7ff" class="${cStar}"/>
+              <circle cx="52" cy="32" r="1.5" fill="#c7d2fe" class="${cStar}" ${isAnimated ? 'style="animation-delay: 1s"' : ''}/>
             </svg>
           `;
         }
         return `
           <svg width="${s}" height="${s}" viewBox="0 0 64 64" fill="none" class="shrink-0">
-            <g class="meteo-sun-rays">
+            <g class="${cRays}">
               <line x1="32" y1="6" x2="32" y2="14" stroke="#f59e0b" stroke-width="3.5" stroke-linecap="round"/>
               <line x1="32" y1="50" x2="32" y2="58" stroke="#f59e0b" stroke-width="3.5" stroke-linecap="round"/>
               <line x1="6" y1="32" x2="14" y2="32" stroke="#f59e0b" stroke-width="3.5" stroke-linecap="round"/>
@@ -197,8 +205,8 @@ const Meteocons = {
       case 'few-clouds':
         return `
           <svg width="${s}" height="${s}" viewBox="0 0 64 64" fill="none" class="shrink-0">
-            <circle cx="26" cy="26" r="11" fill="#f59e0b" class="meteo-sun-pulse"/>
-            <path class="meteo-cloud-drift" d="M44 46H20C15.03 46 11 41.97 11 37C11 32.32 14.58 28.48 19.14 28.05C20.61 21.86 26.15 17.2 32.78 17.2C40.52 17.2 46.86 23.36 47.16 31.06C51.17 32.1 54.2 35.74 54.2 40.06C54.2 43.34 49.68 46 44 46Z" fill="#cbd5e1"/>
+            <circle cx="26" cy="26" r="11" fill="#f59e0b" class="${cPulse}"/>
+            <path class="${cDrift}" d="M44 46H20C15.03 46 11 41.97 11 37C11 32.32 14.58 28.48 19.14 28.05C20.61 21.86 26.15 17.2 32.78 17.2C40.52 17.2 46.86 23.36 47.16 31.06C51.17 32.1 54.2 35.74 54.2 40.06C54.2 43.34 49.68 46 44 46Z" fill="#cbd5e1"/>
           </svg>
         `;
 
@@ -206,8 +214,8 @@ const Meteocons = {
         return `
           <svg width="${s}" height="${s}" viewBox="0 0 64 64" fill="none" class="shrink-0">
             <circle cx="24" cy="24" r="10" fill="#f59e0b"/>
-            <path d="M48 48H18C13.03 48 9 43.97 9 39C9 34.32 12.58 30.48 17.14 30.05C18.61 23.86 24.15 19.2 30.78 19.2C38.52 19.2 44.86 25.36 45.16 33.06C49.17 34.1 52.2 37.74 52.2 42.06C52.2 45.34 50.34 48 48 48Z" fill="#64748b" class="meteo-cloud-drift"/>
-            <path d="M42 54H20C15.58 54 12 50.42 12 46C12 41.84 15.18 38.42 19.24 38.04C20.54 32.54 25.47 28.4 31.36 28.4C38.24 28.4 43.88 33.88 44.14 40.72C47.71 41.64 50.4 44.88 50.4 48.72C50.4 51.64 46.72 54 42 54Z" fill="#94a3b8" class="meteo-cloud-drift" style="animation-delay: -1.5s"/>
+            <path d="M48 48H18C13.03 48 9 43.97 9 39C9 34.32 12.58 30.48 17.14 30.05C18.61 23.86 24.15 19.2 30.78 19.2C38.52 19.2 44.86 25.36 45.16 33.06C49.17 34.1 52.2 37.74 52.2 42.06C52.2 45.34 50.34 48 48 48Z" fill="#64748b" class="${cDrift}"/>
+            <path d="M42 54H20C15.58 54 12 50.42 12 46C12 41.84 15.18 38.42 19.24 38.04C20.54 32.54 25.47 28.4 31.36 28.4C38.24 28.4 43.88 33.88 44.14 40.72C47.71 41.64 50.4 44.88 50.4 48.72C50.4 51.64 46.72 54 42 54Z" fill="#94a3b8" class="${cDrift}" ${isAnimated ? 'style="animation-delay: -1.5s"' : ''}/>
           </svg>
         `;
 
@@ -215,7 +223,7 @@ const Meteocons = {
         return `
           <svg width="${s}" height="${s}" viewBox="0 0 64 64" fill="none" class="shrink-0">
             <path d="M44 38H18C13.58 38 10 34.42 10 30C10 25.84 13.18 22.42 17.24 22.04C18.54 16.54 23.47 12.4 29.36 12.4C36.24 12.4 41.88 17.88 42.14 24.72C45.71 25.64 48.4 28.88 48.4 32.72C48.4 35.64 46.72 38 44 38Z" fill="#64748b"/>
-            <path d="M48 48H16C11.58 48 8 44.42 8 40C8 35.84 11.18 32.42 15.24 32.04C16.54 26.54 21.47 22.4 27.36 22.4C34.24 22.4 39.88 27.88 40.14 34.72C43.71 35.64 46.4 38.88 46.4 42.72C46.4 45.64 44.72 48 48 48Z" fill="#94a3b8" class="meteo-cloud-drift"/>
+            <path d="M48 48H16C11.58 48 8 44.42 8 40C8 35.84 11.18 32.42 15.24 32.04C16.54 26.54 21.47 22.4 27.36 22.4C34.24 22.4 39.88 27.88 40.14 34.72C43.71 35.64 46.4 38.88 46.4 42.72C46.4 45.64 44.72 48 48 48Z" fill="#94a3b8" class="${cDrift}"/>
           </svg>
         `;
 
@@ -223,9 +231,9 @@ const Meteocons = {
         return `
           <svg width="${s}" height="${s}" viewBox="0 0 64 64" fill="none" class="shrink-0">
             <path d="M45 36H17C12.58 36 9 32.42 9 28C9 23.84 12.18 20.42 16.24 20.04C17.54 14.54 22.47 10.4 28.36 10.4C35.24 10.4 40.88 15.88 41.14 22.72C44.71 23.64 47.4 26.88 47.4 30.72C47.4 33.64 46.3 36 45 36Z" fill="#64748b"/>
-            <line x1="22" y1="42" x2="19" y2="50" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round" class="meteo-rain-drop"/>
-            <line x1="32" y1="42" x2="29" y2="50" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round" class="meteo-rain-drop" style="animation-delay: 0.3s"/>
-            <line x1="42" y1="42" x2="39" y2="50" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round" class="meteo-rain-drop" style="animation-delay: 0.6s"/>
+            <line x1="22" y1="42" x2="19" y2="50" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round" class="${cDrop}"/>
+            <line x1="32" y1="42" x2="29" y2="50" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round" class="${cDrop}" ${isAnimated ? 'style="animation-delay: 0.3s"' : ''}/>
+            <line x1="42" y1="42" x2="39" y2="50" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round" class="${cDrop}" ${isAnimated ? 'style="animation-delay: 0.6s"' : ''}/>
           </svg>
         `;
 
@@ -234,9 +242,9 @@ const Meteocons = {
         return `
           <svg width="${s}" height="${s}" viewBox="0 0 64 64" fill="none" class="shrink-0">
             <path d="M45 34H17C12.58 34 9 30.42 9 26C9 21.84 12.18 18.42 16.24 18.04C17.54 12.54 22.47 8.4 28.36 8.4C35.24 8.4 40.88 13.88 41.14 20.72C44.71 21.64 47.4 24.88 47.4 28.72C47.4 31.64 46.3 34 45 34Z" fill="#475569"/>
-            <line x1="20" y1="40" x2="16" y2="52" stroke="#0284c7" stroke-width="3" stroke-linecap="round" class="meteo-rain-drop"/>
-            <line x1="30" y1="40" x2="26" y2="52" stroke="#0284c7" stroke-width="3" stroke-linecap="round" class="meteo-rain-drop" style="animation-delay: 0.25s"/>
-            <line x1="40" y1="40" x2="36" y2="52" stroke="#0284c7" stroke-width="3" stroke-linecap="round" class="meteo-rain-drop" style="animation-delay: 0.5s"/>
+            <line x1="20" y1="40" x2="16" y2="52" stroke="#0284c7" stroke-width="3" stroke-linecap="round" class="${cDrop}"/>
+            <line x1="30" y1="40" x2="26" y2="52" stroke="#0284c7" stroke-width="3" stroke-linecap="round" class="${cDrop}" ${isAnimated ? 'style="animation-delay: 0.25s"' : ''}/>
+            <line x1="40" y1="40" x2="36" y2="52" stroke="#0284c7" stroke-width="3" stroke-linecap="round" class="${cDrop}" ${isAnimated ? 'style="animation-delay: 0.5s"' : ''}/>
           </svg>
         `;
 
@@ -246,7 +254,7 @@ const Meteocons = {
         return `
           <svg width="${s}" height="${s}" viewBox="0 0 64 64" fill="none" class="shrink-0">
             <path d="M45 34H17C12.58 34 9 30.42 9 26C9 21.84 12.18 18.42 16.24 18.04C17.54 12.54 22.47 8.4 28.36 8.4C35.24 8.4 40.88 13.88 41.14 20.72C44.71 21.64 47.4 24.88 47.4 28.72C47.4 31.64 46.3 34 45 34Z" fill="#334155"/>
-            <path d="M30 34L24 45H32L28 58L40 43H32L36 34H30Z" fill="#facc15" stroke="#ca8a04" stroke-width="1.5" class="meteo-lightning"/>
+            <path d="M30 34L24 45H32L28 58L40 43H32L36 34H30Z" fill="#facc15" stroke="#ca8a04" stroke-width="1.5" class="${cLightning}"/>
           </svg>
         `;
 
@@ -256,9 +264,9 @@ const Meteocons = {
         return `
           <svg width="${s}" height="${s}" viewBox="0 0 64 64" fill="none" class="shrink-0">
             <path d="M44 36H18C13.58 36 10 32.42 10 28C10 23.84 13.18 20.42 17.24 20.04C18.54 14.54 23.47 10.4 29.36 10.4C36.24 10.4 41.88 15.88 41.14 22.72C44.71 23.64 48.4 26.88 48.4 30.72C48.4 33.64 46.72 36 44 36Z" fill="#94a3b8"/>
-            <circle cx="22" cy="46" r="2.5" fill="#e0e7ff" class="meteo-snow-flake"/>
-            <circle cx="32" cy="48" r="3" fill="#e0e7ff" class="meteo-snow-flake" style="animation-delay: 0.4s"/>
-            <circle cx="42" cy="46" r="2.5" fill="#e0e7ff" class="meteo-snow-flake" style="animation-delay: 0.8s"/>
+            <circle cx="22" cy="46" r="2.5" fill="#e0e7ff" class="${cSnow}"/>
+            <circle cx="32" cy="48" r="3" fill="#e0e7ff" class="${cSnow}" ${isAnimated ? 'style="animation-delay: 0.4s"' : ''}/>
+            <circle cx="42" cy="46" r="2.5" fill="#e0e7ff" class="${cSnow}" ${isAnimated ? 'style="animation-delay: 0.8s"' : ''}/>
           </svg>
         `;
 
@@ -267,9 +275,9 @@ const Meteocons = {
         return `
           <svg width="${s}" height="${s}" viewBox="0 0 64 64" fill="none" class="shrink-0">
             <path d="M44 36H18C13.58 36 10 32.42 10 28C10 23.84 13.18 20.42 17.24 20.04C18.54 14.54 23.47 10.4 29.36 10.4C36.24 10.4 41.88 15.88 41.14 22.72C44.71 23.64 48.4 26.88 48.4 30.72C48.4 33.64 46.72 36 44 36Z" fill="#64748b"/>
-            <line x1="22" y1="42" x2="19" y2="50" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round" class="meteo-rain-drop"/>
-            <circle cx="34" cy="48" r="2.5" fill="#cbd5e1" class="meteo-snow-flake"/>
-            <line x1="42" y1="42" x2="39" y2="50" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round" class="meteo-rain-drop" style="animation-delay: 0.5s"/>
+            <line x1="22" y1="42" x2="19" y2="50" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round" class="${cDrop}"/>
+            <circle cx="34" cy="48" r="2.5" fill="#cbd5e1" class="${cSnow}"/>
+            <line x1="42" y1="42" x2="39" y2="50" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round" class="${cDrop}" ${isAnimated ? 'style="animation-delay: 0.5s"' : ''}/>
           </svg>
         `;
 
@@ -277,7 +285,7 @@ const Meteocons = {
         return `
           <svg width="${s}" height="${s}" viewBox="0 0 64 64" fill="none" class="shrink-0">
             <line x1="16" y1="26" x2="48" y2="26" stroke="#94a3b8" stroke-width="4" stroke-linecap="round"/>
-            <line x1="12" y1="34" x2="52" y2="34" stroke="#64748b" stroke-width="4" stroke-linecap="round" class="meteo-cloud-drift"/>
+            <line x1="12" y1="34" x2="52" y2="34" stroke="#64748b" stroke-width="4" stroke-linecap="round" class="${cDrift}"/>
             <line x1="18" y1="42" x2="46" y2="42" stroke="#94a3b8" stroke-width="4" stroke-linecap="round"/>
             <line x1="22" y1="50" x2="42" y2="50" stroke="#cbd5e1" stroke-width="3.5" stroke-linecap="round"/>
           </svg>
@@ -889,32 +897,6 @@ class ModelsChartManager {
           pointHoverBorderColor: feelsColor
         }
       ];
-
-      if (recs.some(r => r.dewPoint != null)) {
-        datasets.push({
-          label: 'Çiy Noktası (°C)',
-          data: recs.map(r => r.dewPoint),
-          borderColor: dewColor,
-          borderDash: [2, 2],
-          fill: false,
-          tension: 0.38,
-          borderWidth: 1.75,
-          pointRadius: 0
-        });
-      }
-
-      if (recs.some(r => r.surfaceTemp != null)) {
-        datasets.push({
-          label: 'Zemin Sıcaklığı (°C)',
-          data: recs.map(r => r.surfaceTemp),
-          borderColor: surfaceColor,
-          borderDash: [3, 3],
-          fill: false,
-          tension: 0.38,
-          borderWidth: 1.5,
-          pointRadius: 0
-        });
-      }
 
       this.chart.options.scales.y.ticks.callback = (v) => `${v}°C`;
 
@@ -1628,7 +1610,7 @@ class ModelsUIController {
     const isNight = cur.isDay !== null && cur.isDay !== undefined ? cur.isDay === 0 : (hourVal < 6 || hourVal >= 20);
 
     if (this.dom.heroIcon) {
-      this.dom.heroIcon.innerHTML = Meteocons.getSvg(hadise.type, 64, isNight);
+      this.dom.heroIcon.innerHTML = Meteocons.getSvg(hadise.type, 64, isNight, true);
     }
     if (this.dom.heroTemp) this.dom.heroTemp.textContent = Math.round(cur.sicaklik);
     if (this.dom.heroFeels) this.dom.heroFeels.textContent = `Hissedilen: ${Math.round(cur.hissedilenSicaklik)}°C`;
@@ -1758,7 +1740,7 @@ class ModelsUIController {
           <td class="py-2.5 px-3.5 text-[#0f172a] dark:text-[#f8fafc] font-mono text-[11px] font-bold whitespace-nowrap">${timeStr}</td>
           <td class="py-2.5 px-3.5 whitespace-nowrap">
             <div class="flex items-center gap-2">
-              ${Meteocons.getSvg(hInfo.type, 24, isNight)}
+              ${Meteocons.getSvg(hInfo.type, 24, isNight, false)}
               <span class="font-extrabold text-[#0f172a] dark:text-[#f8fafc]">${hInfo.name}</span>
             </div>
           </td>
@@ -1825,10 +1807,10 @@ class ModelsUIController {
       const isSelected = i === this.selectedIndex;
 
       return `
-        <div class="apple-glass p-3.5 rounded-2xl cursor-pointer select-none transition-all duration-150 active:scale-[0.985] ${isSelected ? 'ring-2 ring-[#2563eb] dark:ring-[#38bdf8] bg-blue-500/10 dark:bg-sky-400/15' : ''}" data-index="${i}">
+        <div class="mobile-forecast-card p-3.5 cursor-pointer select-none ${isSelected ? 'selected' : ''}" data-index="${i}">
           <div class="flex items-center justify-between gap-2 border-b border-black/5 dark:border-white/10 pb-2.5">
             <div class="flex items-center gap-2.5">
-              ${Meteocons.getSvg(hInfo.type, 32, isNight)}
+              ${Meteocons.getSvg(hInfo.type, 32, isNight, false)}
               <div>
                 <span class="text-xs font-black text-[#0f172a] dark:text-[#f8fafc]">${hInfo.name}</span>
                 <div class="text-[10px] text-[#475569] dark:text-[#94a3b8] font-bold">${dayStr} · ${hourStr}</div>
@@ -1903,7 +1885,7 @@ class ModelsUIController {
     this.dom.dictList.innerHTML = items.map(it => `
       <div class="p-2.5 rounded-xl bg-[#e2e8f0] dark:bg-[#1f2837] border border-[#cbd5e1] dark:border-[#283343] flex items-center gap-3">
         <div class="shrink-0 flex items-center justify-center w-10 h-10 rounded-lg bg-[#edf2f7] dark:bg-[#171e29] border border-[#cbd5e1]/60 dark:border-[#283343]">
-          ${Meteocons.getSvg(it.type, 28, false)}
+          ${Meteocons.getSvg(it.type, 28, false, false)}
         </div>
         <div class="min-w-0 flex-1">
           <div class="flex items-center gap-2">

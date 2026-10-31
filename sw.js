@@ -1,16 +1,19 @@
 /**
  * Models — Progressive Web App Service Worker
- * Sayısal Hava Tahmin Modelleri İstasyonu (CHMI ALADIN CZ & MGM ALADIN TR)
+ * Sayısal Hava Tahmin Modelleri İstasyonu
  */
 
-const CACHE_NAME = 'models-forecast-v6.5';
+const CACHE_NAME = 'models-forecast-v6.6';
 
 const PRECACHE_ASSETS = [
   './',
   './index.html',
   './style.css',
+  './style.css?v=6.6',
   './app.js',
+  './app.js?v=6.6',
   './aladin.js',
+  './aladin.js?v=6.6',
   './data/aladin.json',
   './manifest.webmanifest',
   './icon.svg',
@@ -32,7 +35,7 @@ const PRECACHE_ASSETS = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('[SW] Pre-caching offline assets for SmartTemp Pro...');
+      console.log('[SW] Pre-caching offline assets for Models...');
       return cache.addAll(PRECACHE_ASSETS);
     }).then(() => self.skipWaiting())
   );
@@ -61,7 +64,7 @@ self.addEventListener('fetch', (event) => {
   if (!request.url.startsWith('http')) return;
 
   // MGM ALADIN Model Verisi ve Proxy İstekleri için Network-First Stratejisi
-  if (request.url.includes('aladin.json') || request.url.includes('/api/aladin')) {
+  if (request.url.includes('aladin.json') || request.url.includes('/api/aladin') || request.url.includes('api.open-meteo.com')) {
     event.respondWith(
       fetch(request).then((networkResponse) => {
         if (networkResponse && networkResponse.status === 200) {

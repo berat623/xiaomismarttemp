@@ -86,4 +86,10 @@ class AppController {
 // Global bootstrap
 window.addEventListener('DOMContentLoaded', () => {
   window.app = new AppController();
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').then((reg) => {
+      reg.update();
+    }).catch(() => {});
+  }
 });
