@@ -289,7 +289,7 @@ h1, h2, h3, h4, th, .font-bold {
 }
 
 /* Mode Tabs with Smooth Apple Glass Pill Accents */
-.mode-btn, .models-chart-btn {
+.mode-btn, .models-chart-btn, .chart-scope-btn {
   color: #475569;
   font-weight: 700;
   border-radius: 9999px;
@@ -301,28 +301,28 @@ h1, h2, h3, h4, th, .font-bold {
   border: 1px solid transparent;
   transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.mode-btn:hover, .models-chart-btn:hover {
+.mode-btn:hover, .models-chart-btn:hover, .chart-scope-btn:hover {
   color: #0f172a;
   background-color: rgba(255, 255, 255, 0.5);
 }
-.mode-btn:active, .models-chart-btn:active {
+.mode-btn:active, .models-chart-btn:active, .chart-scope-btn:active {
   transform: scale(0.96);
 }
-.mode-btn.active, .models-chart-btn.active {
+.mode-btn.active, .models-chart-btn.active, .chart-scope-btn.active {
   background-color: #0f172a;
   color: #ffffff;
   font-weight: 800;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.2);
 }
 
-.dark .mode-btn, .dark .models-chart-btn {
+.dark .mode-btn, .dark .models-chart-btn, .dark .chart-scope-btn {
   color: #94a3b8;
 }
-.dark .mode-btn:hover, .dark .models-chart-btn:hover {
+.dark .mode-btn:hover, .dark .models-chart-btn:hover, .dark .chart-scope-btn:hover {
   color: #f8fafc;
   background-color: rgba(255, 255, 255, 0.08);
 }
-.dark .mode-btn.active, .dark .models-chart-btn.active {
+.dark .mode-btn.active, .dark .models-chart-btn.active, .dark .chart-scope-btn.active {
   background-color: #f8fafc;
   color: #0f172a;
   font-weight: 800;

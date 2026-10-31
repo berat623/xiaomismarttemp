@@ -38,7 +38,7 @@ const MODEL_CONFIGS = {
     badge: 'Çek Hidrometeoroloji · 2 km · 3 Gün (72 Saat)',
     location: 'Bursa Nilüfer (40.231°K, 28.840°D)',
     provider: 'open-meteo',
-    url: 'https://api.open-meteo.com/v1/forecast?latitude=40.2311&longitude=28.8402&hourly=temperature_2m,relative_humidity_2m,dew_point_2m,apparent_temperature,precipitation_probability,precipitation,rain,snowfall,snow_depth_water_equivalent,visibility,cloud_cover_high,cloud_cover_mid,cloud_cover_low,cloud_cover,wind_gusts_10m,wind_direction_10m,wind_speed_10m,surface_pressure,pressure_msl,weather_code,cape,surface_temperature,vapour_pressure_deficit,et0_fao_evapotranspiration,is_day,wet_bulb_temperature_2m,sunshine_duration,snowfall_water_equivalent&models=chmi_aladin_central_europe_2km&forecast_days=3'
+    url: 'https://api.open-meteo.com/v1/forecast?latitude=40.2311&longitude=28.8402&hourly=temperature_2m,relative_humidity_2m,dew_point_2m,apparent_temperature,precipitation_probability,precipitation,rain,snowfall,snow_depth_water_equivalent,visibility,cloud_cover_high,cloud_cover_mid,cloud_cover_low,cloud_cover,wind_gusts_10m,wind_direction_10m,wind_speed_10m,surface_pressure,pressure_msl,weather_code,cape,surface_temperature,vapour_pressure_deficit,et0_fao_evapotranspiration,is_day,wet_bulb_temperature_2m,sunshine_duration,snowfall_water_equivalent&models=chmi_aladin_central_europe_2km&timezone=auto&forecast_days=3'
   },
   ukmo: {
     key: 'ukmo',
@@ -303,13 +303,52 @@ const Meteocons = {
 };
 
 // ==========================================
-// 5. PUSULA YÖNÜ HESAPLAYICI (16 YÖN TÜRKÇE)
+// 5. PUSULA YÖNÜ VE TÜRKİYE (GMT+3) ZAMAN YARDIMCILARI
 // ==========================================
 function getCompassDirection(deg) {
   if (deg == null || isNaN(deg)) return 'K';
   const directions = ['K', 'KKD', 'KD', 'DKD', 'D', 'DGD', 'GD', 'GGD', 'G', 'GGB', 'GB', 'BGB', 'B', 'BKB', 'KB', 'KKB'];
   const index = Math.round(((deg % 360) / 22.5)) % 16;
   return directions[index];
+}
+
+function formatTurkeyDate(timeInput, options = {}) {
+  const d = typeof timeInput === 'string' ? new Date(timeInput) : timeInput;
+  return d.toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', ...options });
+}
+
+function getTurkeyDayKey(timeInput) {
+  const d = typeof timeInput === 'string' ? new Date(timeInput) : timeInput;
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Istanbul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(d);
+}
+
+function getTurkeyTodayKey() {
+  return getTurkeyDayKey(new Date());
+}
+
+function getTurkeyTomorrowKey() {
+  return getTurkeyDayKey(new Date(Date.now() + 86400000));
+}
+
+function findCurrentHourIndex(records) {
+  if (!records || records.length === 0) return 0;
+  const nowMs = Date.now();
+  let closestIdx = 0;
+  let minDiff = Infinity;
+  for (let i = 0; i < records.length; i++) {
+    const tMs = new Date(records[i].time).getTime();
+    const diff = Math.abs(tMs - nowMs);
+    if (diff < minDiff) {
+      minDiff = diff;
+      closestIdx = i;
+    }
+  }
+  return closestIdx;
 }
 
 // ==========================================
@@ -367,7 +406,13 @@ class OpenMeteoModelService {
       const parsedRecords = [];
 
       for (let i = 0; i < count; i++) {
-        const timeIso = h.time[i];
+        const rawTime = h.time[i];
+        // Open-Meteo &timezone=auto ile Europe/Istanbul (GMT+3) döndürür.
+        // Eğer saat sonu offset içermiyorsa, cihaz bağımsız GMT+3 olarak değerlendirilmesi için '+03:00' iliştir:
+        const timeIso = (rawTime.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(rawTime))
+          ? rawTime
+          : rawTime + '+03:00';
+
         const wCode = h.weather_code && h.weather_code[i] != null ? h.weather_code[i] : 0;
         const hadise = getWmoInfo(wCode);
 
@@ -379,14 +424,26 @@ class OpenMeteoModelService {
           precipVal = Number(h.rain[i]);
         }
 
+        // Görüş mesafesi km cinsine çevrilir (m -> km)
+        let visKm = null;
+        if (h.visibility && h.visibility[i] != null) {
+          visKm = Math.round(Number(h.visibility[i]) / 1000 * 10) / 10;
+        }
+
+        // Güneşlenme süresi dakika cinsine çevrilir (sn -> dk)
+        let sunshineMins = null;
+        if (h.sunshine_duration && h.sunshine_duration[i] != null) {
+          sunshineMins = Math.round(Number(h.sunshine_duration[i]) / 60);
+        }
+
         parsedRecords.push({
           time: timeIso,
           tarih: timeIso,
           sicaklik: Number(h.temperature_2m && h.temperature_2m[i] != null ? h.temperature_2m[i] : 0),
           hissedilenSicaklik: Number(h.apparent_temperature && h.apparent_temperature[i] != null ? h.apparent_temperature[i] : (h.temperature_2m ? h.temperature_2m[i] : 0)),
-          dewPoint: h.dew_point_2m && h.dew_point_2m[i] != null ? Number(h.dew_point_2m[i]) : null,
-          wetBulb: h.wet_bulb_temperature_2m && h.wet_bulb_temperature_2m[i] != null ? Number(h.wet_bulb_temperature_2m[i]) : null,
-          surfaceTemp: h.surface_temperature && h.surface_temperature[i] != null ? Number(h.surface_temperature[i]) : null,
+          dewPoint: h.dew_point_2m && h.dew_point_2m[i] != null ? Number(Number(h.dew_point_2m[i]).toFixed(1)) : null,
+          wetBulb: h.wet_bulb_temperature_2m && h.wet_bulb_temperature_2m[i] != null ? Number(Number(h.wet_bulb_temperature_2m[i]).toFixed(1)) : null,
+          surfaceTemp: h.surface_temperature && h.surface_temperature[i] != null ? Number(Number(h.surface_temperature[i]).toFixed(1)) : null,
           nem: Number(h.relative_humidity_2m && h.relative_humidity_2m[i] != null ? h.relative_humidity_2m[i] : 0),
           saatlikToplamYagis: Number(precipVal.toFixed(2)),
           rain: h.rain && h.rain[i] != null ? Number(h.rain[i]) : 0,
@@ -403,10 +460,11 @@ class OpenMeteoModelService {
           cloudHigh: h.cloud_cover_high && h.cloud_cover_high[i] != null ? Number(h.cloud_cover_high[i]) : null,
           cape: h.cape && h.cape[i] != null ? Math.round(Number(h.cape[i])) : null,
           cin: h.convective_inhibition && h.convective_inhibition[i] != null ? Math.round(Number(h.convective_inhibition[i])) : null,
-          visibility: h.visibility && h.visibility[i] != null ? Math.round(Number(h.visibility[i])) : null,
-          vpd: h.vapour_pressure_deficit && h.vapour_pressure_deficit[i] != null ? Number(h.vapour_pressure_deficit[i]) : null,
-          et0: h.et0_fao_evapotranspiration && h.et0_fao_evapotranspiration[i] != null ? Number(h.et0_fao_evapotranspiration[i]) : null,
-          uvIndex: h.uv_index && h.uv_index[i] != null ? Number(h.uv_index[i]) : null,
+          visibility: visKm,
+          sunshine: sunshineMins,
+          vpd: h.vapour_pressure_deficit && h.vapour_pressure_deficit[i] != null ? Number(Number(h.vapour_pressure_deficit[i]).toFixed(2)) : null,
+          et0: h.et0_fao_evapotranspiration && h.et0_fao_evapotranspiration[i] != null ? Number(Number(h.et0_fao_evapotranspiration[i]).toFixed(2)) : null,
+          uvIndex: h.uv_index && h.uv_index[i] != null ? Number(Number(h.uv_index[i]).toFixed(1)) : null,
           isDay: h.is_day && h.is_day[i] != null ? Number(h.is_day[i]) : 1,
           weatherCode: wCode,
           hadise: hadise
@@ -607,6 +665,9 @@ class ModelsChartManager {
     this.statPill = document.getElementById('chartStatPill');
     this.chart = null;
     this.mode = 'temp';
+    this.scope = 'all'; // 'all' (Tüm Günler) veya 'day' (Seçili Gün)
+    this.allRecords = [];
+    this.dayRecords = [];
     this.records = [];
     this.initChart();
   }
@@ -651,10 +712,9 @@ class ModelsChartManager {
                 const idx = items[0].dataIndex;
                 const rec = this.records[idx];
                 if (rec) {
-                  const d = new Date(rec.time);
+                  const dayStr = formatTurkeyDate(rec.time, { day: '2-digit', month: 'short' });
+                  const timeStr = formatTurkeyDate(rec.time, { hour: '2-digit', minute: '2-digit' });
                   const hName = rec.hadise ? rec.hadise.name : '';
-                  const dayStr = d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' });
-                  const timeStr = d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
                   return `${dayStr} ${timeStr} · ${hName}`;
                 }
                 return items[0].label || '';
@@ -675,7 +735,6 @@ class ModelsChartManager {
                 }
                 return ` ${label}: ${val}`;
               }
-              // afterBody callback TAMAMEN KALDIRILDI! Ek parametre dökümü yok!
             }
           }
         },
@@ -712,39 +771,62 @@ class ModelsChartManager {
     this.update();
   }
 
+  setScope(scope) {
+    this.scope = scope;
+    this.update();
+  }
+
   updateTheme() {
     if (!this.chart) return;
     this.update();
   }
 
-  update(records = null) {
-    if (records) this.records = records;
+  update(allRecords = null, dayRecords = null) {
+    if (allRecords) this.allRecords = allRecords;
+    if (dayRecords) this.dayRecords = dayRecords;
+
+    // Kapsama göre veri seçimi: 'day' ise seçili günün 24 saati, aksi halde tüm model verisi
+    const recs = (this.scope === 'day' && this.dayRecords && this.dayRecords.length > 0)
+      ? this.dayRecords
+      : (this.allRecords && this.allRecords.length > 0 ? this.allRecords : this.records);
+
+    this.records = recs || [];
     if (!this.chart || this.records.length === 0) return;
     if (this.canvas.offsetParent === null) return;
 
     const isDark = document.documentElement.classList.contains('dark');
-    const recs = this.records;
 
-    // Etiketler: Eğer 1 günden az veri varsa saat, aksi halde gün + saat
+    // Zaman etiketleri (Türkiye Saati GMT+3)
     const isSingleDay = recs.length <= 25;
     const labels = recs.map(r => {
-      const d = new Date(r.time);
       if (isSingleDay) {
-        return `${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
+        return formatTurkeyDate(r.time, { hour: '2-digit', minute: '2-digit' });
       }
-      return `${d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'numeric' })} ${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
+      return `${formatTurkeyDate(r.time, { day: 'numeric', month: 'numeric' })} ${formatTurkeyDate(r.time, { hour: '2-digit', minute: '2-digit' })}`;
     });
 
     const tempColor = isDark ? '#f87171' : '#ef4444';
     const feelsColor = isDark ? '#fbbf24' : '#f59e0b';
+    const dewColor = isDark ? '#38bdf8' : '#0284c7';
+    const surfaceColor = isDark ? '#c084fc' : '#9333ea';
     const rainColor = isDark ? '#38bdf8' : '#0284c7';
     const snowColor = isDark ? '#a5b4fc' : '#6366f1';
+    const probColor = isDark ? '#34d399' : '#10b981';
     const windColor = isDark ? '#34d399' : '#10b981';
     const gustColor = isDark ? '#facc15' : '#eab308';
     const humColor = isDark ? '#2dd4bf' : '#0d9488';
     const cloudColor = isDark ? '#94a3b8' : '#64748b';
+    const cloudLowColor = isDark ? '#38bdf8' : '#0284c7';
+    const cloudMidColor = isDark ? '#818cf8' : '#4f46e5';
+    const cloudHighColor = isDark ? '#c084fc' : '#9333ea';
     const pressureColor = isDark ? '#c084fc' : '#9333ea';
+    const surfPressColor = isDark ? '#a855f7' : '#7e22ce';
     const capeColor = isDark ? '#fb923c' : '#ea580c';
+    const cinColor = isDark ? '#f43f5e' : '#e11d48';
+    const uvColor = isDark ? '#f59e0b' : '#d97706';
+    const sunColor = isDark ? '#fbbf24' : '#eab308';
+    const visColor = isDark ? '#06b6d4' : '#0891b2';
+    const vpdColor = isDark ? '#fb923c' : '#ea580c';
 
     const makeGradient = (rgbStr, topAlpha, midAlpha, botAlpha) => {
       return (context) => {
@@ -764,6 +846,11 @@ class ModelsChartManager {
     let windData = [];
     let statText = '';
 
+    // İkincil y-eksenini varsayılan olarak gizle
+    if (this.chart.options.scales.y1) {
+      this.chart.options.scales.y1.display = false;
+    }
+
     if (this.mode === 'temp') {
       const tempRgb = isDark ? '248, 113, 113' : '239, 68, 68';
       const temps = recs.map(r => r.sicaklik);
@@ -772,7 +859,6 @@ class ModelsChartManager {
       const avgT = (temps.reduce((a, b) => a + b, 0) / temps.length).toFixed(1);
       statText = `Min: ${minT}°C · Maks: ${maxT}°C · Ort: ${avgT}°C`;
 
-      // SADECE Sıcaklık ve Hissedilen Sıcaklık
       datasets = [
         {
           label: 'Sıcaklık (°C)',
@@ -782,7 +868,7 @@ class ModelsChartManager {
           fill: true,
           tension: 0.38,
           borderWidth: 2.75,
-          pointRadius: 0,
+          pointRadius: recs.length > 100 ? 0 : 2,
           pointHoverRadius: 6.5,
           pointHoverBackgroundColor: '#ffffff',
           pointHoverBorderWidth: 2.5,
@@ -803,6 +889,33 @@ class ModelsChartManager {
           pointHoverBorderColor: feelsColor
         }
       ];
+
+      if (recs.some(r => r.dewPoint != null)) {
+        datasets.push({
+          label: 'Çiy Noktası (°C)',
+          data: recs.map(r => r.dewPoint),
+          borderColor: dewColor,
+          borderDash: [2, 2],
+          fill: false,
+          tension: 0.38,
+          borderWidth: 1.75,
+          pointRadius: 0
+        });
+      }
+
+      if (recs.some(r => r.surfaceTemp != null)) {
+        datasets.push({
+          label: 'Zemin Sıcaklığı (°C)',
+          data: recs.map(r => r.surfaceTemp),
+          borderColor: surfaceColor,
+          borderDash: [3, 3],
+          fill: false,
+          tension: 0.38,
+          borderWidth: 1.5,
+          pointRadius: 0
+        });
+      }
+
       this.chart.options.scales.y.ticks.callback = (v) => `${v}°C`;
 
     } else if (this.mode === 'rain') {
@@ -823,6 +936,7 @@ class ModelsChartManager {
           borderRadius: 6
         }
       ];
+
       if (recs.some(r => r.snowfall > 0)) {
         datasets.push({
           label: 'Kar (cm)',
@@ -835,6 +949,34 @@ class ModelsChartManager {
           borderRadius: 6
         });
       }
+
+      if (recs.some(r => r.precipProb != null)) {
+        datasets.push({
+          label: 'Yağış İhtimali (%)',
+          data: recs.map(r => r.precipProb),
+          borderColor: probColor,
+          borderDash: [3, 3],
+          fill: false,
+          tension: 0.35,
+          borderWidth: 2,
+          pointRadius: 0,
+          yAxisID: 'y1'
+        });
+
+        this.chart.options.scales.y1 = {
+          display: true,
+          position: 'right',
+          min: 0,
+          max: 100,
+          grid: { drawOnChartArea: false },
+          ticks: {
+            color: isDark ? '#34d399' : '#10b981',
+            font: { family: 'Poppins', size: 10, weight: 600 },
+            callback: (v) => `%${v}`
+          }
+        };
+      }
+
       this.chart.options.scales.y.ticks.callback = (v) => `${v} mm`;
 
     } else if (this.mode === 'wind') {
@@ -862,6 +1004,7 @@ class ModelsChartManager {
           pointHoverBorderColor: windColor
         }
       ];
+
       if (recs.some(r => r.windGust != null && r.windGust > 0)) {
         datasets.push({
           label: 'Hamle / Gust (km/h)',
@@ -874,6 +1017,7 @@ class ModelsChartManager {
           pointRadius: 0
         });
       }
+
       this.chart.options.scales.y.ticks.callback = (v) => `${v} km/h`;
 
     } else if (this.mode === 'hum_cloud') {
@@ -910,6 +1054,46 @@ class ModelsChartManager {
           pointRadius: 0
         }
       ];
+
+      if (recs.some(r => r.cloudLow != null)) {
+        datasets.push({
+          label: 'Alçak Bulut (%)',
+          data: recs.map(r => r.cloudLow),
+          borderColor: cloudLowColor,
+          borderDash: [1, 2],
+          fill: false,
+          tension: 0.38,
+          borderWidth: 1.5,
+          pointRadius: 0
+        });
+      }
+
+      if (recs.some(r => r.cloudMid != null)) {
+        datasets.push({
+          label: 'Orta Bulut (%)',
+          data: recs.map(r => r.cloudMid),
+          borderColor: cloudMidColor,
+          borderDash: [1, 2],
+          fill: false,
+          tension: 0.38,
+          borderWidth: 1.5,
+          pointRadius: 0
+        });
+      }
+
+      if (recs.some(r => r.cloudHigh != null)) {
+        datasets.push({
+          label: 'Yüksek Bulut (%)',
+          data: recs.map(r => r.cloudHigh),
+          borderColor: cloudHighColor,
+          borderDash: [1, 2],
+          fill: false,
+          tension: 0.38,
+          borderWidth: 1.5,
+          pointRadius: 0
+        });
+      }
+
       this.chart.options.scales.y.ticks.callback = (v) => `%${v}`;
 
     } else if (this.mode === 'pressure') {
@@ -921,7 +1105,7 @@ class ModelsChartManager {
 
       datasets = [
         {
-          label: 'Hava Basıncı (hPa)',
+          label: 'MSL Basınç (hPa)',
           data: pressures,
           borderColor: pressureColor,
           backgroundColor: makeGradient(pressRgb, 0.28, 0.06, 0.0),
@@ -935,6 +1119,20 @@ class ModelsChartManager {
           pointHoverBorderColor: pressureColor
         }
       ];
+
+      if (recs.some(r => r.surfacePressure != null)) {
+        datasets.push({
+          label: 'Yüzey Basıncı (hPa)',
+          data: recs.map(r => r.surfacePressure),
+          borderColor: surfPressColor,
+          borderDash: [3, 3],
+          fill: false,
+          tension: 0.38,
+          borderWidth: 1.75,
+          pointRadius: 0
+        });
+      }
+
       this.chart.options.scales.y.ticks.callback = (v) => `${v} hPa`;
 
     } else if (this.mode === 'cape') {
@@ -959,7 +1157,126 @@ class ModelsChartManager {
           pointHoverBorderColor: capeColor
         }
       ];
+
+      if (recs.some(r => r.cin != null)) {
+        datasets.push({
+          label: 'CIN / Bastırma (J/kg)',
+          data: recs.map(r => r.cin),
+          borderColor: cinColor,
+          borderDash: [3, 3],
+          fill: false,
+          tension: 0.38,
+          borderWidth: 1.75,
+          pointRadius: 0
+        });
+      }
+
       this.chart.options.scales.y.ticks.callback = (v) => `${v} J/kg`;
+
+    } else if (this.mode === 'solar_uv') {
+      const uvRgb = isDark ? '245, 158, 11' : '217, 119, 6';
+      const uvs = recs.map(r => r.uvIndex != null ? r.uvIndex : 0);
+      const maxUv = Math.max(...uvs);
+      const totalSun = recs.reduce((a, b) => a + (b.sunshine || 0), 0);
+      statText = `Maks UV: ${maxUv} ${maxUv >= 8 ? '(Çok Yüksek)' : (maxUv >= 6 ? '(Yüksek)' : (maxUv >= 3 ? '(Orta)' : '(Düşük)'))} · Toplam Güneşlenme: ${Math.round(totalSun / 60)} sa`;
+
+      datasets = [
+        {
+          label: 'UV İndeksi',
+          data: uvs,
+          borderColor: uvColor,
+          backgroundColor: makeGradient(uvRgb, 0.35, 0.08, 0.0),
+          fill: true,
+          tension: 0.35,
+          borderWidth: 2.75,
+          pointRadius: recs.length > 100 ? 0 : 2,
+          pointHoverRadius: 6.5,
+          pointHoverBackgroundColor: '#ffffff',
+          pointHoverBorderWidth: 2.5,
+          pointHoverBorderColor: uvColor
+        }
+      ];
+
+      if (recs.some(r => r.sunshine != null)) {
+        datasets.push({
+          label: 'Güneşlenme Süresi (dk/saat)',
+          data: recs.map(r => r.sunshine),
+          borderColor: sunColor,
+          backgroundColor: isDark ? 'rgba(251, 191, 36, 0.35)' : 'rgba(234, 179, 8, 0.30)',
+          fill: true,
+          type: 'bar',
+          borderWidth: 1.5,
+          borderRadius: 4,
+          yAxisID: 'y1'
+        });
+
+        this.chart.options.scales.y1 = {
+          display: true,
+          position: 'right',
+          min: 0,
+          max: 60,
+          grid: { drawOnChartArea: false },
+          ticks: {
+            color: isDark ? '#fbbf24' : '#d97706',
+            font: { family: 'Poppins', size: 10, weight: 600 },
+            callback: (v) => `${v} dk`
+          }
+        };
+      }
+
+      this.chart.options.scales.y.ticks.callback = (v) => `${v}`;
+
+    } else if (this.mode === 'visibility') {
+      const visRgb = isDark ? '6, 182, 212' : '8, 145, 178';
+      const visibilities = recs.map(r => r.visibility != null ? r.visibility : 10);
+      const minVis = Math.min(...visibilities);
+      const vpds = recs.map(r => r.vpd != null ? r.vpd : 0);
+      const maxVpd = Math.max(...vpds);
+      statText = `Min Görüş Mesafesi: ${minVis} km${maxVpd > 0 ? ` · Maks Buhar Açığı (VPD): ${maxVpd} kPa` : ''}`;
+
+      datasets = [
+        {
+          label: 'Görüş Mesafesi (km)',
+          data: visibilities,
+          borderColor: visColor,
+          backgroundColor: makeGradient(visRgb, 0.28, 0.06, 0.0),
+          fill: true,
+          tension: 0.35,
+          borderWidth: 2.5,
+          pointRadius: 0,
+          pointHoverRadius: 6,
+          pointHoverBackgroundColor: '#ffffff',
+          pointHoverBorderWidth: 2.5,
+          pointHoverBorderColor: visColor
+        }
+      ];
+
+      if (recs.some(r => r.vpd != null)) {
+        datasets.push({
+          label: 'Buhar Açığı / VPD (kPa)',
+          data: recs.map(r => r.vpd),
+          borderColor: vpdColor,
+          borderDash: [3, 3],
+          fill: false,
+          tension: 0.35,
+          borderWidth: 2,
+          pointRadius: 0,
+          yAxisID: 'y1'
+        });
+
+        this.chart.options.scales.y1 = {
+          display: true,
+          position: 'right',
+          grid: { drawOnChartArea: false },
+          ticks: {
+            color: isDark ? '#fb923c' : '#ea580c',
+            font: { family: 'Poppins', size: 10, weight: 600 },
+            callback: (v) => `${v} kPa`
+          }
+        };
+      }
+
+      this.chart.options.scales.y.ticks.callback = (v) => `${v} km`;
     }
 
     if (this.statPill && statText) {
@@ -984,7 +1301,7 @@ class ModelsChartManager {
 class ModelsUIController {
   constructor() {
     this.activeModelKey = localStorage.getItem('models_active_model') || 'ecmwf';
-    this.selectedDay = 'all'; // 'all' veya ISO date string 'YYYY-MM-DD'
+    this.selectedDay = null; // null ise otomatik olarak bugünün tarihine ayarlanır
     this.selectedIndex = 0;
     this.dictTab = 'wmo';
     this.chartManager = null;
@@ -1099,10 +1416,23 @@ class ModelsUIController {
         this.selectedDay = btn.dataset.day || 'all';
         this.dom.dayFilterTrack.querySelectorAll('.day-filter-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        this.selectedIndex = 0;
+
+        const filtered = this.getFilteredRecords();
+        const todayKey = getTurkeyTodayKey();
+        this.selectedIndex = (this.selectedDay === todayKey) ? findCurrentHourIndex(filtered) : 0;
         this.render();
       });
     }
+
+    // Grafik Kapsamı Butonları (Tüm Günler vs Seçili Gün)
+    document.querySelectorAll('.chart-scope-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.chart-scope-btn').forEach(b => b.classList.remove('active'));
+        e.currentTarget.classList.add('active');
+        const scope = e.currentTarget.dataset.scope || 'all';
+        if (this.chartManager) this.chartManager.setScope(scope);
+      });
+    });
 
     // Grafik Modu Butonları
     document.querySelectorAll('.models-chart-btn').forEach(btn => {
@@ -1166,7 +1496,7 @@ class ModelsUIController {
     if (this.activeModelKey === modelKey) return;
     this.activeModelKey = modelKey;
     localStorage.setItem('models_active_model', modelKey);
-    this.selectedDay = 'all';
+    this.selectedDay = null; // Yeni seçilen modelde bugüne otomatik odaklan
     this.selectedIndex = 0;
     this.updateModelTabsUI();
     this.render();
@@ -1231,17 +1561,13 @@ class ModelsUIController {
     if (!all || all.length === 0) return [];
     if (this.selectedDay === 'all') return all;
 
-    return all.filter(r => {
-      const dayKey = r.time.slice(0, 10);
-      return dayKey === this.selectedDay;
-    });
+    return all.filter(r => getTurkeyDayKey(r.time) === this.selectedDay);
   }
 
   render() {
     const cfg = this.activeConfig;
     const s = this.activeService;
     const allRecs = s.records;
-    const filteredRecs = this.getFilteredRecords();
 
     // Model Bilgi Başlıkları
     if (this.dom.modelTitleText) this.dom.modelTitleText.textContent = cfg.fullName;
@@ -1250,8 +1576,7 @@ class ModelsUIController {
 
     if (this.dom.modelLastUpdateText) {
       if (s.lastUpdated) {
-        const lu = new Date(s.lastUpdated);
-        this.dom.modelLastUpdateText.textContent = `Son Güncelleme: ${lu.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
+        this.dom.modelLastUpdateText.textContent = `Son Güncelleme: ${formatTurkeyDate(s.lastUpdated, { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
       } else {
         this.dom.modelLastUpdateText.textContent = 'Son Güncelleme: Bekleniyor';
       }
@@ -1263,14 +1588,44 @@ class ModelsUIController {
       return;
     }
 
-    // Gün Filtreleme Şeridi Render
+    // Seçili gün atanmamışsa varsayılan olarak bugünü (yoksa ilk günü) seç
+    const todayKey = getTurkeyTodayKey();
+    if (!this.selectedDay) {
+      const hasToday = allRecs.some(r => getTurkeyDayKey(r.time) === todayKey);
+      this.selectedDay = hasToday ? todayKey : (allRecs[0] ? getTurkeyDayKey(allRecs[0].time) : 'all');
+    }
+
+    const filteredRecs = this.getFilteredRecords();
+
+    // Modelin desteklediği parametrelere göre grafik butonlarını ayarla
+    const hasCape = allRecs.some(r => r.cape != null && r.cape > 0);
+    const hasUvOrSun = allRecs.some(r => (r.uvIndex != null && r.uvIndex > 0) || (r.sunshine != null && r.sunshine > 0));
+    const hasVisOrVpd = allRecs.some(r => r.visibility != null || (r.vpd != null && r.vpd > 0));
+
+    const capeBtn = document.querySelector('.models-chart-btn[data-mode="cape"]');
+    if (capeBtn) capeBtn.style.display = hasCape ? '' : 'none';
+
+    const uvBtn = document.querySelector('.models-chart-btn[data-mode="solar_uv"]');
+    if (uvBtn) uvBtn.style.display = hasUvOrSun ? '' : 'none';
+
+    const visBtn = document.querySelector('.models-chart-btn[data-mode="visibility"]');
+    if (visBtn) visBtn.style.display = hasVisOrVpd ? '' : 'none';
+
+    // Gün filtreleme şeridini çiz
     this.renderDayFilter(allRecs);
 
-    // Hero Card Render (Seçili veya İlk Saat)
+    // Eğer bugün seçiliyse ve seçili indeks 0 ise, canlı saate odaklan
+    if (this.selectedDay === todayKey && (this.selectedIndex === 0 || this.selectedIndex >= filteredRecs.length)) {
+      this.selectedIndex = findCurrentHourIndex(filteredRecs);
+    } else if (this.selectedIndex >= filteredRecs.length) {
+      this.selectedIndex = 0;
+    }
+
+    // Hero Card Render (Seçili Canlı Saat)
     const cur = filteredRecs[this.selectedIndex] || filteredRecs[0] || allRecs[0];
     const hadise = cur.hadise || { name: 'Hava Durumu', desc: '', type: 'cloudy' };
-    const dateObj = new Date(cur.time);
-    const isNight = cur.isDay !== null && cur.isDay !== undefined ? cur.isDay === 0 : (dateObj.getHours() < 6 || dateObj.getHours() >= 20);
+    const hourVal = Number(formatTurkeyDate(cur.time, { hour: 'numeric', hourCycle: 'h23' }));
+    const isNight = cur.isDay !== null && cur.isDay !== undefined ? cur.isDay === 0 : (hourVal < 6 || hourVal >= 20);
 
     if (this.dom.heroIcon) {
       this.dom.heroIcon.innerHTML = Meteocons.getSvg(hadise.type, 64, isNight);
@@ -1317,12 +1672,12 @@ class ModelsUIController {
       }
     }
 
-    // Grafik Güncellemesi
+    // Grafik Güncellemesi: Varsayılan tüm veriyi gösterir, seçili gün istenirse o güne odaklanır
     if (this.chartManager) {
-      this.chartManager.update(filteredRecs);
+      this.chartManager.update(allRecs, filteredRecs);
     }
 
-    // Tablo ve Mobil Liste Render
+    // Tablo ve Mobil Liste Render (Seçili Güne Göre)
     this.renderTable(filteredRecs);
     this.renderMobileList(filteredRecs);
 
@@ -1334,10 +1689,13 @@ class ModelsUIController {
   renderDayFilter(allRecs) {
     if (!this.dom.dayFilterTrack) return;
 
+    const todayKey = getTurkeyTodayKey();
+    const tomorrowKey = getTurkeyTomorrowKey();
+
     // Benzersiz günleri çıkar
     const daysMap = new Map();
     allRecs.forEach(r => {
-      const dKey = r.time.slice(0, 10);
+      const dKey = getTurkeyDayKey(r.time);
       if (!daysMap.has(dKey)) {
         daysMap.set(dKey, new Date(r.time));
       }
@@ -1345,19 +1703,27 @@ class ModelsUIController {
 
     const isAllActive = this.selectedDay === 'all';
     let html = `
-      <button class="day-filter-btn shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold cursor-pointer select-none transition-all duration-150 active:scale-95 ${isAllActive ? 'bg-[#2563eb] text-white dark:bg-[#38bdf8] dark:text-[#020617] shadow-sm shadow-blue-500/30' : 'bg-white/50 dark:bg-white/5 text-[#334155] dark:text-[#cbd5e1] border border-white/70 dark:border-white/10 hover:bg-white/80 dark:hover:bg-white/10'}" data-day="all">
+      <button class="day-filter-btn shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold cursor-pointer select-none transition-all duration-150 active:scale-95 ${isAllActive ? 'bg-[#2563eb] text-white dark:bg-[#38bdf8] dark:text-[#020617] shadow-sm shadow-blue-500/30 font-extrabold' : 'bg-white/50 dark:bg-white/5 text-[#334155] dark:text-[#cbd5e1] border border-white/70 dark:border-white/10 hover:bg-white/80 dark:hover:bg-white/10'}" data-day="all">
         Tümü (${allRecs.length}s)
       </button>
     `;
 
     daysMap.forEach((dateObj, dKey) => {
       const isSelected = this.selectedDay === dKey;
-      const dayName = dateObj.toLocaleDateString('tr-TR', { weekday: 'short' });
-      const dateNum = dateObj.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
+      let label = '';
+      const dateNum = formatTurkeyDate(dateObj, { day: 'numeric', month: 'short' });
+      if (dKey === todayKey) {
+        label = `Bugün (${dateNum})`;
+      } else if (dKey === tomorrowKey) {
+        label = `Yarın (${dateNum})`;
+      } else {
+        const dayName = formatTurkeyDate(dateObj, { weekday: 'short' });
+        label = `${dayName} ${dateNum}`;
+      }
 
       html += `
-        <button class="day-filter-btn shrink-0 px-3 py-1.5 rounded-full text-xs font-bold cursor-pointer select-none transition-all duration-150 active:scale-95 ${isSelected ? 'bg-[#2563eb] text-white dark:bg-[#38bdf8] dark:text-[#020617] shadow-sm shadow-blue-500/30' : 'bg-white/50 dark:bg-white/5 text-[#334155] dark:text-[#cbd5e1] border border-white/70 dark:border-white/10 hover:bg-white/80 dark:hover:bg-white/10'}" data-day="${dKey}">
-          ${dayName} ${dateNum}
+        <button class="day-filter-btn shrink-0 px-3 py-1.5 rounded-full text-xs font-bold cursor-pointer select-none transition-all duration-150 active:scale-95 ${isSelected ? 'bg-[#2563eb] text-white dark:bg-[#38bdf8] dark:text-[#020617] shadow-sm shadow-blue-500/30 font-extrabold' : 'bg-white/50 dark:bg-white/5 text-[#334155] dark:text-[#cbd5e1] border border-white/70 dark:border-white/10 hover:bg-white/80 dark:hover:bg-white/10'}" data-day="${dKey}">
+          ${label}
         </button>
       `;
     });
@@ -1368,11 +1734,22 @@ class ModelsUIController {
   renderTable(recs) {
     if (!this.dom.desktopTableBody) return;
 
+    if (!recs || recs.length === 0) {
+      this.dom.desktopTableBody.innerHTML = `
+        <tr>
+          <td colspan="9" class="py-6 text-center text-[#475569] dark:text-[#94a3b8] font-bold">
+            Bu gün için model tahmini bulunmuyor.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
     this.dom.desktopTableBody.innerHTML = recs.map((r, i) => {
       const hInfo = r.hadise || { name: 'Hava Durumu', type: 'cloudy' };
-      const d = new Date(r.time);
-      const timeStr = `${d.toLocaleDateString('tr-TR', { weekday: 'short', day: '2-digit', month: '2-digit' })} ${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
-      const isNight = r.isDay !== null && r.isDay !== undefined ? r.isDay === 0 : (d.getHours() < 6 || d.getHours() >= 20);
+      const timeStr = `${formatTurkeyDate(r.time, { weekday: 'short', day: '2-digit', month: '2-digit' })} ${formatTurkeyDate(r.time, { hour: '2-digit', minute: '2-digit' })}`;
+      const hourVal = Number(formatTurkeyDate(r.time, { hour: 'numeric', hourCycle: 'h23' }));
+      const isNight = r.isDay !== null && r.isDay !== undefined ? r.isDay === 0 : (hourVal < 6 || hourVal >= 20);
       const windDir = getCompassDirection(r.ruzgarYonu);
       const isSelected = i === this.selectedIndex;
 
@@ -1430,12 +1807,21 @@ class ModelsUIController {
   renderMobileList(recs) {
     if (!this.dom.mobileListContainer) return;
 
+    if (!recs || recs.length === 0) {
+      this.dom.mobileListContainer.innerHTML = `
+        <div class="p-4 text-center text-xs text-[#475569] dark:text-[#94a3b8] font-bold">
+          Bu gün için model tahmini bulunmuyor.
+        </div>
+      `;
+      return;
+    }
+
     this.dom.mobileListContainer.innerHTML = recs.map((r, i) => {
       const hInfo = r.hadise || { name: 'Hava Durumu', type: 'cloudy' };
-      const d = new Date(r.time);
-      const hourStr = d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
-      const dayStr = d.toLocaleDateString('tr-TR', { weekday: 'short', day: 'numeric', month: 'short' });
-      const isNight = r.isDay !== null && r.isDay !== undefined ? r.isDay === 0 : (d.getHours() < 6 || d.getHours() >= 20);
+      const hourStr = formatTurkeyDate(r.time, { hour: '2-digit', minute: '2-digit' });
+      const dayStr = formatTurkeyDate(r.time, { weekday: 'short', day: 'numeric', month: 'short' });
+      const hourVal = Number(formatTurkeyDate(r.time, { hour: 'numeric', hourCycle: 'h23' }));
+      const isNight = r.isDay !== null && r.isDay !== undefined ? r.isDay === 0 : (hourVal < 6 || hourVal >= 20);
       const isSelected = i === this.selectedIndex;
 
       return `

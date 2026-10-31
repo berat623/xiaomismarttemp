@@ -234,14 +234,25 @@
           </span>
         </div>
 
-        <!-- Mode Buttons (Tek Tek Parametre Seçici Segmented Pill) -->
-        <div class="inline-flex rounded-full bg-slate-200/60 dark:bg-slate-800/60 p-0.5 border border-white/60 dark:border-white/10 text-xs backdrop-blur-md overflow-x-auto no-scrollbar shrink-0">
-          <button class="models-chart-btn active px-3 py-1 font-bold cursor-pointer" data-mode="temp">Sıcaklık</button>
-          <button class="models-chart-btn px-3 py-1 font-bold cursor-pointer" data-mode="rain">Yağış & Kar</button>
-          <button class="models-chart-btn px-3 py-1 font-bold cursor-pointer" data-mode="wind">Rüzgar (km/h)</button>
-          <button class="models-chart-btn px-3 py-1 font-bold cursor-pointer" data-mode="hum_cloud">Nem & Bulut</button>
-          <button class="models-chart-btn px-3 py-1 font-bold cursor-pointer" data-mode="pressure">Basınç</button>
-          <button class="models-chart-btn px-3 py-1 font-bold cursor-pointer" data-mode="cape">CAPE</button>
+        <!-- Scope & Mode Selectors -->
+        <div class="flex items-center gap-2 flex-wrap">
+          <!-- Kapsam Seçici: Tüm Günler vs Seçili Gün -->
+          <div class="inline-flex rounded-full bg-slate-200/60 dark:bg-slate-800/60 p-0.5 border border-white/60 dark:border-white/10 text-xs backdrop-blur-md shrink-0">
+            <button class="chart-scope-btn active px-3 py-1 font-bold cursor-pointer" data-scope="all">Tüm Günler</button>
+            <button class="chart-scope-btn px-3 py-1 font-bold cursor-pointer" data-scope="day">Seçili Gün</button>
+          </div>
+
+          <!-- Mode Buttons (Tek Tek Parametre Seçici Segmented Pill) -->
+          <div class="inline-flex rounded-full bg-slate-200/60 dark:bg-slate-800/60 p-0.5 border border-white/60 dark:border-white/10 text-xs backdrop-blur-md overflow-x-auto no-scrollbar shrink-0">
+            <button class="models-chart-btn active px-3 py-1 font-bold cursor-pointer" data-mode="temp">Sıcaklık</button>
+            <button class="models-chart-btn px-3 py-1 font-bold cursor-pointer" data-mode="rain">Yağış & Kar</button>
+            <button class="models-chart-btn px-3 py-1 font-bold cursor-pointer" data-mode="wind">Rüzgar (km/h)</button>
+            <button class="models-chart-btn px-3 py-1 font-bold cursor-pointer" data-mode="hum_cloud">Nem & Bulut</button>
+            <button class="models-chart-btn px-3 py-1 font-bold cursor-pointer" data-mode="pressure">Basınç</button>
+            <button class="models-chart-btn px-3 py-1 font-bold cursor-pointer" data-mode="cape">CAPE / Fırtına</button>
+            <button class="models-chart-btn px-3 py-1 font-bold cursor-pointer" data-mode="solar_uv">Güneş & UV</button>
+            <button class="models-chart-btn px-3 py-1 font-bold cursor-pointer" data-mode="visibility">Görüş & VPD</button>
+          </div>
         </div>
       </div>
 
