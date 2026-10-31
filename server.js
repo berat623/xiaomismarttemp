@@ -1,5 +1,5 @@
 /**
- * Xiaomi SmartTemp & MGM ALADIN — Zero-Dependency Local Dev Server & MGM Proxy
+ * Models — Sayısal Hava Tahmin Modelleri İstasyonu Yerel Geliştirme Sunucusu
  * Run with: node server.js
  * Access at: http://localhost:3000
  */
@@ -96,7 +96,7 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n🚀 Xiaomi SmartTemp & MGM ALADIN İstasyonu Aktif!`);
+  console.log(`\n🚀 Models Sayısal Hava Tahmin İstasyonu Aktif!`);
   console.log(`💻 Bilgisayar Yerel Adres: http://localhost:${PORT}`);
   console.log(`📱 Telefon Wi-Fi Adresi:   http://192.168.1.22:${PORT}`);
   console.log(`🌦️ MGM ALADIN Canlı Proxy: http://localhost:${PORT}/api/aladin\n`);

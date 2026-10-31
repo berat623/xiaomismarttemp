@@ -305,7 +305,7 @@ table th, table td {
 .meteo-cloud-drift {
   animation: meteo-drift 4s ease-in-out infinite alternate;
 }
-.meteo-raindrop-1 {
+.meteo-rain-drop, .meteo-raindrop-1 {
   animation: meteo-rain 1.1s linear infinite;
 }
 .meteo-raindrop-2 {
@@ -317,11 +317,15 @@ table th, table td {
 .meteo-lightning {
   animation: meteo-flash 2.8s ease-in-out infinite;
 }
-.meteo-snowflake-1 {
+.meteo-snow-flake, .meteo-snowflake-1 {
   animation: meteo-snow 2.2s linear infinite;
 }
 .meteo-snowflake-2 {
   animation: meteo-snow 2.2s linear infinite 0.8s;
+}
+.meteo-sun-pulse {
+  animation: meteo-spin 20s linear infinite;
+  transform-origin: center;
 }
 .meteo-star {
   animation: meteo-star-twinkle 2.5s ease-in-out infinite;

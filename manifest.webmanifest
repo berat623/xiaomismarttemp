@@ -1,12 +1,12 @@
 {
-  "name": "Xiaomi SmartTemp Pro",
-  "short_name": "SmartTemp",
-  "description": "Xiaomi Mijia Bluetooth Sıcaklık, Nem ve Atmosferik İstasyon (Çevrimdışı PWA)",
+  "name": "Models",
+  "short_name": "Models",
+  "description": "CHMI ALADIN (CZ 2km) ve MGM ALADIN (TR) Sayısal Hava Tahmin Modelleri İstasyonu",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#d3e3fd",
-  "theme_color": "#0b57d0",
+  "background_color": "#e2e8f0",
+  "theme_color": "#2563eb",
   "orientation": "portrait-primary",
   "icons": [
     {

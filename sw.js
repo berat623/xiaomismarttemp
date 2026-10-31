@@ -1,10 +1,9 @@
 /**
- * Xiaomi SmartTemp Pro — Progressive Web App Service Worker
- * Complete 100% Offline Support (No Internet Connection Required)
- * Bluetooth BLE sensor telemetry operates locally via Web Bluetooth API.
+ * Models — Progressive Web App Service Worker
+ * Sayısal Hava Tahmin Modelleri İstasyonu (CHMI ALADIN CZ & MGM ALADIN TR)
  */
 
-const CACHE_NAME = 'xiaomi-smarttemp-v5.7';
+const CACHE_NAME = 'models-forecast-v6.0';
 
 const PRECACHE_ASSETS = [
   './',
