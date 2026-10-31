@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>Models — Sayısal Hava Tahmin Modelleri</title>
-  <meta name="description" content="CHMI ALADIN (CZ 2km) ve MGM ALADIN (TR 4.5km) Sayısal Hava Tahmin Modelleri İstasyonu." />
+  <meta name="description" content="ECMWF 9km, CZ ALADIN 2km, UKMO 10km, GFS 22km, GFS AI ve MGM ALADIN Sayısal Hava Tahmin Modelleri İstasyonu." />
   <meta name="theme-color" content="#e2e8f0" id="metaThemeColor" />
 
   <!-- PWA & Mobile Web App Meta Tags -->
@@ -47,35 +47,33 @@
 <body class="bg-[#e2e8f0] dark:bg-[#0f141c] text-[#0f172a] dark:text-[#f8fafc] min-h-screen flex flex-col font-poppins selection:bg-[#3b82f6]/20 selection:text-current">
 
   <!-- Ultra-Minimalist Compact Header -->
-  <header class="relative z-10 border-b border-[#cbd5e1] dark:border-[#283343] bg-[#edf2f7] dark:bg-[#171e29] sticky top-0 px-3 sm:px-6 py-2.5">
+  <header class="relative z-10 border-b border-[#cbd5e1] dark:border-[#283343] bg-[#edf2f7] dark:bg-[#171e29] sticky top-0 px-2.5 sm:px-6 py-2">
     <div class="max-w-6xl mx-auto flex items-center justify-between gap-2">
       
-      <!-- Left: Logo & Model Selector Tabs -->
-      <div class="flex items-center gap-2 sm:gap-3.5 min-w-0">
+      <!-- Left: Logo & Scrollable Model Tabs -->
+      <div class="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
         <div class="flex items-center gap-1.5 shrink-0">
           <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-[#2563eb] text-white flex items-center justify-center shadow-xs">
             <i data-lucide="layers" class="w-4 h-4"></i>
           </div>
-          <span class="text-sm sm:text-base font-black tracking-tight text-[#0f172a] dark:text-[#f8fafc] hidden xs:inline">Models</span>
+          <span class="text-xs sm:text-base font-black tracking-tight text-[#0f172a] dark:text-[#f8fafc] hidden md:inline">Models</span>
         </div>
 
-        <!-- Model Switcher Tabs (CHMI ALADIN CZ vs MGM ALADIN TR) -->
-        <div class="inline-flex rounded-full bg-[#e2e8f0] dark:bg-[#1f2837] p-0.5 border border-[#cbd5e1] dark:border-[#283343] text-xs shrink-0">
-          <button id="btnModelChmi" class="nav-tab-btn active text-xs font-bold flex items-center gap-1.5 cursor-pointer" title="CHMI ALADIN Orta Avrupa 2km Modeli (72 Saat · Open-Meteo)">
-            <i data-lucide="compass" class="w-3.5 h-3.5"></i>
-            <span>CHMI ALADIN (CZ)</span>
-          </button>
-          <button id="btnModelMgm" class="nav-tab-btn text-xs font-bold flex items-center gap-1.5 cursor-pointer" title="MGM ALADIN Türkiye Modeli">
-            <i data-lucide="cloud-sun" class="w-3.5 h-3.5"></i>
-            <span>MGM ALADIN (TR)</span>
-          </button>
+        <!-- Scrollable Model Switcher Segmented Bar -->
+        <div id="modelTabsContainer" class="flex items-center gap-1 overflow-x-auto no-scrollbar rounded-full bg-[#e2e8f0] dark:bg-[#1f2837] p-0.5 border border-[#cbd5e1] dark:border-[#283343] text-xs">
+          <button data-model="ecmwf" class="model-tab-btn active text-xs font-bold shrink-0">ECMWF 9km</button>
+          <button data-model="chmi" class="model-tab-btn text-xs font-bold shrink-0">CZ ALADIN 2km</button>
+          <button data-model="ukmo" class="model-tab-btn text-xs font-bold shrink-0">UKMO 10km</button>
+          <button data-model="gfs" class="model-tab-btn text-xs font-bold shrink-0">GFS 22km</button>
+          <button data-model="aigfs" class="model-tab-btn text-xs font-bold shrink-0">GFS AI</button>
+          <button data-model="mgm" class="model-tab-btn text-xs font-bold shrink-0">MGM ALADIN</button>
         </div>
       </div>
 
       <!-- Right: Direct Purpose-Driven Actions -->
       <div class="flex items-center gap-1.5 shrink-0">
         
-        <!-- Hadise Sözlüğü Button -->
+        <!-- Hadise Sözlüğü Butonu -->
         <button id="btnOpenDict" class="px-2.5 py-1 rounded-full text-xs font-bold bg-[#e2e8f0] dark:bg-[#1f2837] hover:bg-[#dae2eb] dark:hover:bg-[#283446] text-[#0f172a] dark:text-[#f8fafc] border border-[#cbd5e1] dark:border-[#283343] flex items-center gap-1 cursor-pointer" title="Hadise & Hava Durumu Kodları Sözlüğü">
           <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
           <span class="hidden sm:inline">Sözlük</span>
@@ -108,8 +106,8 @@
         </div>
         <div class="min-w-0">
           <div class="flex items-center gap-1.5 flex-wrap">
-            <h1 id="modelTitleText" class="text-xs sm:text-sm font-extrabold text-[#0f172a] dark:text-[#f8fafc]">CHMI ALADIN Modeli</h1>
-            <span id="modelBadgeText" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#e2e8f0] dark:bg-[#1f2837] text-[#2563eb] dark:text-[#60a5fa] border border-[#cbd5e1] dark:border-[#283343]">Orta Avrupa 2km · 72 Saat</span>
+            <h1 id="modelTitleText" class="text-xs sm:text-sm font-extrabold text-[#0f172a] dark:text-[#f8fafc]">ECMWF IFS HRES 9km Modeli</h1>
+            <span id="modelBadgeText" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#e2e8f0] dark:bg-[#1f2837] text-[#2563eb] dark:text-[#60a5fa] border border-[#cbd5e1] dark:border-[#283343]">Avrupa Merkezi · 9 km · 15 Gün (360 Saat)</span>
           </div>
           <div class="text-[10px] text-[#334155] dark:text-[#cbd5e1] font-semibold flex items-center gap-1 truncate mt-0.5">
             <span id="modelLocationText">Bursa Nilüfer (40.231°K, 28.840°D)</span>
@@ -240,11 +238,16 @@
 
     <!-- DETAILED HOURLY FORECAST: DESKTOP TABLE & MOBILE LIST -->
     <div class="m3-card p-3 sm:p-4 space-y-3">
-      <div class="flex items-center justify-between gap-2 border-b border-[#cbd5e1] dark:border-[#283343] pb-2">
-        <h2 class="text-xs sm:text-sm font-extrabold text-[#0f172a] dark:text-[#f8fafc] flex items-center gap-1.5">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-[#cbd5e1] dark:border-[#283343] pb-2.5">
+        <h2 class="text-xs sm:text-sm font-extrabold text-[#0f172a] dark:text-[#f8fafc] flex items-center gap-1.5 shrink-0">
           <i data-lucide="calendar" class="w-4 h-4 text-[#2563eb]"></i>
           <span>Saatlik Model Dökümü</span>
         </h2>
+
+        <!-- Gün Filtreleme Şeridi (Yatay Kaydırılabilir) -->
+        <div id="dayFilterTrack" class="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5 text-xs">
+          <!-- Dinamik gün butonları enjekte edilir -->
+        </div>
       </div>
 
       <!-- 1. BİLGİSAYAR GÖRÜNÜMÜ: Geniş Tablo (Yalnızca Desktop/Tablet) -->
@@ -297,7 +300,7 @@
         <!-- Dictionary Tab Switcher (WMO vs MGM) -->
         <div class="px-3.5 pt-3 pb-1.5 border-b border-[#cbd5e1] dark:border-[#283343] flex items-center gap-2">
           <div class="inline-flex rounded-full bg-[#e2e8f0] dark:bg-[#1f2837] p-0.5 border border-[#cbd5e1] dark:border-[#283343] text-xs">
-            <button id="btnDictTabWmo" class="nav-tab-btn active px-3 py-1 font-bold cursor-pointer">CHMI WMO Kodları</button>
+            <button id="btnDictTabWmo" class="nav-tab-btn active px-3 py-1 font-bold cursor-pointer">WMO Hadise Kodları</button>
             <button id="btnDictTabMgm" class="nav-tab-btn px-3 py-1 font-bold cursor-pointer">MGM Hadise Kodları</button>
           </div>
         </div>

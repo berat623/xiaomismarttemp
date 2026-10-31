@@ -1,12 +1,75 @@
 /**
  * Models — Sayısal Hava Tahmin Modelleri İstasyonu
- * 1. CHMI ALADIN (CZ - Orta Avrupa 2km Yüksek Çözünürlüklü Model - 72 Saat)
- * 2. MGM ALADIN (TR - Türkiye Sayısal Modeli)
+ * 1. ECMWF HRES 9km (Avrupa Merkezi · 15 Gün / 360 Saat)
+ * 2. CHMI ALADIN 2km (Çek Hidrometeoroloji · 3 Gün / 72 Saat)
+ * 3. UKMO 10km (İngiltere Met Office · 8 Gün / 192 Saat)
+ * 4. GFS 22km (NOAA NCEP · 16 Gün / 384 Saat)
+ * 5. GFS AI 25km (NOAA AIGFS Yapay Zeka · 16 Gün / 384 Saat)
+ * 6. MGM ALADIN (TR) (MGM Türkiye Sayısal Modeli)
  * Canlı & Güncel Veri, Meteocons Hareketli İkonlar, Google Rüzgar Okları & Poppins Font Grafikler
  */
 
 // ==========================================
-// 1. WMO HAVA DURUMU KODLARI SÖZLÜĞÜ (OPEN-METEO / CHMI ALADIN)
+// 1. MODEL KONFİGÜRASYONLARI
+// ==========================================
+const MODEL_CONFIGS = {
+  ecmwf: {
+    key: 'ecmwf',
+    name: 'ECMWF 9km',
+    fullName: 'ECMWF IFS HRES 9km Modeli',
+    badge: 'Avrupa Merkezi · 9 km · 15 Gün (360 Saat)',
+    location: 'Bursa Nilüfer (40.231°K, 28.840°D)',
+    provider: 'open-meteo',
+    url: 'https://api.open-meteo.com/v1/forecast?latitude=40.2311&longitude=28.8402&hourly=temperature_2m,relative_humidity_2m,dew_point_2m,apparent_temperature,precipitation_probability,precipitation,rain,showers,snowfall,runoff,visibility,et0_fao_evapotranspiration,potential_evapotranspiration,sunshine_duration,cloud_cover_high,cloud_cover_mid,cloud_cover_low,cloud_cover,pressure_msl,surface_pressure,weather_code,total_column_integrated_water_vapour,convective_inhibition,cape,wind_gusts_10m,wind_direction_200m,wind_direction_100m,wind_direction_10m,wind_speed_200m,wind_speed_100m,wind_speed_10m,surface_temperature,vapour_pressure_deficit,precipitation_type,wet_bulb_temperature_2m,is_day&models=ecmwf_ifs&timezone=auto&forecast_days=15'
+  },
+  chmi: {
+    key: 'chmi',
+    name: 'CZ ALADIN 2km',
+    fullName: 'CHMI ALADIN 2km Modeli',
+    badge: 'Çek Hidrometeoroloji · 2 km · 3 Gün (72 Saat)',
+    location: 'Bursa Nilüfer (40.231°K, 28.840°D)',
+    provider: 'open-meteo',
+    url: 'https://api.open-meteo.com/v1/forecast?latitude=40.2311&longitude=28.8402&hourly=temperature_2m,relative_humidity_2m,dew_point_2m,apparent_temperature,precipitation_probability,precipitation,rain,snowfall,snow_depth_water_equivalent,visibility,cloud_cover_high,cloud_cover_mid,cloud_cover_low,cloud_cover,wind_gusts_10m,wind_direction_10m,wind_speed_10m,surface_pressure,pressure_msl,weather_code,cape,surface_temperature,vapour_pressure_deficit,et0_fao_evapotranspiration,is_day,wet_bulb_temperature_2m,sunshine_duration,snowfall_water_equivalent&models=chmi_aladin_central_europe_2km&forecast_days=3'
+  },
+  ukmo: {
+    key: 'ukmo',
+    name: 'UKMO 10km',
+    fullName: 'UK Met Office Global Deterministic 10km',
+    badge: 'İngiltere Meteoroloji · 10 km · 8 Gün (192 Saat)',
+    location: 'Bursa Nilüfer (40.231°K, 28.840°D)',
+    provider: 'open-meteo',
+    url: 'https://api.open-meteo.com/v1/forecast?latitude=40.2311&longitude=28.8402&hourly=temperature_2m,relative_humidity_2m,dew_point_2m,precipitation_probability,apparent_temperature,precipitation,rain,showers,surface_pressure,pressure_msl,visibility,weather_code,snow_depth_water_equivalent,hail,snowfall,cloud_cover_2m,cloud_cover_high,cloud_cover_mid,cloud_cover_low,cloud_cover,vapour_pressure_deficit,et0_fao_evapotranspiration,wind_gusts_10m,wind_direction_10m,wind_speed_10m,is_day,wet_bulb_temperature_2m,convective_inhibition,sunshine_duration,freezing_level_height,cape&models=ukmo_global_deterministic_10km&timezone=auto&forecast_days=8'
+  },
+  gfs: {
+    key: 'gfs',
+    name: 'GFS 22km',
+    fullName: 'NOAA NCEP GFS 22km Modeli',
+    badge: 'NOAA NCEP · 22 km · 16 Gün (384 Saat)',
+    location: 'Bursa Nilüfer (40.231°K, 28.840°D)',
+    provider: 'open-meteo',
+    url: 'https://api.open-meteo.com/v1/forecast?latitude=40.2311&longitude=28.8402&hourly=temperature_2m,snow_depth,snowfall,showers,rain,precipitation,precipitation_probability,apparent_temperature,dew_point_2m,relative_humidity_2m,vapour_pressure_deficit,evapotranspiration,et0_fao_evapotranspiration,visibility,cloud_cover_high,cloud_cover_mid,cloud_cover_low,cloud_cover,surface_pressure,pressure_msl,weather_code,temperature_80m,wind_gusts_10m,wind_direction_80m,wind_direction_10m,wind_speed_80m,wind_speed_10m,surface_temperature,uv_index,is_day,sunshine_duration,wet_bulb_temperature_2m,convective_inhibition,cape&models=ncep_gfs_global&timezone=auto&forecast_days=16'
+  },
+  aigfs: {
+    key: 'aigfs',
+    name: 'GFS AI',
+    fullName: 'NOAA AIGFS Yapay Zeka Modeli',
+    badge: 'NOAA AI-GFS · ~25 km · 16 Gün (384 Saat)',
+    location: 'Bursa Nilüfer (40.231°K, 28.840°D)',
+    provider: 'open-meteo',
+    url: 'https://api.open-meteo.com/v1/forecast?latitude=40.2311&longitude=28.8402&hourly=temperature_2m,snow_depth,snowfall,showers,rain,precipitation,precipitation_probability,apparent_temperature,dew_point_2m,relative_humidity_2m,vapour_pressure_deficit,evapotranspiration,et0_fao_evapotranspiration,visibility,cloud_cover_high,cloud_cover_mid,cloud_cover_low,cloud_cover,surface_pressure,pressure_msl,weather_code,temperature_80m,wind_gusts_10m,wind_direction_80m,wind_direction_10m,wind_speed_80m,wind_speed_10m,surface_temperature,uv_index,is_day,sunshine_duration,wet_bulb_temperature_2m,convective_inhibition,cape&models=ncep_aigfs025&timezone=auto&forecast_days=16'
+  },
+  mgm: {
+    key: 'mgm',
+    name: 'MGM ALADIN',
+    fullName: 'MGM ALADIN Türkiye Modeli',
+    badge: 'MGM Türkiye · 4.5 km',
+    location: 'Bursa Nilüfer (40.224°K, 28.868°D)',
+    provider: 'mgm'
+  }
+};
+
+// ==========================================
+// 2. WMO HAVA DURUMU KODLARI SÖZLÜĞÜ (OPEN-METEO)
 // ==========================================
 const WMO_WEATHER_DICT = {
   0: { code: 0, name: 'Açık', desc: 'Gökyüzü tamamen açık, bulutsuz ve berrak.', type: 'sun' },
@@ -45,7 +108,7 @@ function getWmoInfo(code) {
 }
 
 // ==========================================
-// 2. MGM HADİSE SÖZLÜĞÜ (TÜRKİYE MGM KODLARI)
+// 3. MGM HADİSE SÖZLÜĞÜ (TÜRKİYE)
 // ==========================================
 const MGM_HADİSE_DICT = {
   'A': { code: 'A', name: 'Açık', desc: 'Gökyüzü tamamen açık, bulutsuz veya çok az bulutlu.', type: 'sun' },
@@ -55,97 +118,33 @@ const MGM_HADİSE_DICT = {
   'CB': { code: 'CB', name: 'Çok Bulutlu', desc: 'Gökyüzünün 6/8 veya daha fazlası bulutlarla kaplı.', type: 'cloudy' },
   'KB': { code: 'KB', name: 'Kapalı', desc: 'Gökyüzünün tamamı (8/8) gri bulut tabakasıyla kaplı.', type: 'cloudy' },
   'B': { code: 'B', name: 'Bulutlu', desc: 'Genel bulutlu gökyüzü tabakası.', type: 'cloudy' },
-  'YAB': { code: 'YAB', name: 'Yer Yer Az Bulutlu', desc: 'Bölgesel olarak açık ve az bulutlu geçişler.', type: 'few-clouds' },
-  'YPB': { code: 'YPB', name: 'Yer Yer Parçalı Bulutlu', desc: 'Bölgesel olarak değişen parçalı bulutluluk.', type: 'partly-cloudy' },
-  'YCB': { code: 'YCB', name: 'Yer Yer Çok Bulutlu', desc: 'Bölgesel olarak yoğunlaşan kapalı bulut kümeleri.', type: 'cloudy' },
   'Y': { code: 'Y', name: 'Yağışlı', desc: 'Genel yağış, aralıklı veya sürekli yağmur.', type: 'rain' },
   'HY': { code: 'HY', name: 'Hafif Yağmurlu', desc: 'Hafif çiseleyen veya ince taneli yağmur.', type: 'light-rain' },
   'ÇIS': { code: 'ÇIS', name: 'Çiseleme', desc: 'Görünmez kadar ince damlacıklı hafif yağış serpintisi.', type: 'light-rain' },
   'SY': { code: 'SY', name: 'Sağanak Yağışlı', desc: 'Kısa süreli, ani başlayan ve duran sağanak yağış.', type: 'heavy-rain' },
   'KSY': { code: 'KSY', name: 'Kuvvetli Sağanak', desc: 'Su baskını riski taşıyan şiddetli ve yoğun sağanak yağış.', type: 'storm-rain' },
-  'ÇSY': { code: 'ÇSY', name: 'Çok Şiddetli Sağanak', desc: 'Afet ve sel riski barındıran aşırı sağanak yağış.', type: 'storm-rain' },
-  'MSY': { code: 'MSY', name: 'Mevzi Sağanak', desc: 'Yerel ve bölgesel kısa süreli sağanak yağmur geçişleri.', type: 'heavy-rain' },
   'GY': { code: 'GY', name: 'Gökgürültülü Sağanak', desc: 'Şimşek ve gökgürültüsü eşliğinde sağanak yağış.', type: 'thunderstorm' },
   'KGY': { code: 'KGY', name: 'Kuvvetli Gökgürültülü Yağmur', desc: 'Şiddetli gökgürültüsü, yıldırım ve kuvvetli yağış.', type: 'severe-thunderstorm' },
-  'ÇKGY': { code: 'ÇKGY', name: 'Çok Kuvvetli Gökgürültülü', desc: 'Yıkıcı yıldırım ve sel riski taşıyan şiddetli fırtına.', type: 'severe-thunderstorm' },
-  'YGY': { code: 'YGY', name: 'Yer Yer Gökgürültülü', desc: 'Lokal aralıklarla meydana gelen gökgürültülü yağışlar.', type: 'thunderstorm' },
-  'GŞ': { code: 'GŞ', name: 'Gökgürültülü Şimşekli', desc: 'Gökyüzünde yoğun şimşek ve gökgürültüsü aktivitesi.', type: 'thunderstorm' },
-  'ŞM': { code: 'ŞM', name: 'Şimşek', desc: 'Yağışsız veya uzakta gerçekleşen elektriksel şimşek deşarjı.', type: 'thunderstorm' },
   'K': { code: 'K', name: 'Karlı', desc: 'Lapa lapa standart kar yağışı.', type: 'snow' },
   'HK': { code: 'HK', name: 'Hafif Karlı', desc: 'Hafif kar serpintisi veya ince taneli kar.', type: 'light-snow' },
   'YK': { code: 'YK', name: 'Yoğun Karlı', desc: 'Görüşü kısıtlayan ve kalın örtü bırakan yoğun kar.', type: 'heavy-snow' },
   'TİPİ': { code: 'TİPİ', name: 'Tipi', desc: 'Kuvvetli fırtına ile savrulan dondurucu kar fırtınası.', type: 'heavy-snow' },
-  'SAVK': { code: 'SAVK', name: 'Savrulan Kar', desc: 'Yerdeki kar örtüsünün kuvvetli rüzgarla savrulması.', type: 'light-snow' },
   'KY': { code: 'KY', name: 'Karla Karışık Yağmurlu', desc: 'Yağmur ve kar taneleri birlikte yağıyor (sulusepken).', type: 'sleet' },
-  'HKY': { code: 'HKY', name: 'Hafif Karla Karışık', desc: 'Hafif şiddette sulu kar yağışı.', type: 'light-sleet' },
-  'YKY': { code: 'YKY', name: 'Yoğun Karla Karışık', desc: 'Zeminde sulu kar birikintisi oluşturan yoğun sulusepken.', type: 'heavy-sleet' },
   'DY': { code: 'DY', name: 'Dolu Yağışlı', desc: 'Sert buz küreleri şeklinde düşen dolu yağışı.', type: 'hail' },
-  'KDY': { code: 'KDY', name: 'Kuvvetli Dolu', desc: 'İri taneli, araç ve tarıma zarar verebilecek dolu.', type: 'hail' },
   'S': { code: 'S', name: 'Sisli', desc: 'Yatay görüş mesafesini 1 km\'nin altına düşüren yoğun sis.', type: 'fog' },
-  'YS': { code: 'YS', name: 'Yoğun Sis', desc: 'Görüş mesafesini 50 metreye kadar düşüren tehlikeli sis.', type: 'fog' },
   'P': { code: 'P', name: 'Puslu', desc: 'Görüş mesafesini 1-5 km arasına düşüren hafif pus tabakası.', type: 'fog' },
-  'D': { code: 'D', name: 'Dumanlı', desc: 'Atmosferde asılı duran sanayi/yangın dumanı ve partiküller.', type: 'fog' },
-  'TOZ': { code: 'TOZ', name: 'Toz Taşınımı', desc: 'Atmosferin üst katmanlarından taşınan çöl kökenli mineral toz.', type: 'fog' },
-  'KF': { code: 'KF', name: 'Kum / Toz Fırtınası', desc: 'Kuvvetli rüzgarla kalkan yoğun çöl tozu veya kum fırtınası.', type: 'wind' },
   'R': { code: 'R', name: 'Rüzgarlı', desc: 'Belirgin ve hissedilir kuvvette rüzgar akımı.', type: 'wind' },
-  'FIR': { code: 'FIR', name: 'Fırtına', desc: 'Bofor 8 ve üzeri (62-74 km/h) kuvvetli fırtına.', type: 'wind' },
-  'KFIR': { code: 'KFIR', name: 'Kuvvetli Fırtına', desc: 'Bofor 9-10 (75-102 km/h) çatı uçuran şiddetli fırtına.', type: 'wind' },
-  'TFIR': { code: 'TFIR', name: 'Tam Fırtına', desc: 'Bofor 11+ (103 km/h üzeri) afet boyutunda fırtına.', type: 'wind' },
-  'HORT': { code: 'HORT', name: 'Hortum', desc: 'Buluttan yere uzanan şiddetli dönen hava hortumu girdabı.', type: 'wind' },
-  'DON': { code: 'DON', name: 'Don Hadisesi', desc: 'Hava sıcaklığının 0°C altına inmesiyle oluşan dondurucu soğuk.', type: 'snow' },
-  'BDON': { code: 'BDON', name: 'Buzlanma ve Don', desc: 'Yollarda gizli buzlanma ve şiddetli don tehlikesi.', type: 'snow' },
-  'KIR': { code: 'KIR', name: 'Kırağı', desc: 'Havadaki su buharının soğuk zeminlerde beyaz kristalleşmesi.', type: 'snow' },
-  'KIRÇ': { code: 'KIRÇ', name: 'Kırç', desc: 'Aşırı soğuk sis damlacıklarının tellere ve dallara yapışıp donması.', type: 'snow' },
-  'ÇİY': { code: 'ÇİY', name: 'Çiy', desc: 'Gece yüzeylerde yoğuşan berrak su damlacıkları.', type: 'light-rain' },
-  'SCK': { code: 'SCK', name: 'Sıcak', desc: 'Mevsim normallerinin üzerinde aşırı sıcak hava.', type: 'sun' },
-  'ASCK': { code: 'ASCK', name: 'Aşırı Sıcak', desc: 'Sağlığı tehdit eden 38°C üzeri aşırı sıcak hava dalgası.', type: 'sun' },
-  'SGK': { code: 'SGK', name: 'Soğuk', desc: 'Mevsim normallerinin altında dondurucu soğuk hava.', type: 'snow' },
-  'ASGK': { code: 'ASGK', name: 'Aşırı Soğuk', desc: 'Sıfırın altında ekstrem kutup kökenli dondurucu hava.', type: 'snow' },
-  'ÇIĞ': { code: 'ÇIĞ', name: 'Çığ Tehlikesi', desc: 'Eğimli yamaçlarda biriken kar kütlesinin kayma riski.', type: 'heavy-snow' }
-};
-
-const HADİSE_ALIASES = {
-  'TIPI': 'TİPİ',
-  'KIRC': 'KIRÇ',
-  'KIRCI': 'KIRÇ',
-  'CIG': 'ÇIĞ',
-  'CIS': 'ÇIS',
-  'CISELEME': 'ÇIS',
-  'GSY': 'GY',
-  'FIRTINA': 'FIR',
-  'ACIK': 'A',
-  'GUNESLI': 'G',
-  'PARCALI': 'PB',
-  'BULUTLU': 'B',
-  'KAPALI': 'KB',
-  'YAGMUR': 'Y',
-  'YAGMURLU': 'Y',
-  'SAGANAK': 'SY',
-  'KAR': 'K',
-  'KARLI': 'K',
-  'SIS': 'S',
-  'SISLI': 'S',
-  'PUS': 'P',
-  'PUSLU': 'P',
-  'DUMAN': 'D',
-  'RUZGAR': 'R',
-  'RUZGARLI': 'R',
-  'DOLU': 'DY',
-  'SICAK': 'SCK',
-  'SOGUK': 'SGK'
+  'FIR': { code: 'FIR', name: 'Fırtına', desc: 'Bofor 8 ve üzeri (62-74 km/h) kuvvetli fırtına.', type: 'wind' }
 };
 
 function getHadiseInfo(rawCode) {
   if (!rawCode) return { code: 'A', name: 'Açık', desc: 'Açık hava', type: 'sun' };
   let upper = String(rawCode).trim().toLocaleUpperCase('tr-TR');
-  if (HADİSE_ALIASES[upper]) {
-    upper = HADİSE_ALIASES[upper];
-  }
   return MGM_HADİSE_DICT[upper] || { code: upper, name: upper, desc: 'Hava Hadisesi', type: 'cloudy' };
 }
 
 // ==========================================
-// 3. METEOCONS (HAREKETLİ SVG HAVA DURUMU İKONLARI)
+// 4. METEOCONS (HAREKETLİ SVG HAVA DURUMU İKONLARI)
 // ==========================================
 const Meteocons = {
   getSvg(type, size = 48, isNight = false) {
@@ -271,7 +270,7 @@ const Meteocons = {
           <svg width="${s}" height="${s}" viewBox="0 0 64 64" fill="none" class="shrink-0">
             <path d="M12 24H38C41.31 24 44 21.31 44 18C44 14.69 41.31 12 38 12C34.69 12 32 14.69 32 18" stroke="#10b981" stroke-width="3.5" stroke-linecap="round" fill="none"/>
             <path d="M8 32H44C47.31 32 50 34.69 50 38C50 41.31 47.31 44 44 44C40.69 44 38 41.31 38 38" stroke="#34d399" stroke-width="3.5" stroke-linecap="round" fill="none"/>
-            <path d="M14 40H30C32.21 40 34 41.79 34 44C34 46.21 32.21 48 30 48" stroke="#10b981" stroke-width="3" stroke-linecap="round" fill="none"/>
+            <path d="M14 40H30C32.21 40 34 41.79 34 44C34 46.21 32.21 48 30 48" stroke="#10b981" stroke-width="3.5" stroke-linecap="round" fill="none"/>
           </svg>
         `;
 
@@ -286,7 +285,7 @@ const Meteocons = {
 };
 
 // ==========================================
-// 4. PUSULA YÖNÜ HESAPLAYICI (16 YÖN TÜRKÇE)
+// 5. PUSULA YÖNÜ HESAPLAYICI (16 YÖN TÜRKÇE)
 // ==========================================
 function getCompassDirection(deg) {
   if (deg == null || isNaN(deg)) return 'K';
@@ -296,11 +295,11 @@ function getCompassDirection(deg) {
 }
 
 // ==========================================
-// 5. CHMI ALADIN SERVİSİ (OPEN-METEO 72 SAAT)
+// 6. GENEL OPEN-METEO MODEL SERVİSİ
 // ==========================================
-class ChmiAladinService {
-  constructor() {
-    this.apiUrl = 'https://api.open-meteo.com/v1/forecast?latitude=40.2311&longitude=28.8402&hourly=temperature_2m,relative_humidity_2m,dew_point_2m,apparent_temperature,precipitation_probability,precipitation,rain,snowfall,snow_depth_water_equivalent,visibility,cloud_cover_high,cloud_cover_mid,cloud_cover_low,cloud_cover,wind_gusts_10m,wind_direction_10m,wind_speed_10m,surface_pressure,pressure_msl,weather_code,cape,surface_temperature,vapour_pressure_deficit,et0_fao_evapotranspiration,is_day,wet_bulb_temperature_2m,sunshine_duration,snowfall_water_equivalent&models=chmi_aladin_central_europe_2km&forecast_days=3';
+class OpenMeteoModelService {
+  constructor(config) {
+    this.config = config;
     this.records = [];
     this.lastUpdated = null;
     this.isFetching = false;
@@ -309,7 +308,7 @@ class ChmiAladinService {
 
   loadCache() {
     try {
-      const cached = localStorage.getItem('models_chmi_aladin_v1');
+      const cached = localStorage.getItem(`models_cache_${this.config.key}_v1`);
       if (cached) {
         const parsed = JSON.parse(cached);
         if (parsed && Array.isArray(parsed.records) && parsed.records.length > 0) {
@@ -317,14 +316,12 @@ class ChmiAladinService {
           this.lastUpdated = parsed.lastUpdated ? new Date(parsed.lastUpdated) : null;
         }
       }
-    } catch (e) {
-      console.warn('CHMI cache yüklenemedi:', e);
-    }
+    } catch (e) {}
   }
 
   saveCache() {
     try {
-      localStorage.setItem('models_chmi_aladin_v1', JSON.stringify({
+      localStorage.setItem(`models_cache_${this.config.key}_v1`, JSON.stringify({
         lastUpdated: this.lastUpdated ? this.lastUpdated.toISOString() : new Date().toISOString(),
         records: this.records
       }));
@@ -338,7 +335,7 @@ class ChmiAladinService {
     this.isFetching = true;
 
     try {
-      const res = await fetch(this.apiUrl, { signal: AbortSignal.timeout(9000) });
+      const res = await fetch(this.config.url, { signal: AbortSignal.timeout(12000) });
       if (!res.ok) {
         throw new Error(`Open-Meteo HTTP ${res.status}`);
       }
@@ -353,36 +350,46 @@ class ChmiAladinService {
 
       for (let i = 0; i < count; i++) {
         const timeIso = h.time[i];
-        const wCode = h.weather_code[i] != null ? h.weather_code[i] : 0;
+        const wCode = h.weather_code && h.weather_code[i] != null ? h.weather_code[i] : 0;
         const hadise = getWmoInfo(wCode);
+
+        // Yağış parametresi (precipitation, rain, showers)
+        let precipVal = 0;
+        if (h.precipitation && h.precipitation[i] != null) {
+          precipVal = Number(h.precipitation[i]);
+        } else if (h.rain && h.rain[i] != null) {
+          precipVal = Number(h.rain[i]);
+        }
 
         parsedRecords.push({
           time: timeIso,
           tarih: timeIso,
-          sicaklik: Number(h.temperature_2m[i] != null ? h.temperature_2m[i] : 0),
-          hissedilenSicaklik: Number(h.apparent_temperature[i] != null ? h.apparent_temperature[i] : h.temperature_2m[i]),
-          dewPoint: Number(h.dew_point_2m[i] != null ? h.dew_point_2m[i] : 0),
-          wetBulb: Number(h.wet_bulb_temperature_2m[i] != null ? h.wet_bulb_temperature_2m[i] : 0),
-          surfaceTemp: Number(h.surface_temperature[i] != null ? h.surface_temperature[i] : 0),
-          nem: Number(h.relative_humidity_2m[i] != null ? h.relative_humidity_2m[i] : 0),
-          saatlikToplamYagis: Number(h.precipitation[i] != null ? h.precipitation[i] : 0),
-          rain: Number(h.rain[i] != null ? h.rain[i] : 0),
-          snowfall: Number(h.snowfall[i] != null ? h.snowfall[i] : 0),
-          precipProb: h.precipitation_probability && h.precipitation_probability[i] != null ? h.precipitation_probability[i] : null,
-          ruzgarHizi: Math.round(Number(h.wind_speed_10m[i] != null ? h.wind_speed_10m[i] : 0)),
-          windGust: Math.round(Number(h.wind_gusts_10m[i] != null ? h.wind_gusts_10m[i] : 0)),
-          ruzgarYonu: Number(h.wind_direction_10m[i] != null ? h.wind_direction_10m[i] : 0),
-          basinc: Math.round(Number(h.pressure_msl[i] != null ? h.pressure_msl[i] : 1013)),
-          surfacePressure: Math.round(Number(h.surface_pressure[i] != null ? h.surface_pressure[i] : 1000)),
-          bulutKapaliligi: Number(h.cloud_cover[i] != null ? h.cloud_cover[i] : 0),
-          cloudLow: Number(h.cloud_cover_low[i] != null ? h.cloud_cover_low[i] : 0),
-          cloudMid: Number(h.cloud_cover_mid[i] != null ? h.cloud_cover_mid[i] : 0),
-          cloudHigh: Number(h.cloud_cover_high[i] != null ? h.cloud_cover_high[i] : 0),
-          cape: Math.round(Number(h.cape[i] != null ? h.cape[i] : 0)),
-          visibility: Math.round(Number(h.visibility[i] != null ? h.visibility[i] : 10000)),
-          vpd: Number(h.vapour_pressure_deficit[i] != null ? h.vapour_pressure_deficit[i] : 0),
-          et0: Number(h.et0_fao_evapotranspiration[i] != null ? h.et0_fao_evapotranspiration[i] : 0),
-          isDay: h.is_day[i] != null ? Number(h.is_day[i]) : 1,
+          sicaklik: Number(h.temperature_2m && h.temperature_2m[i] != null ? h.temperature_2m[i] : 0),
+          hissedilenSicaklik: Number(h.apparent_temperature && h.apparent_temperature[i] != null ? h.apparent_temperature[i] : (h.temperature_2m ? h.temperature_2m[i] : 0)),
+          dewPoint: h.dew_point_2m && h.dew_point_2m[i] != null ? Number(h.dew_point_2m[i]) : null,
+          wetBulb: h.wet_bulb_temperature_2m && h.wet_bulb_temperature_2m[i] != null ? Number(h.wet_bulb_temperature_2m[i]) : null,
+          surfaceTemp: h.surface_temperature && h.surface_temperature[i] != null ? Number(h.surface_temperature[i]) : null,
+          nem: Number(h.relative_humidity_2m && h.relative_humidity_2m[i] != null ? h.relative_humidity_2m[i] : 0),
+          saatlikToplamYagis: Number(precipVal.toFixed(2)),
+          rain: h.rain && h.rain[i] != null ? Number(h.rain[i]) : 0,
+          snowfall: h.snowfall && h.snowfall[i] != null ? Number(h.snowfall[i]) : 0,
+          precipProb: h.precipitation_probability && h.precipitation_probability[i] != null ? Number(h.precipitation_probability[i]) : null,
+          ruzgarHizi: Math.round(Number(h.wind_speed_10m && h.wind_speed_10m[i] != null ? h.wind_speed_10m[i] : 0)),
+          windGust: h.wind_gusts_10m && h.wind_gusts_10m[i] != null ? Math.round(Number(h.wind_gusts_10m[i])) : null,
+          ruzgarYonu: Number(h.wind_direction_10m && h.wind_direction_10m[i] != null ? h.wind_direction_10m[i] : 0),
+          basinc: Math.round(Number(h.pressure_msl && h.pressure_msl[i] != null ? h.pressure_msl[i] : (h.surface_pressure ? h.surface_pressure[i] : 1013))),
+          surfacePressure: h.surface_pressure && h.surface_pressure[i] != null ? Math.round(Number(h.surface_pressure[i])) : null,
+          bulutKapaliligi: Number(h.cloud_cover && h.cloud_cover[i] != null ? h.cloud_cover[i] : 0),
+          cloudLow: h.cloud_cover_low && h.cloud_cover_low[i] != null ? Number(h.cloud_cover_low[i]) : null,
+          cloudMid: h.cloud_cover_mid && h.cloud_cover_mid[i] != null ? Number(h.cloud_cover_mid[i]) : null,
+          cloudHigh: h.cloud_cover_high && h.cloud_cover_high[i] != null ? Number(h.cloud_cover_high[i]) : null,
+          cape: h.cape && h.cape[i] != null ? Math.round(Number(h.cape[i])) : null,
+          cin: h.convective_inhibition && h.convective_inhibition[i] != null ? Math.round(Number(h.convective_inhibition[i])) : null,
+          visibility: h.visibility && h.visibility[i] != null ? Math.round(Number(h.visibility[i])) : null,
+          vpd: h.vapour_pressure_deficit && h.vapour_pressure_deficit[i] != null ? Number(h.vapour_pressure_deficit[i]) : null,
+          et0: h.et0_fao_evapotranspiration && h.et0_fao_evapotranspiration[i] != null ? Number(h.et0_fao_evapotranspiration[i]) : null,
+          uvIndex: h.uv_index && h.uv_index[i] != null ? Number(h.uv_index[i]) : null,
+          isDay: h.is_day && h.is_day[i] != null ? Number(h.is_day[i]) : 1,
           weatherCode: wCode,
           hadise: hadise
         });
@@ -393,7 +400,7 @@ class ChmiAladinService {
       this.saveCache();
       return { success: true, count: parsedRecords.length, records: parsedRecords };
     } catch (err) {
-      console.warn('CHMI fetch hatası:', err);
+      console.warn(`Model [${this.config.key}] fetch hatası:`, err);
       return { success: false, records: this.records, count: this.records.length, error: err.message };
     } finally {
       this.isFetching = false;
@@ -402,10 +409,11 @@ class ChmiAladinService {
 }
 
 // ==========================================
-// 6. MGM ALADIN SERVİSİ (TÜRKİYE MGM MODELİ)
+// 7. MGM ALADIN SERVİSİ (TÜRKİYE)
 // ==========================================
-class MgmAladinService {
-  constructor() {
+class MgmModelService {
+  constructor(config) {
+    this.config = config;
     this.records = [];
     this.lastUpdated = null;
     this.isFetching = false;
@@ -414,7 +422,7 @@ class MgmAladinService {
 
   loadCache() {
     try {
-      const cached = localStorage.getItem('models_mgm_aladin_v1');
+      const cached = localStorage.getItem('models_cache_mgm_v1');
       if (cached) {
         const parsed = JSON.parse(cached);
         if (parsed && Array.isArray(parsed.records) && parsed.records.length > 0) {
@@ -427,7 +435,7 @@ class MgmAladinService {
 
   saveCache() {
     try {
-      localStorage.setItem('models_mgm_aladin_v1', JSON.stringify({
+      localStorage.setItem('models_cache_mgm_v1', JSON.stringify({
         lastUpdated: this.lastUpdated ? this.lastUpdated.toISOString() : new Date().toISOString(),
         records: this.records
       }));
@@ -441,10 +449,8 @@ class MgmAladinService {
     this.isFetching = true;
 
     try {
-      // 1. Önce yerel sunucu /api/aladin proxy'sini dene
       let fetched = await this.tryLocalProxy();
       if (!fetched || fetched.length === 0) {
-        // 2. data/aladin.json dosyasını çek
         fetched = await this.tryStaticJson();
       }
 
@@ -457,10 +463,13 @@ class MgmAladinService {
             sicaklik: Number(r.sicaklik != null ? r.sicaklik : 0),
             hissedilenSicaklik: Number(r.hissedilenSicaklik != null ? r.hissedilenSicaklik : r.sicaklik),
             dewPoint: null,
+            wetBulb: null,
+            surfaceTemp: null,
             nem: Number(r.nem != null ? r.nem : 0),
             saatlikToplamYagis: Number(r.saatlikToplamYagis != null ? r.saatlikToplamYagis : 0),
             rain: Number(r.saatlikToplamYagis != null ? r.saatlikToplamYagis : 0),
             snowfall: Number(r.karYuksekligi != null ? r.karYuksekligi : 0),
+            precipProb: null,
             ruzgarHizi: Math.round(Number(r.ruzgarHizi != null ? r.ruzgarHizi : 0)),
             windGust: null,
             ruzgarYonu: Number(r.ruzgarYonu != null ? r.ruzgarYonu : 0),
@@ -468,7 +477,11 @@ class MgmAladinService {
             surfacePressure: null,
             bulutKapaliligi: Number(r.bulutKapaliligi != null ? r.bulutKapaliligi : 0),
             cape: null,
+            cin: null,
             visibility: null,
+            vpd: null,
+            et0: null,
+            uvIndex: null,
             isDay: null,
             hadise: hInfo
           };
@@ -518,7 +531,7 @@ class MgmAladinService {
 }
 
 // ==========================================
-// 7. CHART.JS GOOGLE RÜZGAR OKLARI EKLENTİSİ
+// 8. CHART.JS GOOGLE RÜZGAR OKLARI EKLENTİSİ
 // ==========================================
 const googleWindArrowsPlugin = {
   id: 'googleWindArrows',
@@ -532,7 +545,12 @@ const googleWindArrowsPlugin = {
     const isDark = document.documentElement.classList.contains('dark');
     const arrowColor = isDark ? '#34d399' : '#10b981';
 
+    // Kalabalık veri setlerinde okları her 3 veya 4 adımda bir çiz
+    const totalCount = options.windData.length;
+    const step = totalCount > 100 ? 4 : (totalCount > 48 ? 2 : 1);
+
     meta.data.forEach((element, index) => {
+      if (index % step !== 0) return;
       const item = options.windData[index];
       if (!item || item.speed == null) return;
       const x = element.x;
@@ -563,7 +581,7 @@ if (typeof Chart !== 'undefined') {
 }
 
 // ==========================================
-// 8. MODELS GRAFİK YÖNETİCİSİ (POPPINS FONT)
+// 9. MODELS GRAFİK YÖNETİCİSİ (POPPINS FONT)
 // ==========================================
 class ModelsChartManager {
   constructor(canvasId) {
@@ -614,7 +632,7 @@ class ModelsChartManager {
                 if (rec) {
                   const d = new Date(rec.time);
                   const hName = rec.hadise ? rec.hadise.name : '';
-                  return `${d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' })} ${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })} · ${hName}`;
+                  return `${d.toLocaleDateString('tr-TR', { weekday: 'short', day: '2-digit', month: 'short' })} ${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })} · ${hName}`;
                 }
                 return items[0].label || '';
               },
@@ -646,7 +664,7 @@ class ModelsChartManager {
             ticks: {
               color: isDark ? '#94a3b8' : '#64748b',
               font: { family: 'Poppins', size: 10, weight: 600 },
-              maxTicksLimit: 12
+              maxTicksLimit: 14
             }
           },
           y: {
@@ -685,7 +703,7 @@ class ModelsChartManager {
 
     const labels = recs.map(r => {
       const d = new Date(r.time);
-      return `${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
+      return `${d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'numeric' })} ${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
     });
 
     const tempColor = isDark ? '#f87171' : '#ef4444';
@@ -727,11 +745,11 @@ class ModelsChartManager {
           backgroundColor: makeGradient(tempRgb, 0.32, 0.08, 0.0),
           fill: true,
           tension: 0.38,
-          borderWidth: 2.75,
+          borderWidth: 2.5,
           pointRadius: 0,
-          pointHoverRadius: 6.5,
+          pointHoverRadius: 6,
           pointHoverBackgroundColor: '#ffffff',
-          pointHoverBorderWidth: 3,
+          pointHoverBorderWidth: 2.5,
           pointHoverBorderColor: tempColor
         },
         {
@@ -741,12 +759,8 @@ class ModelsChartManager {
           borderDash: [4, 4],
           fill: false,
           tension: 0.38,
-          borderWidth: 2,
-          pointRadius: 0,
-          pointHoverRadius: 5.5,
-          pointHoverBackgroundColor: '#ffffff',
-          pointHoverBorderWidth: 2.5,
-          pointHoverBorderColor: feelsColor
+          borderWidth: 1.75,
+          pointRadius: 0
         }
       ];
       if (recs.some(r => r.dewPoint != null)) {
@@ -771,8 +785,8 @@ class ModelsChartManager {
           backgroundColor: isDark ? 'rgba(56, 189, 248, 0.35)' : 'rgba(2, 132, 199, 0.28)',
           fill: true,
           type: 'bar',
-          borderWidth: 1.5,
-          borderRadius: 6
+          borderWidth: 1.25,
+          borderRadius: 4
         }
       ];
       if (recs.some(r => r.snowfall > 0)) {
@@ -783,8 +797,8 @@ class ModelsChartManager {
           backgroundColor: isDark ? 'rgba(165, 180, 252, 0.35)' : 'rgba(99, 102, 241, 0.28)',
           fill: true,
           type: 'bar',
-          borderWidth: 1.5,
-          borderRadius: 6
+          borderWidth: 1.25,
+          borderRadius: 4
         });
       }
       this.chart.options.scales.y.ticks.callback = (v) => `${v} mm`;
@@ -800,11 +814,11 @@ class ModelsChartManager {
           backgroundColor: makeGradient(windRgb, 0.30, 0.08, 0.0),
           fill: true,
           tension: 0.35,
-          borderWidth: 2.75,
-          pointRadius: 3,
-          pointHoverRadius: 7,
+          borderWidth: 2.5,
+          pointRadius: recs.length > 100 ? 0 : 2,
+          pointHoverRadius: 6,
           pointHoverBackgroundColor: '#ffffff',
-          pointHoverBorderWidth: 3,
+          pointHoverBorderWidth: 2.5,
           pointHoverBorderColor: windColor
         }
       ];
@@ -816,7 +830,7 @@ class ModelsChartManager {
           borderDash: [3, 3],
           fill: false,
           tension: 0.35,
-          borderWidth: 2,
+          borderWidth: 1.75,
           pointRadius: 0
         });
       }
@@ -831,7 +845,7 @@ class ModelsChartManager {
           backgroundColor: makeGradient(humRgb, 0.26, 0.06, 0.0),
           fill: true,
           tension: 0.38,
-          borderWidth: 2.5,
+          borderWidth: 2.25,
           pointRadius: 0
         },
         {
@@ -841,7 +855,7 @@ class ModelsChartManager {
           borderDash: [3, 3],
           fill: false,
           tension: 0.38,
-          borderWidth: 2,
+          borderWidth: 1.75,
           pointRadius: 0
         }
       ];
@@ -856,22 +870,10 @@ class ModelsChartManager {
           backgroundColor: makeGradient(pressRgb, 0.28, 0.07, 0.0),
           fill: true,
           tension: 0.38,
-          borderWidth: 2.75,
+          borderWidth: 2.5,
           pointRadius: 0
         }
       ];
-      if (recs.some(r => r.surfacePressure != null)) {
-        datasets.push({
-          label: 'Yüzey Basıncı (hPa)',
-          data: recs.map(r => r.surfacePressure),
-          borderColor: isDark ? '#e9d5ff' : '#7e22ce',
-          borderDash: [3, 3],
-          fill: false,
-          tension: 0.38,
-          borderWidth: 1.75,
-          pointRadius: 0
-        });
-      }
       this.chart.options.scales.y.ticks.callback = (v) => `${v} hPa`;
     } else if (this.mode === 'cape') {
       const capeRgb = isDark ? '251, 146, 60' : '234, 88, 12';
@@ -895,7 +897,7 @@ class ModelsChartManager {
           label: 'Sıcaklık (°C)',
           data: recs.map(r => r.sicaklik),
           borderColor: tempColor,
-          borderWidth: 2.25,
+          borderWidth: 2,
           tension: 0.38,
           pointRadius: 0
         },
@@ -903,7 +905,7 @@ class ModelsChartManager {
           label: 'Rüzgar (km/h)',
           data: recs.map(r => r.ruzgarHizi),
           borderColor: windColor,
-          borderWidth: 2.25,
+          borderWidth: 2,
           tension: 0.35,
           pointRadius: 0
         },
@@ -911,7 +913,7 @@ class ModelsChartManager {
           label: 'Nem (%)',
           data: recs.map(r => r.nem),
           borderColor: humColor,
-          borderWidth: 1.75,
+          borderWidth: 1.5,
           borderDash: [3, 3],
           tension: 0.38,
           pointRadius: 0
@@ -933,22 +935,36 @@ class ModelsChartManager {
 }
 
 // ==========================================
-// 9. MODELS ARAYÜZ KONTROLCÜSÜ (MODELS UI)
+// 10. MODELS ARAYÜZ KONTROLCÜSÜ (MODELS UI)
 // ==========================================
 class ModelsUIController {
   constructor() {
-    this.activeModel = localStorage.getItem('models_active_model') || 'chmi';
-    this.chmiService = new ChmiAladinService();
-    this.mgmService = new MgmAladinService();
-    this.chartManager = null;
+    this.activeModelKey = localStorage.getItem('models_active_model') || 'ecmwf';
+    this.selectedDay = 'all'; // 'all' veya ISO date string 'YYYY-MM-DD'
     this.selectedIndex = 0;
     this.dictTab = 'wmo';
+    this.chartManager = null;
     this.dom = {};
+
+    // Servis havuzu oluştur
+    this.services = {};
+    for (const [key, cfg] of Object.entries(MODEL_CONFIGS)) {
+      if (cfg.provider === 'mgm') {
+        this.services[key] = new MgmModelService(cfg);
+      } else {
+        this.services[key] = new OpenMeteoModelService(cfg);
+      }
+    }
+
     this.init();
   }
 
+  get activeConfig() {
+    return MODEL_CONFIGS[this.activeModelKey] || MODEL_CONFIGS.ecmwf;
+  }
+
   get activeService() {
-    return this.activeModel === 'chmi' ? this.chmiService : this.mgmService;
+    return this.services[this.activeModelKey] || this.services.ecmwf;
   }
 
   init() {
@@ -960,20 +976,18 @@ class ModelsUIController {
     this.updateModelTabsUI();
     this.render();
 
-    // Otomatik canlı veri çek
+    // Seçili modelin canlı verisini çek
     this.refreshCurrentModel(true);
   }
 
   cacheDom() {
     this.dom = {
-      // Header Switchers & Actions
-      btnModelChmi: document.getElementById('btnModelChmi'),
-      btnModelMgm: document.getElementById('btnModelMgm'),
+      modelTabsContainer: document.getElementById('modelTabsContainer'),
       btnRefreshModel: document.getElementById('btnRefreshModel'),
       modelRefreshSpinner: document.getElementById('modelRefreshSpinner'),
       btnOpenDict: document.getElementById('btnOpenDict'),
 
-      // Model Header Metadata
+      // Model Başlık Bilgileri
       modelTitleText: document.getElementById('modelTitleText'),
       modelBadgeText: document.getElementById('modelBadgeText'),
       modelLocationText: document.getElementById('modelLocationText'),
@@ -998,11 +1012,14 @@ class ModelsUIController {
       heroCape: document.getElementById('heroCape'),
       heroCapeContainer: document.getElementById('heroCapeContainer'),
 
-      // Desktop Table & Mobile List
+      // Günlük Filtreleme Şeridi
+      dayFilterTrack: document.getElementById('dayFilterTrack'),
+
+      // Desktop Tablo & Mobil Liste
       desktopTableBody: document.getElementById('desktopTableBody'),
       mobileListContainer: document.getElementById('mobileListContainer'),
 
-      // Sözlük Modal
+      // Sözlük Modalı
       modalDict: document.getElementById('modalDict'),
       btnCloseDict: document.getElementById('btnCloseDict'),
       dictSearch: document.getElementById('dictSearch'),
@@ -1013,15 +1030,13 @@ class ModelsUIController {
   }
 
   bindEvents() {
-    // Model Değiştirici Tablar
-    if (this.dom.btnModelChmi) {
-      this.dom.btnModelChmi.addEventListener('click', () => {
-        this.switchModel('chmi');
-      });
-    }
-    if (this.dom.btnModelMgm) {
-      this.dom.btnModelMgm.addEventListener('click', () => {
-        this.switchModel('mgm');
+    // Model Değiştirici Sekmeler
+    if (this.dom.modelTabsContainer) {
+      this.dom.modelTabsContainer.addEventListener('click', (e) => {
+        const btn = e.target.closest('.model-tab-btn');
+        if (!btn) return;
+        const modelKey = btn.dataset.model;
+        if (modelKey) this.switchModel(modelKey);
       });
     }
 
@@ -1029,6 +1044,19 @@ class ModelsUIController {
     if (this.dom.btnRefreshModel) {
       this.dom.btnRefreshModel.addEventListener('click', () => {
         this.refreshCurrentModel(false);
+      });
+    }
+
+    // Gün Filtreleme Şeridi
+    if (this.dom.dayFilterTrack) {
+      this.dom.dayFilterTrack.addEventListener('click', (e) => {
+        const btn = e.target.closest('.day-filter-btn');
+        if (!btn) return;
+        this.selectedDay = btn.dataset.day || 'all';
+        this.dom.dayFilterTrack.querySelectorAll('.day-filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        this.selectedIndex = 0;
+        this.render();
       });
     }
 
@@ -1091,9 +1119,10 @@ class ModelsUIController {
   }
 
   switchModel(modelKey) {
-    if (this.activeModel === modelKey) return;
-    this.activeModel = modelKey;
+    if (this.activeModelKey === modelKey) return;
+    this.activeModelKey = modelKey;
     localStorage.setItem('models_active_model', modelKey);
+    this.selectedDay = 'all';
     this.selectedIndex = 0;
     this.updateModelTabsUI();
     this.render();
@@ -1101,13 +1130,15 @@ class ModelsUIController {
   }
 
   updateModelTabsUI() {
-    if (this.activeModel === 'chmi') {
-      if (this.dom.btnModelChmi) this.dom.btnModelChmi.classList.add('active');
-      if (this.dom.btnModelMgm) this.dom.btnModelMgm.classList.remove('active');
-    } else {
-      if (this.dom.btnModelMgm) this.dom.btnModelMgm.classList.add('active');
-      if (this.dom.btnModelChmi) this.dom.btnModelChmi.classList.remove('active');
-    }
+    if (!this.dom.modelTabsContainer) return;
+    this.dom.modelTabsContainer.querySelectorAll('.model-tab-btn').forEach(btn => {
+      if (btn.dataset.model === this.activeModelKey) {
+        btn.classList.add('active');
+        btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      } else {
+        btn.classList.remove('active');
+      }
+    });
   }
 
   async refreshCurrentModel(isSilent = false) {
@@ -1127,8 +1158,7 @@ class ModelsUIController {
       if (result && result.success && result.count > 0) {
         this.render();
         if (!isSilent && window.app && window.app.showToast) {
-          const modelLabel = this.activeModel === 'chmi' ? 'CHMI ALADIN (CZ)' : 'MGM ALADIN (TR)';
-          window.app.showToast(`${modelLabel}: ${result.count} saatlik güncel model verisi başarıyla yüklendi.`, 'success');
+          window.app.showToast(`${this.activeConfig.name}: ${result.count} saatlik güncel model verisi başarıyla yüklendi.`, 'success');
         }
       } else {
         if (!isSilent && window.app && window.app.showToast) {
@@ -1152,22 +1182,27 @@ class ModelsUIController {
     }
   }
 
-  render() {
-    const s = this.activeService;
-    const recs = s.records;
+  getFilteredRecords() {
+    const all = this.activeService.records;
+    if (!all || all.length === 0) return [];
+    if (this.selectedDay === 'all') return all;
 
-    // Model Başlık & Bilgi Barı
-    if (this.activeModel === 'chmi') {
-      if (this.dom.modelTitleText) this.dom.modelTitleText.textContent = 'CHMI ALADIN Modeli';
-      if (this.dom.modelBadgeText) this.dom.modelBadgeText.textContent = 'Orta Avrupa 2km · 72 Saat';
-      if (this.dom.modelLocationText) this.dom.modelLocationText.textContent = 'Bursa Nilüfer (40.231°K, 28.840°D)';
-      if (this.dom.heroCapeContainer) this.dom.heroCapeContainer.classList.remove('hidden');
-    } else {
-      if (this.dom.modelTitleText) this.dom.modelTitleText.textContent = 'MGM ALADIN Modeli';
-      if (this.dom.modelBadgeText) this.dom.modelBadgeText.textContent = 'Türkiye 4.5km';
-      if (this.dom.modelLocationText) this.dom.modelLocationText.textContent = 'Bursa Nilüfer (40.224°K, 28.868°D)';
-      if (this.dom.heroCapeContainer) this.dom.heroCapeContainer.classList.add('hidden');
-    }
+    return all.filter(r => {
+      const dayKey = r.time.slice(0, 10);
+      return dayKey === this.selectedDay;
+    });
+  }
+
+  render() {
+    const cfg = this.activeConfig;
+    const s = this.activeService;
+    const allRecs = s.records;
+    const filteredRecs = this.getFilteredRecords();
+
+    // Model Bilgi Başlıkları
+    if (this.dom.modelTitleText) this.dom.modelTitleText.textContent = cfg.fullName;
+    if (this.dom.modelBadgeText) this.dom.modelBadgeText.textContent = cfg.badge;
+    if (this.dom.modelLocationText) this.dom.modelLocationText.textContent = cfg.location;
 
     if (this.dom.modelLastUpdateText) {
       if (s.lastUpdated) {
@@ -1178,14 +1213,17 @@ class ModelsUIController {
       }
     }
 
-    if (!recs || recs.length === 0) {
+    if (!allRecs || allRecs.length === 0) {
       if (this.dom.heroConditionName) this.dom.heroConditionName.textContent = 'Model Verisi Yükleniyor...';
       if (this.dom.heroConditionDesc) this.dom.heroConditionDesc.textContent = 'Canlı sayısal tahmin çıktısı taranıyor...';
       return;
     }
 
+    // Gün Filtreleme Şeridi Render
+    this.renderDayFilter(allRecs);
+
     // Hero Card Render (Seçili veya İlk Saat)
-    const cur = recs[this.selectedIndex] || recs[0];
+    const cur = filteredRecs[this.selectedIndex] || filteredRecs[0] || allRecs[0];
     const hadise = cur.hadise || { name: 'Hava Durumu', desc: '', type: 'cloudy' };
     const dateObj = new Date(cur.time);
     const isNight = cur.isDay !== null && cur.isDay !== undefined ? cur.isDay === 0 : (dateObj.getHours() < 6 || dateObj.getHours() >= 20);
@@ -1197,7 +1235,7 @@ class ModelsUIController {
     if (this.dom.heroFeels) this.dom.heroFeels.textContent = `Hissedilen: ${Math.round(cur.hissedilenSicaklik)}°C`;
     if (this.dom.heroDewPoint) {
       if (cur.dewPoint != null) {
-        this.dom.heroDewPoint.textContent = `Çiy Noktası: ${Math.round(cur.dewPoint)}°C`;
+        this.dom.heroDewPoint.textContent = `Çiy: ${Math.round(cur.dewPoint)}°C`;
         this.dom.heroDewPoint.classList.remove('hidden');
       } else {
         this.dom.heroDewPoint.classList.add('hidden');
@@ -1225,22 +1263,62 @@ class ModelsUIController {
     if (this.dom.heroRain) this.dom.heroRain.textContent = `${cur.saatlikToplamYagis} mm`;
     if (this.dom.heroPressure) this.dom.heroPressure.textContent = `${cur.basinc} hPa`;
     if (this.dom.heroCloud) this.dom.heroCloud.textContent = `%${cur.bulutKapaliligi}`;
-    if (this.dom.heroCape) {
-      this.dom.heroCape.textContent = cur.cape != null ? `${cur.cape} J/kg` : '--';
+    
+    if (this.dom.heroCapeContainer) {
+      if (cur.cape != null) {
+        this.dom.heroCapeContainer.classList.remove('hidden');
+        if (this.dom.heroCape) this.dom.heroCape.textContent = `${cur.cape} J/kg`;
+      } else {
+        this.dom.heroCapeContainer.classList.add('hidden');
+      }
     }
 
     // Grafik Güncellemesi
     if (this.chartManager) {
-      this.chartManager.update(recs);
+      this.chartManager.update(filteredRecs);
     }
 
     // Tablo ve Mobil Liste Render
-    this.renderTable(recs);
-    this.renderMobileList(recs);
+    this.renderTable(filteredRecs);
+    this.renderMobileList(filteredRecs);
 
     if (window.lucide && window.lucide.createIcons) {
       window.lucide.createIcons();
     }
+  }
+
+  renderDayFilter(allRecs) {
+    if (!this.dom.dayFilterTrack) return;
+
+    // Benzersiz günleri çıkar
+    const daysMap = new Map();
+    allRecs.forEach(r => {
+      const dKey = r.time.slice(0, 10);
+      if (!daysMap.has(dKey)) {
+        daysMap.set(dKey, new Date(r.time));
+      }
+    });
+
+    const isAllActive = this.selectedDay === 'all';
+    let html = `
+      <button class="day-filter-btn shrink-0 px-3 py-1 rounded-full text-xs font-bold cursor-pointer select-none transition-none ${isAllActive ? 'bg-[#2563eb] text-white dark:bg-[#38bdf8] dark:text-[#0f172a]' : 'bg-[#e2e8f0] dark:bg-[#1f2837] text-[#334155] dark:text-[#cbd5e1] hover:bg-[#dae2eb]'}" data-day="all">
+        Tümü (${allRecs.length}s)
+      </button>
+    `;
+
+    daysMap.forEach((dateObj, dKey) => {
+      const isSelected = this.selectedDay === dKey;
+      const dayName = dateObj.toLocaleDateString('tr-TR', { weekday: 'short' });
+      const dateNum = dateObj.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
+
+      html += `
+        <button class="day-filter-btn shrink-0 px-2.5 py-1 rounded-full text-xs font-bold cursor-pointer select-none transition-none ${isSelected ? 'bg-[#2563eb] text-white dark:bg-[#38bdf8] dark:text-[#0f172a]' : 'bg-[#e2e8f0] dark:bg-[#1f2837] text-[#334155] dark:text-[#cbd5e1] hover:bg-[#dae2eb]'}" data-day="${dKey}">
+          ${dayName} ${dateNum}
+        </button>
+      `;
+    });
+
+    this.dom.dayFilterTrack.innerHTML = html;
   }
 
   renderTable(recs) {
@@ -1249,7 +1327,7 @@ class ModelsUIController {
     this.dom.desktopTableBody.innerHTML = recs.map((r, i) => {
       const hInfo = r.hadise || { name: 'Hava Durumu', type: 'cloudy' };
       const d = new Date(r.time);
-      const timeStr = `${d.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })} ${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
+      const timeStr = `${d.toLocaleDateString('tr-TR', { weekday: 'short', day: '2-digit', month: '2-digit' })} ${d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
       const isNight = r.isDay !== null && r.isDay !== undefined ? r.isDay === 0 : (d.getHours() < 6 || d.getHours() >= 20);
       const windDir = getCompassDirection(r.ruzgarYonu);
       const isSelected = i === this.selectedIndex;
@@ -1314,7 +1392,6 @@ class ModelsUIController {
       const hourStr = d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
       const dayStr = d.toLocaleDateString('tr-TR', { weekday: 'short', day: 'numeric', month: 'short' });
       const isNight = r.isDay !== null && r.isDay !== undefined ? r.isDay === 0 : (d.getHours() < 6 || d.getHours() >= 20);
-      const windDir = getCompassDirection(r.ruzgarYonu);
       const isSelected = i === this.selectedIndex;
 
       return `

@@ -131,6 +131,52 @@ h1, h2, h3, h4, th, .font-bold {
   background: #283343;
 }
 
+/* Model Tab Buttons with Soft Pastel Accents */
+.model-tab-btn {
+  color: #64748b;
+  font-weight: 700;
+  border-radius: 9999px;
+  touch-action: manipulation;
+  white-space: nowrap;
+  padding: 4px 12px;
+  background: transparent;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.model-tab-btn:hover {
+  color: #334155;
+  background-color: rgba(84, 110, 122, 0.08);
+}
+.model-tab-btn.active {
+  background-color: #2563eb;
+  color: #ffffff;
+  font-weight: 800;
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.2);
+}
+
+.dark .model-tab-btn {
+  color: #94a3b8;
+}
+.dark .model-tab-btn:hover {
+  color: #e2e8f0;
+  background-color: rgba(255, 255, 255, 0.06);
+}
+.dark .model-tab-btn.active {
+  background-color: #38bdf8;
+  color: #0f172a;
+  font-weight: 800;
+  box-shadow: 0 1px 3px rgba(56, 189, 248, 0.25);
+}
+
+/* No Scrollbar Utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 /* Ultra-Minimalist Pastel Gray Card Styles */
 .m3-card {
   background: #edf2f7;
