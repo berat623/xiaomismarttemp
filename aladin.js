@@ -162,33 +162,25 @@ function getHadiseInfo(rawCode) {
 }
 
 // ==========================================
-// 4. METEOCONS (HAREKETLİ SVG HAVA DURUMU İKONLARI)
+// 4. METEOCONS (STATİK, HAFİF & HIZLI SVG İKONLARI)
 // ==========================================
 const Meteocons = {
-  getSvg(type, size = 48, isNight = false, isAnimated = false) {
+  getSvg(type, size = 48, isNight = false) {
     const s = size;
-    const cRays = isAnimated ? 'meteo-sun-rays' : '';
-    const cPulse = isAnimated ? 'meteo-sun-pulse' : '';
-    const cDrift = isAnimated ? 'meteo-cloud-drift' : '';
-    const cDrop = isAnimated ? 'meteo-rain-drop' : '';
-    const cSnow = isAnimated ? 'meteo-snow-flake' : '';
-    const cLightning = isAnimated ? 'meteo-lightning' : '';
-    const cStar = isAnimated ? 'meteo-star' : '';
-
     switch (type) {
       case 'sun':
         if (isNight) {
           return `
             <svg width="${s}" height="${s}" viewBox="0 0 64 64" fill="none" class="shrink-0">
               <path d="M42 38C42 47.94 33.94 56 24 56C19.14 56 14.73 54.07 11.5 50.95C14.07 51.63 16.76 52 19.55 52C31.95 52 42 41.95 42 29.55C42 21.6 37.89 14.6 31.67 10.6C40.06 13.9 42 24.5 42 38Z" fill="#818cf8"/>
-              <circle cx="48" cy="18" r="2" fill="#e0e7ff" class="${cStar}"/>
-              <circle cx="52" cy="32" r="1.5" fill="#c7d2fe" class="${cStar}" ${isAnimated ? 'style="animation-delay: 1s"' : ''}/>
+              <circle cx="48" cy="18" r="2" fill="#e0e7ff"/>
+              <circle cx="52" cy="32" r="1.5" fill="#c7d2fe"/>
             </svg>
           `;
         }
         return `
           <svg width="${s}" height="${s}" viewBox="0 0 64 64" fill="none" class="shrink-0">
-            <g class="${cRays}">
+            <g>
               <line x1="32" y1="6" x2="32" y2="14" stroke="#f59e0b" stroke-width="3.5" stroke-linecap="round"/>
               <line x1="32" y1="50" x2="32" y2="58" stroke="#f59e0b" stroke-width="3.5" stroke-linecap="round"/>
               <line x1="6" y1="32" x2="14" y2="32" stroke="#f59e0b" stroke-width="3.5" stroke-linecap="round"/>
@@ -205,8 +197,8 @@ const Meteocons = {
       case 'few-clouds':
         return `
           <svg width="${s}" height="${s}" viewBox="0 0 64 64" fill="none" class="shrink-0">
-            <circle cx="26" cy="26" r="11" fill="#f59e0b" class="${cPulse}"/>
-            <path class="${cDrift}" d="M44 46H20C15.03 46 11 41.97 11 37C11 32.32 14.58 28.48 19.14 28.05C20.61 21.86 26.15 17.2 32.78 17.2C40.52 17.2 46.86 23.36 47.16 31.06C51.17 32.1 54.2 35.74 54.2 40.06C54.2 43.34 49.68 46 44 46Z" fill="#cbd5e1"/>
+            <circle cx="26" cy="26" r="11" fill="#f59e0b"/>
+            <path d="M44 46H20C15.03 46 11 41.97 11 37C11 32.32 14.58 28.48 19.14 28.05C20.61 21.86 26.15 17.2 32.78 17.2C40.52 17.2 46.86 23.36 47.16 31.06C51.17 32.1 54.2 35.74 54.2 40.06C54.2 43.34 49.68 46 44 46Z" fill="#cbd5e1"/>
           </svg>
         `;
 
@@ -214,8 +206,8 @@ const Meteocons = {
         return `
           <svg width="${s}" height="${s}" viewBox="0 0 64 64" fill="none" class="shrink-0">
             <circle cx="24" cy="24" r="10" fill="#f59e0b"/>
-            <path d="M48 48H18C13.03 48 9 43.97 9 39C9 34.32 12.58 30.48 17.14 30.05C18.61 23.86 24.15 19.2 30.78 19.2C38.52 19.2 44.86 25.36 45.16 33.06C49.17 34.1 52.2 37.74 52.2 42.06C52.2 45.34 50.34 48 48 48Z" fill="#64748b" class="${cDrift}"/>
-            <path d="M42 54H20C15.58 54 12 50.42 12 46C12 41.84 15.18 38.42 19.24 38.04C20.54 32.54 25.47 28.4 31.36 28.4C38.24 28.4 43.88 33.88 44.14 40.72C47.71 41.64 50.4 44.88 50.4 48.72C50.4 51.64 46.72 54 42 54Z" fill="#94a3b8" class="${cDrift}" ${isAnimated ? 'style="animation-delay: -1.5s"' : ''}/>
+            <path d="M48 48H18C13.03 48 9 43.97 9 39C9 34.32 12.58 30.48 17.14 30.05C18.61 23.86 24.15 19.2 30.78 19.2C38.52 19.2 44.86 25.36 45.16 33.06C49.17 34.1 52.2 37.74 52.2 42.06C52.2 45.34 50.34 48 48 48Z" fill="#64748b"/>
+            <path d="M42 54H20C15.58 54 12 50.42 12 46C12 41.84 15.18 38.42 19.24 38.04C20.54 32.54 25.47 28.4 31.36 28.4C38.24 28.4 43.88 33.88 44.14 40.72C47.71 41.64 50.4 44.88 50.4 48.72C50.4 51.64 46.72 54 42 54Z" fill="#94a3b8"/>
           </svg>
         `;
 
@@ -223,7 +215,7 @@ const Meteocons = {
         return `
           <svg width="${s}" height="${s}" viewBox="0 0 64 64" fill="none" class="shrink-0">
             <path d="M44 38H18C13.58 38 10 34.42 10 30C10 25.84 13.18 22.42 17.24 22.04C18.54 16.54 23.47 12.4 29.36 12.4C36.24 12.4 41.88 17.88 42.14 24.72C45.71 25.64 48.4 28.88 48.4 32.72C48.4 35.64 46.72 38 44 38Z" fill="#64748b"/>
-            <path d="M48 48H16C11.58 48 8 44.42 8 40C8 35.84 11.18 32.42 15.24 32.04C16.54 26.54 21.47 22.4 27.36 22.4C34.24 22.4 39.88 27.88 40.14 34.72C43.71 35.64 46.4 38.88 46.4 42.72C46.4 45.64 44.72 48 48 48Z" fill="#94a3b8" class="${cDrift}"/>
+            <path d="M48 48H16C11.58 48 8 44.42 8 40C8 35.84 11.18 32.42 15.24 32.04C16.54 26.54 21.47 22.4 27.36 22.4C34.24 22.4 39.88 27.88 40.14 34.72C43.71 35.64 46.4 38.88 46.4 42.72C46.4 45.64 44.72 48 48 48Z" fill="#94a3b8"/>
           </svg>
         `;
 
@@ -231,9 +223,9 @@ const Meteocons = {
         return `
           <svg width="${s}" height="${s}" viewBox="0 0 64 64" fill="none" class="shrink-0">
             <path d="M45 36H17C12.58 36 9 32.42 9 28C9 23.84 12.18 20.42 16.24 20.04C17.54 14.54 22.47 10.4 28.36 10.4C35.24 10.4 40.88 15.88 41.14 22.72C44.71 23.64 47.4 26.88 47.4 30.72C47.4 33.64 46.3 36 45 36Z" fill="#64748b"/>
-            <line x1="22" y1="42" x2="19" y2="50" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round" class="${cDrop}"/>
-            <line x1="32" y1="42" x2="29" y2="50" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round" class="${cDrop}" ${isAnimated ? 'style="animation-delay: 0.3s"' : ''}/>
-            <line x1="42" y1="42" x2="39" y2="50" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round" class="${cDrop}" ${isAnimated ? 'style="animation-delay: 0.6s"' : ''}/>
+            <line x1="22" y1="42" x2="19" y2="50" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="32" y1="42" x2="29" y2="50" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="42" y1="42" x2="39" y2="50" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round"/>
           </svg>
         `;
 
@@ -242,9 +234,9 @@ const Meteocons = {
         return `
           <svg width="${s}" height="${s}" viewBox="0 0 64 64" fill="none" class="shrink-0">
             <path d="M45 34H17C12.58 34 9 30.42 9 26C9 21.84 12.18 18.42 16.24 18.04C17.54 12.54 22.47 8.4 28.36 8.4C35.24 8.4 40.88 13.88 41.14 20.72C44.71 21.64 47.4 24.88 47.4 28.72C47.4 31.64 46.3 34 45 34Z" fill="#475569"/>
-            <line x1="20" y1="40" x2="16" y2="52" stroke="#0284c7" stroke-width="3" stroke-linecap="round" class="${cDrop}"/>
-            <line x1="30" y1="40" x2="26" y2="52" stroke="#0284c7" stroke-width="3" stroke-linecap="round" class="${cDrop}" ${isAnimated ? 'style="animation-delay: 0.25s"' : ''}/>
-            <line x1="40" y1="40" x2="36" y2="52" stroke="#0284c7" stroke-width="3" stroke-linecap="round" class="${cDrop}" ${isAnimated ? 'style="animation-delay: 0.5s"' : ''}/>
+            <line x1="20" y1="40" x2="16" y2="52" stroke="#0284c7" stroke-width="3" stroke-linecap="round"/>
+            <line x1="30" y1="40" x2="26" y2="52" stroke="#0284c7" stroke-width="3" stroke-linecap="round"/>
+            <line x1="40" y1="40" x2="36" y2="52" stroke="#0284c7" stroke-width="3" stroke-linecap="round"/>
           </svg>
         `;
 
@@ -254,7 +246,7 @@ const Meteocons = {
         return `
           <svg width="${s}" height="${s}" viewBox="0 0 64 64" fill="none" class="shrink-0">
             <path d="M45 34H17C12.58 34 9 30.42 9 26C9 21.84 12.18 18.42 16.24 18.04C17.54 12.54 22.47 8.4 28.36 8.4C35.24 8.4 40.88 13.88 41.14 20.72C44.71 21.64 47.4 24.88 47.4 28.72C47.4 31.64 46.3 34 45 34Z" fill="#334155"/>
-            <path d="M30 34L24 45H32L28 58L40 43H32L36 34H30Z" fill="#facc15" stroke="#ca8a04" stroke-width="1.5" class="${cLightning}"/>
+            <path d="M30 34L24 45H32L28 58L40 43H32L36 34H30Z" fill="#facc15" stroke="#ca8a04" stroke-width="1.5"/>
           </svg>
         `;
 
@@ -264,9 +256,9 @@ const Meteocons = {
         return `
           <svg width="${s}" height="${s}" viewBox="0 0 64 64" fill="none" class="shrink-0">
             <path d="M44 36H18C13.58 36 10 32.42 10 28C10 23.84 13.18 20.42 17.24 20.04C18.54 14.54 23.47 10.4 29.36 10.4C36.24 10.4 41.88 15.88 41.14 22.72C44.71 23.64 48.4 26.88 48.4 30.72C48.4 33.64 46.72 36 44 36Z" fill="#94a3b8"/>
-            <circle cx="22" cy="46" r="2.5" fill="#e0e7ff" class="${cSnow}"/>
-            <circle cx="32" cy="48" r="3" fill="#e0e7ff" class="${cSnow}" ${isAnimated ? 'style="animation-delay: 0.4s"' : ''}/>
-            <circle cx="42" cy="46" r="2.5" fill="#e0e7ff" class="${cSnow}" ${isAnimated ? 'style="animation-delay: 0.8s"' : ''}/>
+            <circle cx="22" cy="46" r="2.5" fill="#e0e7ff"/>
+            <circle cx="32" cy="48" r="3" fill="#e0e7ff"/>
+            <circle cx="42" cy="46" r="2.5" fill="#e0e7ff"/>
           </svg>
         `;
 
@@ -275,9 +267,9 @@ const Meteocons = {
         return `
           <svg width="${s}" height="${s}" viewBox="0 0 64 64" fill="none" class="shrink-0">
             <path d="M44 36H18C13.58 36 10 32.42 10 28C10 23.84 13.18 20.42 17.24 20.04C18.54 14.54 23.47 10.4 29.36 10.4C36.24 10.4 41.88 15.88 41.14 22.72C44.71 23.64 48.4 26.88 48.4 30.72C48.4 33.64 46.72 36 44 36Z" fill="#64748b"/>
-            <line x1="22" y1="42" x2="19" y2="50" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round" class="${cDrop}"/>
-            <circle cx="34" cy="48" r="2.5" fill="#cbd5e1" class="${cSnow}"/>
-            <line x1="42" y1="42" x2="39" y2="50" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round" class="${cDrop}" ${isAnimated ? 'style="animation-delay: 0.5s"' : ''}/>
+            <line x1="22" y1="42" x2="19" y2="50" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round"/>
+            <circle cx="34" cy="48" r="2.5" fill="#cbd5e1"/>
+            <line x1="42" y1="42" x2="39" y2="50" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round"/>
           </svg>
         `;
 
@@ -285,7 +277,7 @@ const Meteocons = {
         return `
           <svg width="${s}" height="${s}" viewBox="0 0 64 64" fill="none" class="shrink-0">
             <line x1="16" y1="26" x2="48" y2="26" stroke="#94a3b8" stroke-width="4" stroke-linecap="round"/>
-            <line x1="12" y1="34" x2="52" y2="34" stroke="#64748b" stroke-width="4" stroke-linecap="round" class="${cDrift}"/>
+            <line x1="12" y1="34" x2="52" y2="34" stroke="#64748b" stroke-width="4" stroke-linecap="round"/>
             <line x1="18" y1="42" x2="46" y2="42" stroke="#94a3b8" stroke-width="4" stroke-linecap="round"/>
             <line x1="22" y1="50" x2="42" y2="50" stroke="#cbd5e1" stroke-width="3.5" stroke-linecap="round"/>
           </svg>
@@ -1610,7 +1602,7 @@ class ModelsUIController {
     const isNight = cur.isDay !== null && cur.isDay !== undefined ? cur.isDay === 0 : (hourVal < 6 || hourVal >= 20);
 
     if (this.dom.heroIcon) {
-      this.dom.heroIcon.innerHTML = Meteocons.getSvg(hadise.type, 64, isNight, true);
+      this.dom.heroIcon.innerHTML = Meteocons.getSvg(hadise.type, 56, isNight);
     }
     if (this.dom.heroTemp) this.dom.heroTemp.textContent = Math.round(cur.sicaklik);
     if (this.dom.heroFeels) this.dom.heroFeels.textContent = `Hissedilen: ${Math.round(cur.hissedilenSicaklik)}°C`;
@@ -1685,7 +1677,7 @@ class ModelsUIController {
 
     const isAllActive = this.selectedDay === 'all';
     let html = `
-      <button class="day-filter-btn shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold cursor-pointer select-none transition-all duration-150 active:scale-95 ${isAllActive ? 'bg-[#2563eb] text-white dark:bg-[#38bdf8] dark:text-[#020617] shadow-sm shadow-blue-500/30 font-extrabold' : 'bg-white/50 dark:bg-white/5 text-[#334155] dark:text-[#cbd5e1] border border-white/70 dark:border-white/10 hover:bg-white/80 dark:hover:bg-white/10'}" data-day="all">
+      <button class="day-filter-btn shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer select-none ${isAllActive ? 'bg-[#2563eb] text-white dark:bg-[#38bdf8] dark:text-[#020617] font-extrabold' : 'bg-[#f1f5f9] dark:bg-[#1e293b] text-[#334155] dark:text-[#cbd5e1] border border-[#e2e8f0] dark:border-[#334155]'}" data-day="all">
         Tümü (${allRecs.length}s)
       </button>
     `;
@@ -1704,7 +1696,7 @@ class ModelsUIController {
       }
 
       html += `
-        <button class="day-filter-btn shrink-0 px-3 py-1.5 rounded-full text-xs font-bold cursor-pointer select-none transition-all duration-150 active:scale-95 ${isSelected ? 'bg-[#2563eb] text-white dark:bg-[#38bdf8] dark:text-[#020617] shadow-sm shadow-blue-500/30 font-extrabold' : 'bg-white/50 dark:bg-white/5 text-[#334155] dark:text-[#cbd5e1] border border-white/70 dark:border-white/10 hover:bg-white/80 dark:hover:bg-white/10'}" data-day="${dKey}">
+        <button class="day-filter-btn shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer select-none ${isSelected ? 'bg-[#2563eb] text-white dark:bg-[#38bdf8] dark:text-[#020617] font-extrabold' : 'bg-[#f1f5f9] dark:bg-[#1e293b] text-[#334155] dark:text-[#cbd5e1] border border-[#e2e8f0] dark:border-[#334155]'}" data-day="${dKey}">
           ${label}
         </button>
       `;
@@ -1740,7 +1732,7 @@ class ModelsUIController {
           <td class="py-2.5 px-3.5 text-[#0f172a] dark:text-[#f8fafc] font-mono text-[11px] font-bold whitespace-nowrap">${timeStr}</td>
           <td class="py-2.5 px-3.5 whitespace-nowrap">
             <div class="flex items-center gap-2">
-              ${Meteocons.getSvg(hInfo.type, 24, isNight, false)}
+              ${Meteocons.getSvg(hInfo.type, 24, isNight)}
               <span class="font-extrabold text-[#0f172a] dark:text-[#f8fafc]">${hInfo.name}</span>
             </div>
           </td>
@@ -1805,42 +1797,36 @@ class ModelsUIController {
       const hourVal = Number(formatTurkeyDate(r.time, { hour: 'numeric', hourCycle: 'h23' }));
       const isNight = r.isDay !== null && r.isDay !== undefined ? r.isDay === 0 : (hourVal < 6 || hourVal >= 20);
       const isSelected = i === this.selectedIndex;
+      const windDir = getCompassDirection(r.ruzgarYonu);
 
       return `
-        <div class="mobile-forecast-card p-3.5 cursor-pointer select-none ${isSelected ? 'selected' : ''}" data-index="${i}">
-          <div class="flex items-center justify-between gap-2 border-b border-black/5 dark:border-white/10 pb-2.5">
-            <div class="flex items-center gap-2.5">
-              ${Meteocons.getSvg(hInfo.type, 32, isNight, false)}
-              <div>
-                <span class="text-xs font-black text-[#0f172a] dark:text-[#f8fafc]">${hInfo.name}</span>
-                <div class="text-[10px] text-[#475569] dark:text-[#94a3b8] font-bold">${dayStr} · ${hourStr}</div>
-              </div>
+        <div class="mobile-forecast-row px-3 py-2 rounded-xl cursor-pointer select-none flex items-center justify-between gap-2 ${isSelected ? 'selected' : ''}" data-index="${i}">
+          <!-- Sol: Saat + İkon + Hadise Adı -->
+          <div class="flex items-center gap-2 min-w-0 flex-1">
+            <span class="text-xs font-mono font-bold text-[#475569] dark:text-[#94a3b8] w-11 shrink-0">${hourStr}</span>
+            <div class="shrink-0 w-7 h-7 flex items-center justify-center">
+              ${Meteocons.getSvg(hInfo.type, 26, isNight)}
             </div>
-            <div class="text-right">
-              <span class="text-lg font-black text-[#0f172a] dark:text-[#f8fafc] font-mono">${Math.round(r.sicaklik)}°C</span>
-              <div class="text-[10px] text-[#475569] dark:text-[#94a3b8] font-bold">His: ${Math.round(r.hissedilenSicaklik)}°C</div>
+            <div class="min-w-0">
+              <div class="text-xs font-bold text-[#0f172a] dark:text-[#f8fafc] truncate leading-tight">${hInfo.name}</div>
+              <div class="text-[10px] text-[#64748b] dark:text-[#94a3b8] font-semibold">${dayStr}</div>
             </div>
           </div>
 
-          <div class="grid grid-cols-3 gap-1.5 pt-2.5 text-[11px] font-mono">
-            <div class="flex items-center justify-center gap-1 apple-chip px-1.5 py-1 text-[#15803d] dark:text-[#4ade80] font-extrabold" title="Rüzgar Hızı ve Yönü">
+          <!-- Orta: Yağış & Rüzgar -->
+          <div class="flex items-center gap-1.5 shrink-0 text-[11px] font-mono">
+            ${r.saatlikToplamYagis > 0 ? `<span class="text-[#2563eb] dark:text-[#38bdf8] font-extrabold whitespace-nowrap bg-blue-50 dark:bg-blue-950/40 px-1.5 py-0.5 rounded">💧${r.saatlikToplamYagis}mm</span>` : ''}
+            <span class="text-[#15803d] dark:text-[#4ade80] font-extrabold whitespace-nowrap flex items-center gap-0.5">
               <span class="inline-block transform" style="transform: rotate(${r.ruzgarYonu}deg);">➤</span>
-              <span class="truncate">${r.ruzgarHizi} km/h</span>
-            </div>
-            <div class="flex items-center justify-center gap-1 apple-chip px-1.5 py-1 ${r.saatlikToplamYagis > 0 ? 'text-[#2563eb] dark:text-[#60a5fa] font-black' : 'text-[#64748b] dark:text-[#94a3b8] font-bold'}" title="Yağış">
-              <span class="truncate">💧 ${r.saatlikToplamYagis} mm</span>
-            </div>
-            <div class="flex items-center justify-center gap-1 apple-chip px-1.5 py-1 text-[#0f766e] dark:text-[#2dd4bf] font-extrabold" title="Bağıl Nem">
-              <span class="truncate">%${r.nem}</span>
-            </div>
+              ${r.ruzgarHizi} <span class="text-[9px] font-normal text-[#64748b] dark:text-[#94a3b8]">(${windDir})</span>
+            </span>
           </div>
 
-          ${r.cape != null && r.cape > 0 ? `
-            <div class="mt-2 flex items-center justify-between text-[10px] font-mono text-[#ea580c] font-bold px-1 pt-1.5 border-t border-black/5 dark:border-white/5">
-              <span>⚡ Konvektif Enerji (CAPE)</span>
-              <span>${r.cape} J/kg</span>
-            </div>
-          ` : ''}
+          <!-- Sağ: Sıcaklık & Hissedilen -->
+          <div class="text-right shrink-0 min-w-[50px]">
+            <span class="text-sm font-black font-mono text-[#0f172a] dark:text-[#f8fafc]">${Math.round(r.sicaklik)}°</span>
+            <span class="text-[10px] font-mono text-[#64748b] dark:text-[#94a3b8] font-bold block leading-none">(${Math.round(r.hissedilenSicaklik)}°)</span>
+          </div>
         </div>
       `;
     }).join('');
@@ -1885,7 +1871,7 @@ class ModelsUIController {
     this.dom.dictList.innerHTML = items.map(it => `
       <div class="p-2.5 rounded-xl bg-[#e2e8f0] dark:bg-[#1f2837] border border-[#cbd5e1] dark:border-[#283343] flex items-center gap-3">
         <div class="shrink-0 flex items-center justify-center w-10 h-10 rounded-lg bg-[#edf2f7] dark:bg-[#171e29] border border-[#cbd5e1]/60 dark:border-[#283343]">
-          ${Meteocons.getSvg(it.type, 28, false, false)}
+          ${Meteocons.getSvg(it.type, 26, false)}
         </div>
         <div class="min-w-0 flex-1">
           <div class="flex items-center gap-2">

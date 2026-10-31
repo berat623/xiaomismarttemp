@@ -3,17 +3,17 @@
  * Sayısal Hava Tahmin Modelleri İstasyonu
  */
 
-const CACHE_NAME = 'models-forecast-v6.6';
+const CACHE_NAME = 'models-forecast-v6.7';
 
 const PRECACHE_ASSETS = [
   './',
   './index.html',
   './style.css',
-  './style.css?v=6.6',
+  './style.css?v=6.7',
   './app.js',
-  './app.js?v=6.6',
+  './app.js?v=6.7',
   './aladin.js',
-  './aladin.js?v=6.6',
+  './aladin.js?v=6.7',
   './data/aladin.json',
   './manifest.webmanifest',
   './icon.svg',
