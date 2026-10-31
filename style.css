@@ -76,22 +76,23 @@
 html {
   -webkit-text-size-adjust: 100%;
   touch-action: manipulation;
-  scroll-behavior: auto !important;
-  font-family: 'Parkinsans', sans-serif;
+  scroll-behavior: smooth;
+  font-family: 'Poppins', sans-serif;
 }
 
 body {
-  font-family: 'Parkinsans', sans-serif;
+  font-family: 'Poppins', sans-serif;
   font-weight: 600;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
-  background-color: #e2e8f0;
+  background: linear-gradient(145deg, #e2e8f0 0%, #cbd5e1 35%, #e2e8f0 70%, #dbeafe 100%) fixed;
   color: #0f172a;
+  min-height: 100vh;
 }
 
 .dark body {
-  background-color: #0f141c;
+  background: linear-gradient(145deg, #090d16 0%, #0f172a 40%, #111827 75%, #0d1527 100%) fixed;
   color: #f8fafc;
 }
 
@@ -115,57 +116,167 @@ h1, h2, h3, h4, th, .font-bold {
   font-weight: 800 !important;
 }
 
-/* Custom Sleek Pastel Scrollbars */
+/* ==========================================
+   APPLE AMBIENT FROSTED GLOW MESH (FIXED)
+   ========================================== */
+.apple-glow-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(95px);
+  pointer-events: none;
+  transform: translateZ(0);
+}
+.apple-glow-1 {
+  top: -12%;
+  left: -8%;
+  width: 55vw;
+  height: 55vw;
+  max-width: 650px;
+  max-height: 650px;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.32) 0%, rgba(147, 197, 253, 0) 70%);
+}
+.apple-glow-2 {
+  top: 35%;
+  right: -12%;
+  width: 50vw;
+  height: 50vw;
+  max-width: 600px;
+  max-height: 600px;
+  background: radial-gradient(circle, rgba(168, 85, 247, 0.25) 0%, rgba(216, 180, 254, 0) 70%);
+}
+.apple-glow-3 {
+  bottom: -15%;
+  left: 25%;
+  width: 60vw;
+  height: 60vw;
+  max-width: 700px;
+  max-height: 700px;
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.22) 0%, rgba(110, 231, 183, 0) 70%);
+}
+.dark .apple-glow-1 {
+  background: radial-gradient(circle, rgba(37, 99, 235, 0.28) 0%, rgba(30, 58, 138, 0) 70%);
+}
+.dark .apple-glow-2 {
+  background: radial-gradient(circle, rgba(147, 51, 234, 0.22) 0%, rgba(88, 28, 135, 0) 70%);
+}
+.dark .apple-glow-3 {
+  background: radial-gradient(circle, rgba(13, 148, 136, 0.22) 0%, rgba(19, 78, 74, 0) 70%);
+}
+
+/* ==========================================
+   APPLE LIQUID GLASS CARDS (CAM BLUR EFEKTİ)
+   ========================================== */
+.m3-card, .apple-glass {
+  background: rgba(255, 255, 255, 0.68) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(190%) !important;
+  backdrop-filter: blur(28px) saturate(190%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.85) !important;
+  border-radius: 22px !important;
+  box-shadow: 0 12px 32px -4px rgba(15, 23, 42, 0.06), 0 0 0 1px rgba(255, 255, 255, 0.8) inset, 0 1px 2px 0 rgba(255, 255, 255, 0.95) inset !important;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease !important;
+}
+
+.dark .m3-card, .dark .apple-glass {
+  background: rgba(15, 23, 42, 0.68) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(190%) !important;
+  backdrop-filter: blur(28px) saturate(190%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.09) !important;
+  border-radius: 22px !important;
+  box-shadow: 0 16px 40px -6px rgba(0, 0, 0, 0.50), 0 0 0 1px rgba(255, 255, 255, 0.07) inset, 0 1px 1px 0 rgba(255, 255, 255, 0.15) inset !important;
+}
+
+/* Apple Sub-chips / Parametre Kartları */
+.apple-chip {
+  background: rgba(255, 255, 255, 0.55);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  backdrop-filter: blur(14px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.02), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.15s ease, box-shadow 0.18s ease;
+}
+.apple-chip:hover {
+  transform: translateY(-1.5px);
+  background: rgba(255, 255, 255, 0.75);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
+}
+
+.dark .apple-chip {
+  background: rgba(255, 255, 255, 0.04);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  backdrop-filter: blur(14px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.10);
+}
+.dark .apple-chip:hover {
+  transform: translateY(-1.5px);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+/* Custom Sleek Frosted Scrollbars */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 6px;
+  background: rgba(148, 163, 184, 0.5);
+  border-radius: 9999px;
+  backdrop-filter: blur(8px);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.7);
 }
 .dark ::-webkit-scrollbar-thumb {
-  background: #283343;
+  background: rgba(255, 255, 255, 0.18);
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
-/* Model Tab Buttons with Soft Pastel Accents */
+/* Model Tab Buttons with Apple Segmented Pill Feel */
 .model-tab-btn {
-  color: #64748b;
+  color: #475569;
   font-weight: 700;
   border-radius: 9999px;
   touch-action: manipulation;
   white-space: nowrap;
-  padding: 4px 12px;
+  padding: 5px 13px;
   background: transparent;
   cursor: pointer;
   border: 1px solid transparent;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .model-tab-btn:hover {
-  color: #334155;
-  background-color: rgba(84, 110, 122, 0.08);
+  color: #0f172a;
+  background-color: rgba(255, 255, 255, 0.5);
+}
+.model-tab-btn:active {
+  transform: scale(0.96);
 }
 .model-tab-btn.active {
   background-color: #2563eb;
   color: #ffffff;
   font-weight: 800;
-  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.2);
+  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 .dark .model-tab-btn {
   color: #94a3b8;
 }
 .dark .model-tab-btn:hover {
-  color: #e2e8f0;
-  background-color: rgba(255, 255, 255, 0.06);
+  color: #f8fafc;
+  background-color: rgba(255, 255, 255, 0.08);
 }
 .dark .model-tab-btn.active {
   background-color: #38bdf8;
-  color: #0f172a;
+  color: #020617;
   font-weight: 800;
-  box-shadow: 0 1px 3px rgba(56, 189, 248, 0.25);
+  box-shadow: 0 2px 12px rgba(56, 189, 248, 0.40);
 }
 
 /* No Scrollbar Utility */
@@ -177,92 +288,71 @@ h1, h2, h3, h4, th, .font-bold {
   scrollbar-width: none;
 }
 
-/* Ultra-Minimalist Pastel Gray Card Styles */
-.m3-card {
-  background: #edf2f7;
-  border: 1px solid #cbd5e1;
-  border-radius: 18px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-}
-
-.dark .m3-card {
-  background: #171e29;
-  border: 1px solid #283343;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
-}
-
-/* Mode Tabs with Soft Pastel Accents */
-.mode-btn, .aladin-mode-btn {
-  color: #64748b;
-  font-weight: 600;
+/* Mode Tabs with Smooth Apple Glass Pill Accents */
+.mode-btn, .models-chart-btn {
+  color: #475569;
+  font-weight: 700;
   border-radius: 9999px;
   touch-action: manipulation;
   white-space: nowrap;
-  border: 1px solid transparent;
-}
-.mode-btn:hover, .aladin-mode-btn:hover {
-  color: #334155;
-  background-color: rgba(84, 110, 122, 0.08);
-}
-.mode-btn.active, .aladin-mode-btn.active {
-  background-color: #546e7a;
-  color: #ffffff;
-  font-weight: 700;
-}
-
-.dark .mode-btn, .dark .aladin-mode-btn {
-  color: #94a3b8;
-}
-.dark .mode-btn:hover, .dark .aladin-mode-btn:hover {
-  color: #e2e8f0;
-  background-color: rgba(255, 255, 255, 0.06);
-}
-.dark .mode-btn.active, .dark .aladin-mode-btn.active {
-  background-color: #3d4d5e;
-  color: #f1f5f9;
-  font-weight: 700;
-}
-
-/* Navigation Segmented Tab Switcher */
-.nav-tab-btn {
-  font-weight: 600;
-  border-radius: 9999px;
-  touch-action: manipulation;
-  white-space: nowrap;
-  padding: 4px 12px;
-  color: #64748b;
+  padding: 5px 12px;
   background: transparent;
   cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.nav-tab-btn.active {
-  background: #546e7a;
-  color: #ffffff;
-  font-weight: 700;
-}
-.dark .nav-tab-btn {
-  color: #94a3b8;
-}
-.dark .nav-tab-btn.active {
-  background: #38bdf8;
+.mode-btn:hover, .models-chart-btn:hover {
   color: #0f172a;
-  font-weight: 700;
+  background-color: rgba(255, 255, 255, 0.5);
+}
+.mode-btn:active, .models-chart-btn:active {
+  transform: scale(0.96);
+}
+.mode-btn.active, .models-chart-btn.active {
+  background-color: #0f172a;
+  color: #ffffff;
+  font-weight: 800;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.2);
 }
 
-/* High-Performance Unified Table */
+.dark .mode-btn, .dark .models-chart-btn {
+  color: #94a3b8;
+}
+.dark .mode-btn:hover, .dark .models-chart-btn:hover {
+  color: #f8fafc;
+  background-color: rgba(255, 255, 255, 0.08);
+}
+.dark .mode-btn.active, .dark .models-chart-btn.active {
+  background-color: #f8fafc;
+  color: #0f172a;
+  font-weight: 800;
+  box-shadow: 0 2px 10px rgba(255, 255, 255, 0.25);
+}
+
+/* Day Filter Buttons */
+.day-filter-btn {
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.day-filter-btn:active {
+  transform: scale(0.95);
+}
+
+/* High-Performance Fluid Table */
 table {
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
 }
 table th, table td {
-  padding: 8px 12px;
+  padding: 10px 14px;
 }
 @media (max-width: 640px) {
   table th, table td {
-    padding: 6px 8px;
+    padding: 7px 10px;
     font-size: 11px;
   }
 }
 
-/* Mobile Fluidity & Ergonomics for Samsung A23 and similar */
+/* Mobile Fluidity & Ergonomics */
 @media (max-width: 640px) {
   html, body {
     overflow-x: hidden;
@@ -270,7 +360,7 @@ table th, table td {
   }
 
   header {
-    padding-top: max(0.4rem, env(safe-area-inset-top));
+    padding-top: max(0.5rem, env(safe-area-inset-top));
   }
 
   button {

@@ -1345,7 +1345,7 @@ class ModelsUIController {
 
     const isAllActive = this.selectedDay === 'all';
     let html = `
-      <button class="day-filter-btn shrink-0 px-3 py-1 rounded-full text-xs font-bold cursor-pointer select-none transition-none ${isAllActive ? 'bg-[#2563eb] text-white dark:bg-[#38bdf8] dark:text-[#0f172a]' : 'bg-[#e2e8f0] dark:bg-[#1f2837] text-[#334155] dark:text-[#cbd5e1] hover:bg-[#dae2eb]'}" data-day="all">
+      <button class="day-filter-btn shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold cursor-pointer select-none transition-all duration-150 active:scale-95 ${isAllActive ? 'bg-[#2563eb] text-white dark:bg-[#38bdf8] dark:text-[#020617] shadow-sm shadow-blue-500/30' : 'bg-white/50 dark:bg-white/5 text-[#334155] dark:text-[#cbd5e1] border border-white/70 dark:border-white/10 hover:bg-white/80 dark:hover:bg-white/10'}" data-day="all">
         Tümü (${allRecs.length}s)
       </button>
     `;
@@ -1356,7 +1356,7 @@ class ModelsUIController {
       const dateNum = dateObj.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
 
       html += `
-        <button class="day-filter-btn shrink-0 px-2.5 py-1 rounded-full text-xs font-bold cursor-pointer select-none transition-none ${isSelected ? 'bg-[#2563eb] text-white dark:bg-[#38bdf8] dark:text-[#0f172a]' : 'bg-[#e2e8f0] dark:bg-[#1f2837] text-[#334155] dark:text-[#cbd5e1] hover:bg-[#dae2eb]'}" data-day="${dKey}">
+        <button class="day-filter-btn shrink-0 px-3 py-1.5 rounded-full text-xs font-bold cursor-pointer select-none transition-all duration-150 active:scale-95 ${isSelected ? 'bg-[#2563eb] text-white dark:bg-[#38bdf8] dark:text-[#020617] shadow-sm shadow-blue-500/30' : 'bg-white/50 dark:bg-white/5 text-[#334155] dark:text-[#cbd5e1] border border-white/70 dark:border-white/10 hover:bg-white/80 dark:hover:bg-white/10'}" data-day="${dKey}">
           ${dayName} ${dateNum}
         </button>
       `;
@@ -1377,25 +1377,25 @@ class ModelsUIController {
       const isSelected = i === this.selectedIndex;
 
       return `
-        <tr class="table-row cursor-pointer select-none border-b border-[#cbd5e1]/70 dark:border-[#283343] transition-colors ${isSelected ? 'bg-[#2563eb]/15 dark:bg-[#60a5fa]/20' : 'hover:bg-[#dae2eb]/60 dark:hover:bg-[#1f2837]/60'}" data-index="${i}">
-          <td class="py-2.5 px-3 text-[#0f172a] dark:text-[#f8fafc] font-mono text-[11px] font-bold whitespace-nowrap">${timeStr}</td>
-          <td class="py-2.5 px-3 whitespace-nowrap">
+        <tr class="table-row cursor-pointer select-none border-b border-black/5 dark:border-white/5 transition-colors duration-150 ${isSelected ? 'bg-blue-500/15 dark:bg-sky-400/20 font-bold' : 'hover:bg-white/50 dark:hover:bg-white/5'}" data-index="${i}">
+          <td class="py-2.5 px-3.5 text-[#0f172a] dark:text-[#f8fafc] font-mono text-[11px] font-bold whitespace-nowrap">${timeStr}</td>
+          <td class="py-2.5 px-3.5 whitespace-nowrap">
             <div class="flex items-center gap-2">
               ${Meteocons.getSvg(hInfo.type, 24, isNight)}
               <span class="font-extrabold text-[#0f172a] dark:text-[#f8fafc]">${hInfo.name}</span>
             </div>
           </td>
-          <td class="py-2.5 px-3 font-mono whitespace-nowrap">
+          <td class="py-2.5 px-3.5 font-mono whitespace-nowrap">
             <span class="text-sm font-black text-[#0f172a] dark:text-[#f8fafc]">${Math.round(r.sicaklik)}°</span>
             <span class="text-[10px] text-[#475569] dark:text-[#94a3b8] font-bold">(${Math.round(r.hissedilenSicaklik)}°)</span>
           </td>
-          <td class="py-2.5 px-3 font-mono whitespace-nowrap">
+          <td class="py-2.5 px-3.5 font-mono whitespace-nowrap">
             ${r.saatlikToplamYagis > 0
               ? `<span class="font-extrabold text-[#2563eb] dark:text-[#60a5fa]">${r.saatlikToplamYagis} mm</span>`
               : `<span class="text-[#64748b] dark:text-[#94a3b8]">0 mm</span>`
             }
           </td>
-          <td class="py-2.5 px-3 whitespace-nowrap">
+          <td class="py-2.5 px-3.5 whitespace-nowrap">
             <div class="flex items-center gap-1.5 font-mono text-[#15803d] dark:text-[#4ade80] font-extrabold">
               <span class="inline-block transform" style="transform: rotate(${r.ruzgarYonu}deg);">➤</span>
               <span>${r.ruzgarHizi} km/h</span>
@@ -1403,17 +1403,17 @@ class ModelsUIController {
               ${r.windGust ? `<span class="text-[10px] text-[#d97706] font-bold">[${r.windGust}]</span>` : ''}
             </div>
           </td>
-          <td class="py-2.5 px-3 font-mono text-[#0f766e] dark:text-[#2dd4bf] font-extrabold whitespace-nowrap">
+          <td class="py-2.5 px-3.5 font-mono text-[#0f766e] dark:text-[#2dd4bf] font-extrabold whitespace-nowrap">
             %${r.nem}
             ${r.dewPoint != null ? `<span class="text-[10px] text-[#475569] dark:text-[#94a3b8] font-bold">(${Math.round(r.dewPoint)}°)</span>` : ''}
           </td>
-          <td class="py-2.5 px-3 font-mono text-[#7e22ce] dark:text-[#c084fc] font-extrabold whitespace-nowrap">${r.basinc} hPa</td>
-          <td class="py-2.5 px-3 font-mono text-[#475569] dark:text-[#94a3b8] font-extrabold whitespace-nowrap">%${r.bulutKapaliligi}</td>
+          <td class="py-2.5 px-3.5 font-mono text-[#7e22ce] dark:text-[#c084fc] font-extrabold whitespace-nowrap">${r.basinc} hPa</td>
+          <td class="py-2.5 px-3.5 font-mono text-[#475569] dark:text-[#94a3b8] font-extrabold whitespace-nowrap">%${r.bulutKapaliligi}</td>
           ${r.cape != null ? `
-            <td class="py-2.5 px-3 font-mono ${r.cape > 300 ? 'text-[#ea580c] font-black' : 'text-[#64748b] dark:text-[#94a3b8] font-bold'} whitespace-nowrap">
+            <td class="py-2.5 px-3.5 font-mono ${r.cape > 300 ? 'text-[#ea580c] font-black' : 'text-[#64748b] dark:text-[#94a3b8] font-bold'} whitespace-nowrap">
               ${r.cape} J/kg
             </td>
-          ` : '<td class="py-2.5 px-3 font-mono text-[#64748b] text-[10px]">--</td>'}
+          ` : '<td class="py-2.5 px-3.5 font-mono text-[#64748b] text-[10px]">--</td>'}
         </tr>
       `;
     }).join('');
@@ -1439,10 +1439,10 @@ class ModelsUIController {
       const isSelected = i === this.selectedIndex;
 
       return `
-        <div class="p-3 rounded-xl border cursor-pointer select-none transition-colors ${isSelected ? 'bg-[#2563eb]/15 border-[#2563eb] dark:bg-[#60a5fa]/20 dark:border-[#60a5fa]' : 'bg-[#edf2f7] dark:bg-[#171e29] border-[#cbd5e1] dark:border-[#283343] active:bg-[#dae2eb]'}" data-index="${i}">
-          <div class="flex items-center justify-between gap-2 border-b border-[#cbd5e1]/60 dark:border-[#283343] pb-2">
-            <div class="flex items-center gap-2">
-              ${Meteocons.getSvg(hInfo.type, 30, isNight)}
+        <div class="apple-glass p-3.5 rounded-2xl cursor-pointer select-none transition-all duration-150 active:scale-[0.985] ${isSelected ? 'ring-2 ring-[#2563eb] dark:ring-[#38bdf8] bg-blue-500/10 dark:bg-sky-400/15' : ''}" data-index="${i}">
+          <div class="flex items-center justify-between gap-2 border-b border-black/5 dark:border-white/10 pb-2.5">
+            <div class="flex items-center gap-2.5">
+              ${Meteocons.getSvg(hInfo.type, 32, isNight)}
               <div>
                 <span class="text-xs font-black text-[#0f172a] dark:text-[#f8fafc]">${hInfo.name}</span>
                 <div class="text-[10px] text-[#475569] dark:text-[#94a3b8] font-bold">${dayStr} · ${hourStr}</div>
@@ -1454,21 +1454,21 @@ class ModelsUIController {
             </div>
           </div>
 
-          <div class="grid grid-cols-3 gap-1.5 pt-2 text-[11px] font-mono">
-            <div class="flex items-center justify-center gap-1 bg-[#e2e8f0] dark:bg-[#1f2837] border border-[#cbd5e1]/60 dark:border-[#283343] px-1 py-1 rounded-lg text-[#15803d] dark:text-[#4ade80] font-extrabold" title="Rüzgar Hızı ve Yönü">
+          <div class="grid grid-cols-3 gap-1.5 pt-2.5 text-[11px] font-mono">
+            <div class="flex items-center justify-center gap-1 apple-chip px-1.5 py-1 text-[#15803d] dark:text-[#4ade80] font-extrabold" title="Rüzgar Hızı ve Yönü">
               <span class="inline-block transform" style="transform: rotate(${r.ruzgarYonu}deg);">➤</span>
-              <span>${r.ruzgarHizi} km/h</span>
+              <span class="truncate">${r.ruzgarHizi} km/h</span>
             </div>
-            <div class="flex items-center justify-center gap-1 bg-[#e2e8f0] dark:bg-[#1f2837] border border-[#cbd5e1]/60 dark:border-[#283343] px-1 py-1 rounded-lg ${r.saatlikToplamYagis > 0 ? 'text-[#2563eb] dark:text-[#60a5fa] font-black' : 'text-[#64748b] dark:text-[#94a3b8] font-bold'}" title="Yağış">
-              <span>💧 ${r.saatlikToplamYagis} mm</span>
+            <div class="flex items-center justify-center gap-1 apple-chip px-1.5 py-1 ${r.saatlikToplamYagis > 0 ? 'text-[#2563eb] dark:text-[#60a5fa] font-black' : 'text-[#64748b] dark:text-[#94a3b8] font-bold'}" title="Yağış">
+              <span class="truncate">💧 ${r.saatlikToplamYagis} mm</span>
             </div>
-            <div class="flex items-center justify-center gap-1 bg-[#e2e8f0] dark:bg-[#1f2837] border border-[#cbd5e1]/60 dark:border-[#283343] px-1 py-1 rounded-lg text-[#0f766e] dark:text-[#2dd4bf] font-extrabold" title="Bağıl Nem">
-              <span>%${r.nem}</span>
+            <div class="flex items-center justify-center gap-1 apple-chip px-1.5 py-1 text-[#0f766e] dark:text-[#2dd4bf] font-extrabold" title="Bağıl Nem">
+              <span class="truncate">%${r.nem}</span>
             </div>
           </div>
 
           ${r.cape != null && r.cape > 0 ? `
-            <div class="mt-1.5 flex items-center justify-between text-[10px] font-mono text-[#ea580c] font-bold px-1">
+            <div class="mt-2 flex items-center justify-between text-[10px] font-mono text-[#ea580c] font-bold px-1 pt-1.5 border-t border-black/5 dark:border-white/5">
               <span>⚡ Konvektif Enerji (CAPE)</span>
               <span>${r.cape} J/kg</span>
             </div>

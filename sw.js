@@ -3,7 +3,7 @@
  * Sayısal Hava Tahmin Modelleri İstasyonu (CHMI ALADIN CZ & MGM ALADIN TR)
  */
 
-const CACHE_NAME = 'models-forecast-v6.3';
+const CACHE_NAME = 'models-forecast-v6.4';
 
 const PRECACHE_ASSETS = [
   './',
