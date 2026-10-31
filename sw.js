@@ -3,18 +3,17 @@
  * Sayısal Hava Tahmin Modelleri İstasyonu
  */
 
-const CACHE_NAME = 'models-forecast-v6.7';
+const CACHE_NAME = 'models-forecast-v7.0';
 
 const PRECACHE_ASSETS = [
   './',
   './index.html',
   './style.css',
-  './style.css?v=6.7',
+  './style.css?v=7.0',
   './app.js',
-  './app.js?v=6.7',
+  './app.js?v=7.0',
   './aladin.js',
-  './aladin.js?v=6.7',
-  './data/aladin.json',
+  './aladin.js?v=7.0',
   './manifest.webmanifest',
   './icon.svg',
   './vendor/tailwind.js',
@@ -55,16 +54,16 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// 3. Fetch: Clean Cache-First Strategy with Zero Unnecessary Background Network Calls
+// 3. Fetch: Dynamic network-first strategy with cache fallback
 self.addEventListener('fetch', (event) => {
   const request = event.request;
 
-  // Only handle HTTP/HTTPS GET requests
+  // Sadece HTTP(S) GET isteklerini ele al
   if (request.method !== 'GET') return;
   if (!request.url.startsWith('http')) return;
 
-  // MGM ALADIN Model Verisi ve Proxy İstekleri için Network-First Stratejisi
-  if (request.url.includes('aladin.json') || request.url.includes('/api/aladin') || request.url.includes('api.open-meteo.com')) {
+  // Open-Meteo API istekleri için Network-First (Ağ Öncelikli, Ağ yoksa Önbellek)
+  if (request.url.includes('api.open-meteo.com')) {
     event.respondWith(
       fetch(request).then((networkResponse) => {
         if (networkResponse && networkResponse.status === 200) {
@@ -72,35 +71,37 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(request, toCache));
         }
         return networkResponse;
-      }).catch(() => caches.match(request))
+      }).catch(() => {
+        return caches.match(request);
+      })
     );
     return;
   }
 
+  // Statik varlıklar ve uygulama kabuğu için Cache-First (Hızlı Açılış)
   event.respondWith(
     caches.match(request).then((cachedResponse) => {
       if (cachedResponse) {
-        // Return instantly from cache for 0ms offline latency with zero redundant background network traffic
+        // Arka planda güncelle (Stale-While-Revalidate)
+        fetch(request).then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(request, networkResponse);
+            });
+          }
+        }).catch(() => {});
         return cachedResponse;
       }
 
-      // If not in cache, fetch from network and store in cache
       return fetch(request).then((networkResponse) => {
-        if (!networkResponse || networkResponse.status !== 200) {
+        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
           return networkResponse;
         }
-
         const responseToCache = networkResponse.clone();
         caches.open(CACHE_NAME).then((cache) => {
           cache.put(request, responseToCache);
         });
-
         return networkResponse;
-      }).catch(() => {
-        // Offline Fallback for HTML page navigations
-        if (request.mode === 'navigate') {
-          return caches.match('./index.html') || caches.match('./');
-        }
       });
     })
   );

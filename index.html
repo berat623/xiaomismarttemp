@@ -1,24 +1,24 @@
 <!DOCTYPE html>
-<html lang="tr" class="light">
+<html lang="tr" class="dark">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
-  <meta name="theme-color" content="#f1f5f9" id="metaThemeColor" />
-  <meta name="description" content="Models — Sayısal Hava Tahmin Modelleri İstasyonu. ECMWF, GFS, UKMO, GEM, AIFS ve CZ ALADIN modelleri ile yüksek çözünürlüklü tahminler." />
-
-  <!-- Apple iOS Web App Meta Tags -->
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <meta name="apple-mobile-web-app-title" content="Models" />
-
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>Models — Sayısal Hava Tahmin Modelleri İstasyonu</title>
-
-  <!-- PWA Manifest & App Icon -->
+  
+  <!-- PWA & Meta Tags -->
+  <meta name="description" content="ECMWF, CZ ALADIN, UKMO, GFS ve GEM Yüksek Çözünürlüklü Sayısal Hava Tahmin Modelleri İstasyonu" />
+  <meta name="theme-color" content="#0b0f19" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Models" />
+  
+  <!-- Web Manifest & Favicon -->
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" type="image/svg+xml" href="icon.svg" />
   <link rel="apple-touch-icon" href="icon.svg" />
 
-  <!-- Offline Tailwind CSS Engine -->
+  <!-- Tailwind CSS Runtime -->
   <script src="vendor/tailwind.js"></script>
   <script>
     tailwind.config = {
@@ -26,32 +26,29 @@
       theme: {
         extend: {
           fontFamily: {
-            parkinsans: ['Parkinsans', 'sans-serif'],
             poppins: ['Poppins', 'sans-serif'],
-          },
-          screens: {
-            'xs': '360px',
+            parkinsans: ['Parkinsans', 'sans-serif']
           }
         }
       }
-    }
+    };
   </script>
 
   <!-- Lucide Icons & Chart.js (Offline-First Local Vendors) -->
   <script src="vendor/lucide.min.js"></script>
   <script src="vendor/chart.umd.min.js"></script>
 
-  <!-- Custom CSS (Zero Animation, Hardware Accelerated) -->
-  <link rel="stylesheet" href="style.css?v=6.7" />
+  <!-- Core App Styling -->
+  <link rel="stylesheet" href="style.css?v=7.0" />
 </head>
-<body class="bg-[#f1f5f9] dark:bg-[#0b0f19] text-[#0f172a] dark:text-[#f8fafc] min-h-screen flex flex-col font-poppins selection:bg-blue-500/20 selection:text-current">
+<body class="bg-[#f1f5f9] dark:bg-[#0b0f19] text-[#0f172a] dark:text-[#f8fafc] min-h-screen flex flex-col font-poppins selection:bg-blue-500/20 selection:text-current overflow-x-hidden w-full">
 
   <!-- Mobile-Optimized Fast Modern Header -->
-  <header class="sticky top-0 z-30 border-b border-[#e2e8f0] dark:border-[#1f2937] bg-white dark:bg-[#0f172a] px-3 sm:px-6 py-2 shadow-xs">
-    <div class="max-w-6xl mx-auto flex flex-col gap-2">
+  <header class="sticky top-0 z-30 border-b border-[#e2e8f0] dark:border-[#1f2937] bg-white dark:bg-[#0f172a] px-3 sm:px-6 py-2 shadow-xs w-full">
+    <div class="max-w-6xl mx-auto flex flex-col gap-2 w-full">
       
       <!-- Top Row: Logo & Title + Action Buttons -->
-      <div class="flex items-center justify-between gap-2">
+      <div class="flex items-center justify-between gap-2 w-full">
         <div class="flex items-center gap-2 min-w-0">
           <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0">
             <i data-lucide="layers" class="w-4 h-4"></i>
@@ -64,11 +61,6 @@
 
         <!-- Right Action Buttons -->
         <div class="flex items-center gap-1.5 shrink-0">
-          <button id="btnOpenDict" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold bg-[#f1f5f9] dark:bg-[#1e293b] hover:bg-[#e2e8f0] dark:hover:bg-[#334155] text-[#0f172a] dark:text-[#f8fafc] border border-[#e2e8f0] dark:border-[#334155] flex items-center gap-1.5 cursor-pointer" title="Hadise & Hava Durumu Kodları Sözlüğü">
-            <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
-            <span class="text-xs">Sözlük</span>
-          </button>
-
           <button id="btnRefreshModel" class="px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#2563eb] hover:bg-blue-700 text-white flex items-center gap-1.5 cursor-pointer" title="Canlı ve güncel verileri sorgula">
             <i id="modelRefreshSpinner" data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
             <span>Güncelle</span>
@@ -80,8 +72,8 @@
         </div>
       </div>
 
-      <!-- Bottom Row: 8 Model Switcher Pills (Full Width Horizontal Touch Scroll) -->
-      <div id="modelTabsContainer" class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 -mx-1 px-1">
+      <!-- Bottom Row: 7 Model Switcher Pills (Full Width Horizontal Touch Scroll) -->
+      <div id="modelTabsContainer" class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 w-full min-w-0">
         <button data-model="ecmwf" class="model-tab-btn active text-xs font-bold shrink-0">ECMWF 9km</button>
         <button data-model="aifs" class="model-tab-btn text-xs font-bold shrink-0">ECMWF AIFS</button>
         <button data-model="chmi" class="model-tab-btn text-xs font-bold shrink-0">CZ ALADIN 2km</button>
@@ -89,18 +81,17 @@
         <button data-model="gfs" class="model-tab-btn text-xs font-bold shrink-0">GFS 22km</button>
         <button data-model="aigfs" class="model-tab-btn text-xs font-bold shrink-0">GFS AI</button>
         <button data-model="gem" class="model-tab-btn text-xs font-bold shrink-0">GEM 15km</button>
-        <button data-model="mgm" class="model-tab-btn text-xs font-bold shrink-0">MGM ALADIN</button>
       </div>
 
     </div>
   </header>
 
   <!-- Main Container -->
-  <main class="flex-1 max-w-6xl w-full mx-auto p-3 sm:p-5 space-y-3.5 pb-12">
+  <main class="flex-1 max-w-6xl w-full mx-auto p-3 sm:p-5 space-y-3.5 pb-12 overflow-hidden">
 
     <!-- Top Action & Model Status Bar -->
-    <div class="apple-glass p-3 sm:p-3.5 flex flex-wrap items-center justify-between gap-2">
-      <div class="flex items-center gap-2.5 min-w-0">
+    <div class="apple-glass p-3 sm:p-3.5 flex flex-wrap items-center justify-between gap-2 w-full">
+      <div class="flex items-center gap-2.5 min-w-0 flex-1">
         <div class="w-8 h-8 rounded-xl bg-blue-500/15 text-[#2563eb] dark:text-[#60a5fa] flex items-center justify-center shrink-0">
           <i data-lucide="cloud-lightning" class="w-4 h-4"></i>
         </div>
@@ -119,10 +110,10 @@
     </div>
 
     <!-- HERO FORECAST CARD -->
-    <div class="apple-glass p-3.5 sm:p-5 space-y-3.5">
+    <div class="apple-glass p-3.5 sm:p-5 space-y-3.5 w-full">
       
       <!-- Top Row: Icon, Temperature, Condition Name and Description -->
-      <div class="flex items-center justify-between gap-3">
+      <div class="flex items-center justify-between gap-3 w-full">
         
         <!-- Left: Static Weather Icon & Temperature -->
         <div class="flex items-center gap-3 shrink-0">
@@ -156,46 +147,46 @@
       <div class="border-t border-black/5 dark:border-white/10"></div>
 
       <!-- Bottom Row: 6 Parameter Chips (3 cols on mobile, 6 on desktop) -->
-      <div class="grid grid-cols-3 lg:grid-cols-6 gap-1.5 sm:gap-2 text-xs">
+      <div class="grid grid-cols-3 lg:grid-cols-6 gap-1.5 sm:gap-2 text-xs w-full">
         
         <!-- Rüzgar -->
-        <div class="apple-chip p-2 flex flex-col justify-center">
+        <div class="apple-chip p-2 flex flex-col justify-center min-w-0 overflow-hidden">
           <div class="text-[9px] text-[#475569] dark:text-[#94a3b8] uppercase font-bold tracking-wider">Rüzgar</div>
           <div class="flex items-center gap-1 text-[#15803d] dark:text-[#4ade80] font-mono font-extrabold text-[11px] sm:text-xs truncate">
-            <span id="heroWindArrow" class="inline-block transform">➤</span>
+            <span id="heroWindArrow" class="inline-block transform shrink-0">➤</span>
             <span id="heroWind" class="truncate">-- km/h</span>
           </div>
           <div id="heroWindGust" class="hidden text-[8px] sm:text-[9px] text-[#d97706] font-mono font-bold truncate">Hamle: -- km/h</div>
         </div>
 
         <!-- Nem -->
-        <div class="apple-chip p-2 flex flex-col justify-center">
+        <div class="apple-chip p-2 flex flex-col justify-center min-w-0 overflow-hidden">
           <div class="text-[9px] text-[#475569] dark:text-[#94a3b8] uppercase font-bold tracking-wider">Bağıl Nem</div>
-          <div id="heroHumidity" class="font-black font-mono text-[#0f766e] dark:text-[#2dd4bf] text-[11px] sm:text-xs">--%</div>
+          <div id="heroHumidity" class="font-black font-mono text-[#0f766e] dark:text-[#2dd4bf] text-[11px] sm:text-xs truncate">--%</div>
         </div>
 
         <!-- Yağış -->
-        <div class="apple-chip p-2 flex flex-col justify-center">
+        <div class="apple-chip p-2 flex flex-col justify-center min-w-0 overflow-hidden">
           <div class="text-[9px] text-[#475569] dark:text-[#94a3b8] uppercase font-bold tracking-wider">Yağış</div>
-          <div id="heroRain" class="font-black font-mono text-[#2563eb] dark:text-[#60a5fa] text-[11px] sm:text-xs">-- mm</div>
+          <div id="heroRain" class="font-black font-mono text-[#2563eb] dark:text-[#60a5fa] text-[11px] sm:text-xs truncate">-- mm</div>
         </div>
 
         <!-- Basınç -->
-        <div class="apple-chip p-2 flex flex-col justify-center">
+        <div class="apple-chip p-2 flex flex-col justify-center min-w-0 overflow-hidden">
           <div class="text-[9px] text-[#475569] dark:text-[#94a3b8] uppercase font-bold tracking-wider">Basınç</div>
-          <div id="heroPressure" class="font-black font-mono text-[#7e22ce] dark:text-[#c084fc] text-[11px] sm:text-xs">-- hPa</div>
+          <div id="heroPressure" class="font-black font-mono text-[#7e22ce] dark:text-[#c084fc] text-[11px] sm:text-xs truncate">-- hPa</div>
         </div>
 
         <!-- Bulutluluk -->
-        <div class="apple-chip p-2 flex flex-col justify-center">
+        <div class="apple-chip p-2 flex flex-col justify-center min-w-0 overflow-hidden">
           <div class="text-[9px] text-[#475569] dark:text-[#94a3b8] uppercase font-bold tracking-wider">Bulut</div>
-          <div id="heroCloud" class="font-black font-mono text-[#475569] dark:text-[#94a3b8] text-[11px] sm:text-xs">--%</div>
+          <div id="heroCloud" class="font-black font-mono text-[#475569] dark:text-[#94a3b8] text-[11px] sm:text-xs truncate">--%</div>
         </div>
 
         <!-- CAPE (Konvektif Kararsızlık) -->
-        <div id="heroCapeContainer" class="apple-chip p-2 flex flex-col justify-center">
+        <div id="heroCapeContainer" class="apple-chip p-2 flex flex-col justify-center min-w-0 overflow-hidden">
           <div class="text-[9px] text-[#475569] dark:text-[#94a3b8] uppercase font-bold tracking-wider">CAPE</div>
-          <div id="heroCape" class="font-black font-mono text-[#ea580c] dark:text-[#fb923c] text-[11px] sm:text-xs">-- J/kg</div>
+          <div id="heroCape" class="font-black font-mono text-[#ea580c] dark:text-[#fb923c] text-[11px] sm:text-xs truncate">-- J/kg</div>
         </div>
 
       </div>
@@ -203,8 +194,8 @@
     </div>
 
     <!-- MODEL EĞRİLERİ GRAFİK BÖLÜMÜ -->
-    <div id="modelsChartSection" class="apple-glass p-3 sm:p-4 space-y-3">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-black/5 dark:border-white/10 pb-2.5">
+    <div id="modelsChartSection" class="apple-glass p-3 sm:p-4 space-y-3 w-full overflow-hidden" style="touch-action: pan-y;">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-black/5 dark:border-white/10 pb-2.5 w-full">
         <div class="flex items-center gap-2 min-w-0">
           <h2 class="text-xs sm:text-sm font-extrabold text-[#0f172a] dark:text-[#f8fafc] flex items-center gap-1.5 shrink-0">
             <i data-lucide="line-chart" class="w-4 h-4 text-[#2563eb]"></i>
@@ -215,44 +206,46 @@
           </span>
         </div>
 
-        <!-- Scope & Mode Selectors -->
-        <div class="flex items-center gap-2 flex-wrap">
+        <!-- Scope & Mode Selectors (Tamamen Taşmasız ve Yatay Kayabilir) -->
+        <div class="flex items-center gap-2 flex-wrap w-full sm:w-auto min-w-0">
           <!-- Kapsam Seçici: Tüm Günler vs Seçili Gün -->
           <div class="inline-flex rounded-xl bg-[#f1f5f9] dark:bg-[#1e293b] p-0.5 border border-[#e2e8f0] dark:border-[#334155] text-xs shrink-0">
             <button class="chart-scope-btn active px-2.5 py-1 font-bold cursor-pointer" data-scope="all">Tüm Günler</button>
             <button class="chart-scope-btn px-2.5 py-1 font-bold cursor-pointer" data-scope="day">Seçili Gün</button>
           </div>
 
-          <!-- Mode Buttons (Tek Tek Parametre Seçici) -->
-          <div class="inline-flex rounded-xl bg-[#f1f5f9] dark:bg-[#1e293b] p-0.5 border border-[#e2e8f0] dark:border-[#334155] text-xs overflow-x-auto no-scrollbar shrink-0">
-            <button class="models-chart-btn active px-2.5 py-1 font-bold cursor-pointer" data-mode="temp">Sıcaklık</button>
-            <button class="models-chart-btn px-2.5 py-1 font-bold cursor-pointer" data-mode="rain">Yağış & Kar</button>
-            <button class="models-chart-btn px-2.5 py-1 font-bold cursor-pointer" data-mode="wind">Rüzgar</button>
-            <button class="models-chart-btn px-2.5 py-1 font-bold cursor-pointer" data-mode="hum_cloud">Nem & Bulut</button>
-            <button class="models-chart-btn px-2.5 py-1 font-bold cursor-pointer" data-mode="pressure">Basınç</button>
-            <button class="models-chart-btn px-2.5 py-1 font-bold cursor-pointer" data-mode="cape">CAPE</button>
-            <button class="models-chart-btn px-2.5 py-1 font-bold cursor-pointer" data-mode="solar_uv">Güneş/UV</button>
-            <button class="models-chart-btn px-2.5 py-1 font-bold cursor-pointer" data-mode="visibility">Görüş/VPD</button>
+          <!-- Mode Buttons (Tek Tek Parametre Seçici - Mobil Kaydırılabilir) -->
+          <div class="flex-1 sm:flex-initial min-w-0 overflow-x-auto no-scrollbar">
+            <div class="inline-flex rounded-xl bg-[#f1f5f9] dark:bg-[#1e293b] p-0.5 border border-[#e2e8f0] dark:border-[#334155] text-xs">
+              <button class="models-chart-btn active px-2.5 py-1 font-bold cursor-pointer shrink-0" data-mode="temp">Sıcaklık</button>
+              <button class="models-chart-btn px-2.5 py-1 font-bold cursor-pointer shrink-0" data-mode="rain">Yağış & Kar</button>
+              <button class="models-chart-btn px-2.5 py-1 font-bold cursor-pointer shrink-0" data-mode="wind">Rüzgar</button>
+              <button class="models-chart-btn px-2.5 py-1 font-bold cursor-pointer shrink-0" data-mode="hum_cloud">Nem & Bulut</button>
+              <button class="models-chart-btn px-2.5 py-1 font-bold cursor-pointer shrink-0" data-mode="pressure">Basınç</button>
+              <button class="models-chart-btn px-2.5 py-1 font-bold cursor-pointer shrink-0" data-mode="cape">CAPE</button>
+              <button class="models-chart-btn px-2.5 py-1 font-bold cursor-pointer shrink-0" data-mode="solar_uv">Güneş/UV</button>
+              <button class="models-chart-btn px-2.5 py-1 font-bold cursor-pointer shrink-0" data-mode="visibility">Görüş/VPD</button>
+            </div>
           </div>
         </div>
       </div>
 
       <!-- Chart Canvas Container -->
-      <div class="relative w-full h-52 sm:h-64 lg:h-72">
-        <canvas id="modelsChartCanvas"></canvas>
+      <div class="relative w-full h-52 sm:h-64 lg:h-72 overflow-hidden" style="touch-action: pan-y;">
+        <canvas id="modelsChartCanvas" style="touch-action: pan-y;"></canvas>
       </div>
     </div>
 
     <!-- DETAILED HOURLY FORECAST -->
-    <div class="apple-glass p-3 sm:p-5 space-y-3">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-black/5 dark:border-white/10 pb-2.5">
+    <div class="apple-glass p-3 sm:p-5 space-y-3 w-full overflow-hidden">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-black/5 dark:border-white/10 pb-2.5 w-full">
         <h2 class="text-xs sm:text-sm font-extrabold text-[#0f172a] dark:text-[#f8fafc] flex items-center gap-1.5 shrink-0">
           <i data-lucide="calendar" class="w-4 h-4 text-[#2563eb]"></i>
           <span>Saatlik Model Dökümü</span>
         </h2>
 
         <!-- Gün Filtreleme Şeridi (Yatay Kaydırılabilir Track) -->
-        <div id="dayFilterTrack" class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 text-xs -mx-1 px-1">
+        <div id="dayFilterTrack" class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 text-xs w-full min-w-0">
           <!-- Dinamik gün butonları enjekte edilir -->
         </div>
       </div>
@@ -284,42 +277,9 @@
       </div>
 
       <!-- 2. TELEFON GÖRÜNÜMÜ: Sleek Row / Liste Yapısı (Ultra-Hafif & Hızlı) -->
-      <div id="mobileListContainer" class="md:hidden space-y-1.5">
+      <div id="mobileListContainer" class="md:hidden space-y-1.5 w-full">
         <div class="p-4 text-center text-xs text-[#475569] dark:text-[#94a3b8] font-bold">
           Model verisi yükleniyor...
-        </div>
-      </div>
-    </div>
-
-    <!-- HADİSE & WMO SÖZLÜĞÜ MODAL -->
-    <div id="modalDict" class="hidden fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/60">
-      <div class="bg-white dark:bg-[#111827] rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl border border-[#e2e8f0] dark:border-[#1f2937]">
-        <div class="p-3.5 border-b border-[#e2e8f0] dark:border-[#1f2937] flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <i data-lucide="book-open" class="w-4 h-4 text-[#2563eb]"></i>
-            <h3 class="text-sm font-extrabold text-[#0f172a] dark:text-[#f8fafc]">Hava Hadiseleri ve Kodları Sözlüğü</h3>
-          </div>
-          <button id="btnCloseDict" class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-[#334155] dark:text-[#cbd5e1] cursor-pointer">
-            <i data-lucide="x" class="w-4 h-4"></i>
-          </button>
-        </div>
-
-        <!-- Dictionary Tab Switcher (WMO vs MGM) -->
-        <div class="px-3.5 pt-2.5 pb-1.5 border-b border-[#e2e8f0] dark:border-[#1f2937] flex items-center gap-2">
-          <div class="inline-flex rounded-xl bg-[#f1f5f9] dark:bg-[#1e293b] p-0.5 border border-[#e2e8f0] dark:border-[#334155] text-xs">
-            <button id="btnDictTabWmo" class="nav-tab-btn active px-3 py-1 font-bold cursor-pointer">WMO Hadise Kodları</button>
-            <button id="btnDictTabMgm" class="nav-tab-btn px-3 py-1 font-bold cursor-pointer">MGM Hadise Kodları</button>
-          </div>
-        </div>
-
-        <div class="px-3.5 pt-2 pb-2 border-b border-[#e2e8f0] dark:border-[#1f2937]">
-          <div class="relative">
-            <input type="text" id="dictSearch" placeholder="Hadise veya kod ara (örn: Yağmur, Fırtına, 61, KGY, Kar)..." class="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl bg-[#f8fafc] dark:bg-[#1f2937] border border-[#cbd5e1] dark:border-[#374151] text-[#0f172a] dark:text-[#f8fafc] font-bold placeholder-[#64748b] focus:outline-none focus:ring-2 focus:ring-[#2563eb]">
-            <i data-lucide="search" class="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#64748b]"></i>
-          </div>
-        </div>
-        <div class="p-3.5 overflow-y-auto space-y-1.5 flex-1" id="dictList">
-          <!-- Sözlük öğeleri dinamik yüklenir -->
         </div>
       </div>
     </div>
@@ -330,7 +290,7 @@
   <div id="toastContainer" class="fixed bottom-3 left-3 right-3 sm:left-auto sm:right-5 z-50 flex flex-col gap-1.5 pointer-events-none max-w-sm mx-auto sm:mx-0"></div>
 
   <!-- Scripts -->
-  <script src="app.js?v=6.7"></script>
-  <script src="aladin.js?v=6.7"></script>
+  <script src="app.js?v=7.0"></script>
+  <script src="aladin.js?v=7.0"></script>
 </body>
 </html>

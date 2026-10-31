@@ -5,7 +5,6 @@
  */
 
 const http = require('http');
-const https = require('https');
 const fs = require('fs');
 const path = require('path');
 
@@ -29,48 +28,7 @@ const server = http.createServer((req, res) => {
   const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const pathname = parsedUrl.pathname;
 
-  // 1. MGM ALADIN PROXY UÇ NOKTASI (Breezy Weather Metodu)
-  if (pathname === '/api/aladin') {
-    const targetUrl = 'https://modelservis.mgm.gov.tr/web/modeltahmin/lokasyon/light3' + parsedUrl.search;
-    
-    const proxyReq = https.get(targetUrl, {
-      headers: {
-        'Origin': 'https://www.mgm.gov.tr',
-        'Referer': 'https://www.mgm.gov.tr/',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-      },
-      timeout: 6000
-    }, (upstreamRes) => {
-      res.writeHead(upstreamRes.statusCode, {
-        'Content-Type': 'application/json; charset=utf-8',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, OPTIONS',
-        'Access-Control-Allow-Headers': '*'
-      });
-      upstreamRes.pipe(res);
-    });
-
-    proxyReq.on('error', (err) => {
-      res.writeHead(500, {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
-      });
-      res.end(JSON.stringify({ error: 'ProxyError', message: err.message }));
-    });
-
-    proxyReq.on('timeout', () => {
-      proxyReq.destroy();
-      res.writeHead(504, {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
-      });
-      res.end(JSON.stringify({ error: 'TimeoutError', message: 'MGM sunucusu yanıt vermedi' }));
-    });
-
-    return;
-  }
-
-  // 2. STATİK DOSYA SUNUCUSU
+  // Statik Dosya Sunucusu
   let safePath = path.normalize(decodeURIComponent(pathname)).replace(/^(\.\.[\/\\])+/, '');
   if (safePath === '/' || safePath === '\\') safePath = '/index.html';
   const filePath = path.join(ROOT_DIR, safePath);
@@ -98,6 +56,16 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`\n🚀 Models Sayısal Hava Tahmin İstasyonu Aktif!`);
   console.log(`💻 Bilgisayar Yerel Adres: http://localhost:${PORT}`);
-  console.log(`📱 Telefon Wi-Fi Adresi:   http://192.168.1.22:${PORT}`);
-  console.log(`🌦️ MGM ALADIN Canlı Proxy: http://localhost:${PORT}/api/aladin\n`);
+  
+  // Yerel Ağ (Wi-Fi) IP adresini tespit et
+  const os = require('os');
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        console.log(`📱 Telefon/Tablet Ağ Adresi: http://${iface.address}:${PORT}`);
+      }
+    }
+  }
+  console.log(`\n(Sunucuyu durdurmak için Ctrl+C tuşlayabilirsiniz)\n`);
 });
