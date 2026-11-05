@@ -335,6 +335,147 @@ function findCurrentHourIndex(records) {
 }
 
 // ==========================================
+// 4.1 İLERİ METEOROLOJİK ANALİZ VE ATMOSFER YARDIMCILARI
+// ==========================================
+function getBeaufortScale(kmh) {
+  if (kmh == null || isNaN(kmh) || kmh < 1) return { bft: 0, name: 'B0 Sakin' };
+  if (kmh <= 5) return { bft: 1, name: 'B1 Esinti' };
+  if (kmh <= 11) return { bft: 2, name: 'B2 Hafif Rüzgar' };
+  if (kmh <= 19) return { bft: 3, name: 'B3 Tatlı Rüzgar' };
+  if (kmh <= 28) return { bft: 4, name: 'B4 Orta Rüzgar' };
+  if (kmh <= 38) return { bft: 5, name: 'B5 Sertçe Rüzgar' };
+  if (kmh <= 49) return { bft: 6, name: 'B6 Sert Rüzgar' };
+  if (kmh <= 61) return { bft: 7, name: 'B7 Fırtınamsı' };
+  if (kmh <= 74) return { bft: 8, name: 'B8 Fırtına' };
+  return { bft: 9, name: 'B9+ Şiddetli Fırtına' };
+}
+
+function getHumidityComfort(humidity, dewPoint) {
+  if (humidity == null) return 'Normal';
+  if (humidity < 30) return 'Kuru Hava';
+  if (humidity <= 60) return 'İdeal Konfor';
+  if (humidity <= 75) return 'Ilımlı Nem';
+  if (dewPoint != null && dewPoint >= 20) return 'Bunaltıcı Nem';
+  return 'Yüksek Nem';
+}
+
+function getPressureTrend(curPressure, prevPressure) {
+  if (curPressure == null) return 'Kararlı';
+  if (prevPressure == null) {
+    if (curPressure > 1020) return 'Yüksek Basınç (Açık)';
+    if (curPressure < 1008) return 'Alçak Basınç (Dinamik)';
+    return 'Normal Basınç';
+  }
+  const diff = curPressure - prevPressure;
+  if (diff >= 1.5) return 'Hızlı Yükseliş ↗';
+  if (diff >= 0.5) return 'Yükselişte ↗';
+  if (diff <= -1.5) return 'Hızlı Düşüş ↘';
+  if (diff <= -0.5) return 'Düşüşte ↘';
+  return 'Kararlı Basınç →';
+}
+
+function getCapeRisk(cape) {
+  if (cape == null || cape <= 0) return 'Atmosfer Sakin';
+  if (cape < 300) return 'Kararlı / Zayıf';
+  if (cape < 1000) return 'Orta Konveksiyon';
+  if (cape < 2000) return 'Fırtına / Dolu Riski ⚡';
+  return 'Şiddetli Süperhücre ⚠️';
+}
+
+function getUvAdvice(uv) {
+  if (uv == null || uv <= 0) return 'Güneşsiz / Güvenli';
+  if (uv < 3) return 'Düşük (Güvenli)';
+  if (uv < 6) return 'Orta (Şapka / Gözlük)';
+  if (uv < 8) return 'Yüksek (Gölge & Krem)';
+  if (uv < 11) return 'Çok Yüksek (Korunun)';
+  return 'Aşırı Tehlikeli ⚠️';
+}
+
+function getAirClarity(visKm) {
+  if (visKm == null) return 'Standart Görüş';
+  if (visKm < 1) return 'Yoğun Sis (< 1 km)';
+  if (visKm < 4) return 'Puslu / Sisli';
+  if (visKm < 10) return 'Orta Görüş';
+  if (visKm >= 20) return 'Mükemmel Berraklık';
+  return 'Açık Görüş';
+}
+
+function getSmartWeatherAdvice(cur, dayRecords) {
+  if (!cur) return 'Model verisi hazır.';
+  const hadise = cur.hadise || {};
+  const t = cur.sicaklik;
+  const rain = cur.saatlikToplamYagis || 0;
+  const prob = cur.precipProb != null ? cur.precipProb : 0;
+  const gust = cur.windGust || 0;
+  const cape = cur.cape || 0;
+  const uv = cur.uvIndex || 0;
+
+  if (cape >= 1200 || hadise.type === 'thunderstorm' || hadise.type === 'severe-thunderstorm') {
+    return '⚡ Dikkat: Şiddetli gökgürültülü fırtına, yıldırım ve yerel dolu riski bulunuyor.';
+  }
+  if (cur.snowfall > 0 || hadise.type === 'snow' || hadise.type === 'heavy-snow') {
+    return '❄️ Kar yağışı ve gizli buzlanma riski; yollarda ve kaldırımlarda dikkatli olun.';
+  }
+  if (rain >= 3 || hadise.type === 'heavy-rain' || hadise.type === 'storm-rain') {
+    return '🌧️ Kuvvetli yağmur geçişi; su birikintilerine karşı tedbirli olun ve şemsiyenizi unutmayın.';
+  }
+  if (rain > 0 || prob >= 50) {
+    return '💧 Aralıklı yağış ihtimali yüksek; yanınıza şemsiye veya yağmurluk almanız önerilir.';
+  }
+  if (gust >= 50) {
+    return '💨 Dikkat: Hamleli sert rüzgar (50+ km/h); açık alanda rüzgara karşı korunun.';
+  }
+  if (t <= 2) {
+    return '🥶 Dondurucu soğuk; don ve kırağı ihtimaline karşı kalın giyinin.';
+  }
+  if (t < 10) {
+    return '🧥 Soğuk hava dalgası; mont veya kalın ceket giymeniz tavsiye edilir.';
+  }
+  if (uv >= 6) {
+    return '☀️ Güneş ışınları ve UV indeksi kuvvetli; güneş kremi ve gözlük kullanmayı ihmal etmeyin.';
+  }
+  if (cur.nem >= 80 && t >= 25) {
+    return '🌡️ Yüksek nem bunaltıcı etki yapabilir; bol su tüketin ve serin yerleri tercih edin.';
+  }
+  if (hadise.type === 'fog') {
+    return '🌫️ Sis nedeniyle yatay görüş mesafesi düşüyor; trafikte takip mesafesini artırın.';
+  }
+  if (t >= 18 && t <= 25 && (hadise.type === 'sun' || hadise.type === 'few-clouds')) {
+    return '✨ Açık ve ılık bir atmosfer; açık hava etkinlikleri ve yürüyüş için harika koşullar.';
+  }
+  return '🌤️ Bursa Nilüfer için sayısal atmosfer tahmin verileri canlı işlenmektedir.';
+}
+
+function updateAmbientWeatherGlow(glowEl, cur) {
+  if (!glowEl || !cur) return;
+  const hadise = cur.hadise || {};
+  const hourVal = Number(formatTurkeyDate(cur.time, { hour: 'numeric', hourCycle: 'h23' }));
+  const isNight = cur.isDay !== null && cur.isDay !== undefined ? cur.isDay === 0 : (hourVal < 6 || hourVal >= 20);
+
+  let bg = '';
+  if (cur.cape >= 1000 || hadise.type === 'thunderstorm' || hadise.type === 'severe-thunderstorm') {
+    bg = 'radial-gradient(circle at 50% 15%, rgba(147, 51, 234, 0.45), rgba(99, 102, 241, 0.25), transparent 70%)';
+  } else if (cur.snowfall > 0 || hadise.type === 'snow' || hadise.type === 'heavy-snow') {
+    bg = 'radial-gradient(circle at 50% 15%, rgba(56, 189, 248, 0.4), rgba(199, 210, 254, 0.25), transparent 70%)';
+  } else if (cur.saatlikToplamYagis > 0 || hadise.type === 'rain' || hadise.type === 'heavy-rain' || hadise.type === 'light-rain') {
+    bg = 'radial-gradient(circle at 50% 15%, rgba(2, 132, 199, 0.42), rgba(37, 99, 235, 0.22), transparent 70%)';
+  } else if (hadise.type === 'fog') {
+    bg = 'radial-gradient(circle at 50% 15%, rgba(148, 163, 184, 0.4), rgba(100, 116, 139, 0.2), transparent 70%)';
+  } else if (isNight) {
+    bg = 'radial-gradient(circle at 50% 15%, rgba(67, 56, 202, 0.45), rgba(15, 23, 42, 0.35), transparent 70%)';
+  } else if (cur.bulutKapaliligi > 75) {
+    bg = 'radial-gradient(circle at 50% 15%, rgba(100, 116, 139, 0.38), rgba(71, 85, 105, 0.22), transparent 70%)';
+  } else if (cur.bulutKapaliligi > 30) {
+    bg = 'radial-gradient(circle at 50% 15%, rgba(245, 158, 11, 0.32), rgba(59, 130, 246, 0.25), transparent 70%)';
+  } else {
+    // Açık / Güneşli
+    bg = 'radial-gradient(circle at 50% 15%, rgba(245, 158, 11, 0.42), rgba(251, 191, 36, 0.22), transparent 70%)';
+  }
+
+  glowEl.style.background = bg;
+}
+
+// ==========================================
 // 5. GENEL OPEN-METEO MODEL SERVİSİ (YÜKSEK HIZ & DOĞRULUK)
 // ==========================================
 class OpenMeteoModelService {
@@ -1492,6 +1633,9 @@ class ModelsUIController {
 
   cacheDom() {
     this.dom = {
+      // Dinamik Ortam Atmosfer Işığı
+      ambientWeatherGlow: document.getElementById('ambientWeatherGlow'),
+
       modelTabsContainer: document.getElementById('modelTabsContainer'),
       btnRefreshModel: document.getElementById('btnRefreshModel'),
       modelRefreshSpinner: document.getElementById('modelRefreshSpinner'),
@@ -1502,7 +1646,10 @@ class ModelsUIController {
       modelLocationText: document.getElementById('modelLocationText'),
       modelLastUpdateText: document.getElementById('modelLastUpdateText'),
 
-      // Hero Card
+      // Hero Card Ana Göstergeler
+      heroDateText: document.getElementById('heroDateText'),
+      heroTempRange: document.getElementById('heroTempRange'),
+      heroSmartAdvice: document.getElementById('heroSmartAdvice'),
       heroIcon: document.getElementById('heroIcon'),
       heroTemp: document.getElementById('heroTemp'),
       heroFeels: document.getElementById('heroFeels'),
@@ -1510,16 +1657,43 @@ class ModelsUIController {
       heroConditionName: document.getElementById('heroConditionName'),
       heroConditionDesc: document.getElementById('heroConditionDesc'),
 
-      // Hero 6 Badges
+      // Bento Grid 8 Widget
       heroWind: document.getElementById('heroWind'),
-      heroWindGust: document.getElementById('heroWindGust'),
       heroWindArrow: document.getElementById('heroWindArrow'),
+      heroWindName: document.getElementById('heroWindName'),
+      heroWindGust: document.getElementById('heroWindGust'),
+      heroWindBeaufort: document.getElementById('heroWindBeaufort'),
+
       heroHumidity: document.getElementById('heroHumidity'),
+      heroDewPointBento: document.getElementById('heroDewPointBento'),
+      heroHumidityComfort: document.getElementById('heroHumidityComfort'),
+
       heroRain: document.getElementById('heroRain'),
+      heroRainProb: document.getElementById('heroRainProb'),
+      heroRainSnow: document.getElementById('heroRainSnow'),
+
       heroPressure: document.getElementById('heroPressure'),
+      heroSurfacePressure: document.getElementById('heroSurfacePressure'),
+      heroPressureTrend: document.getElementById('heroPressureTrend'),
+
       heroCloud: document.getElementById('heroCloud'),
+      heroCloudDesc: document.getElementById('heroCloudDesc'),
+      heroCloudLayers: document.getElementById('heroCloudLayers'),
+
       heroCape: document.getElementById('heroCape'),
-      heroCapeContainer: document.getElementById('heroCapeContainer'),
+      heroCapeStatus: document.getElementById('heroCapeStatus'),
+
+      heroUv: document.getElementById('heroUv'),
+      heroSunshine: document.getElementById('heroSunshine'),
+      heroUvAdvice: document.getElementById('heroUvAdvice'),
+
+      heroVisibility: document.getElementById('heroVisibility'),
+      heroVpd: document.getElementById('heroVpd'),
+      heroAirClarity: document.getElementById('heroAirClarity'),
+
+      // 24 Saatlik Yatay Carousel Şeridi
+      hourlyStripSection: document.getElementById('hourlyStripSection'),
+      hourlyStripTrack: document.getElementById('hourlyStripTrack'),
 
       // Günlük Filtreleme Şeridi & Tablo Filtresi
       dayFilterTrack: document.getElementById('dayFilterTrack'),
@@ -1547,6 +1721,48 @@ class ModelsUIController {
     if (this.dom.btnRefreshModel) {
       this.dom.btnRefreshModel.addEventListener('click', () => {
         this.refreshCurrentModel(false, true);
+      });
+    }
+
+    // 24 Saatlik Yatay Şerit Tıklama Delegasyonu
+    if (this.dom.hourlyStripTrack) {
+      this.dom.hourlyStripTrack.addEventListener('click', (e) => {
+        const card = e.target.closest('.hourly-strip-card');
+        if (!card) return;
+        const timeVal = card.dataset.time;
+        if (!timeVal) return;
+
+        const filtered = this.getFilteredRecords();
+        let foundIdx = filtered.findIndex(r => r.time === timeVal);
+
+        // Eğer mevcut filtrede bu saat gizlenmişse, filtreyi sıfırla ve günü ayarla
+        if (foundIdx === -1) {
+          const cardDay = getTurkeyDayKey(timeVal);
+          if (this.selectedDay !== 'all' && this.selectedDay !== cardDay) {
+            this.selectedDay = cardDay;
+            if (this.dom.dayFilterTrack) {
+              this.dom.dayFilterTrack.querySelectorAll('.day-filter-btn').forEach(b => {
+                if (b.dataset.day === cardDay) b.classList.add('active');
+                else b.classList.remove('active');
+              });
+            }
+          }
+          this.tableFilter = 'all';
+          if (this.dom.tableFilterTrack) {
+            this.dom.tableFilterTrack.querySelectorAll('.table-filter-btn').forEach(b => {
+              if (b.dataset.filter === 'all') b.classList.add('active');
+              else b.classList.remove('active');
+            });
+          }
+          const updatedFiltered = this.getFilteredRecords();
+          foundIdx = updatedFiltered.findIndex(r => r.time === timeVal);
+          this.renderTable(updatedFiltered);
+          this.renderMobileList(updatedFiltered);
+        }
+
+        if (foundIdx !== -1) {
+          this.selectRecord(foundIdx);
+        }
       });
     }
 
@@ -1743,6 +1959,18 @@ class ModelsUIController {
       this.renderHeroCard(cur);
     }
 
+    // 24 Saatlik Yatay Şeritte seçili kartı güncelle ve görünür alana ortala
+    if (this.dom.hourlyStripTrack && cur) {
+      this.dom.hourlyStripTrack.querySelectorAll('.hourly-strip-card').forEach(card => {
+        if (card.dataset.time === cur.time) {
+          card.classList.add('active');
+          card.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        } else {
+          card.classList.remove('active');
+        }
+      });
+    }
+
     // Mobilde seçili satırın detay panelini güncelle
     this.renderMobileList(filteredRecs);
 
@@ -1782,12 +2010,42 @@ class ModelsUIController {
 
   renderHeroCard(cur) {
     if (!cur) return;
+    const allRecs = this.activeService.records || [];
     const hadise = cur.hadise || { name: 'Hava Durumu', desc: '', type: 'cloudy' };
     const hourVal = Number(formatTurkeyDate(cur.time, { hour: 'numeric', hourCycle: 'h23' }));
     const isNight = cur.isDay !== null && cur.isDay !== undefined ? cur.isDay === 0 : (hourVal < 6 || hourVal >= 20);
 
+    // 1. Atmosferik Dinamik Ortam Işığı (Ambient Glow)
+    updateAmbientWeatherGlow(this.dom.ambientWeatherGlow, cur);
+
+    // 2. Canlı Tarih ve Saat Bilgisi
+    if (this.dom.heroDateText) {
+      this.dom.heroDateText.textContent = formatTurkeyDate(cur.time, {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+
+    // 3. Günün Sıcaklık Aralığı (En Düşük / En Yüksek)
+    const curDayKey = getTurkeyDayKey(cur.time);
+    const daySubset = allRecs.filter(r => getTurkeyDayKey(r.time) === curDayKey);
+    if (this.dom.heroTempRange) {
+      if (daySubset.length > 0) {
+        const temps = daySubset.map(r => r.sicaklik);
+        const minT = Math.round(Math.min(...temps));
+        const maxT = Math.round(Math.max(...temps));
+        this.dom.heroTempRange.textContent = `▲ ${maxT}° / ▼ ${minT}°C`;
+      } else {
+        this.dom.heroTempRange.textContent = `▲ ${Math.round(cur.sicaklik)}°C`;
+      }
+    }
+
+    // 4. Hero Ana Sıcaklık ve Hadise Bilgileri
     if (this.dom.heroIcon) {
-      this.dom.heroIcon.innerHTML = Meteocons.getSvg(hadise.type, 56, isNight);
+      this.dom.heroIcon.innerHTML = Meteocons.getSvg(hadise.type, 64, isNight);
     }
     if (this.dom.heroTemp) this.dom.heroTemp.textContent = Math.round(cur.sicaklik);
     if (this.dom.heroFeels) this.dom.heroFeels.textContent = `Hissedilen: ${Math.round(cur.hissedilenSicaklik)}°C`;
@@ -1804,36 +2062,157 @@ class ModelsUIController {
     if (this.dom.heroConditionName) this.dom.heroConditionName.textContent = hadise.name;
     if (this.dom.heroConditionDesc) this.dom.heroConditionDesc.textContent = hadise.desc;
 
-    // Rüzgar ve Pusula
+    // 5. Akıllı Meteorolojik Tavsiye
+    if (this.dom.heroSmartAdvice) {
+      this.dom.heroSmartAdvice.textContent = getSmartWeatherAdvice(cur, daySubset);
+    }
+
+    // 6. Rüzgar ve Pusula Yönü (Bento 1)
     const windDir = getCompassDirection(cur.ruzgarYonu);
     const windDirFull = getCompassDirectionName(cur.ruzgarYonu);
-    if (this.dom.heroWind) this.dom.heroWind.textContent = `${cur.ruzgarHizi} km/h (${windDir} ${cur.ruzgarYonu}° - ${windDirFull})`;
-    
-    if (this.dom.heroWindGust) {
-      if (cur.windGust != null && cur.windGust > 0) {
-        this.dom.heroWindGust.textContent = `Hamle: ${cur.windGust} km/h`;
-        this.dom.heroWindGust.classList.remove('hidden');
-      } else {
-        this.dom.heroWindGust.classList.add('hidden');
-      }
-    }
+    if (this.dom.heroWind) this.dom.heroWind.textContent = `${cur.ruzgarHizi} km/h`;
     if (this.dom.heroWindArrow) {
       this.dom.heroWindArrow.style.transform = `rotate(${cur.ruzgarYonu}deg)`;
     }
-
-    if (this.dom.heroHumidity) this.dom.heroHumidity.textContent = `%${cur.nem}`;
-    if (this.dom.heroRain) this.dom.heroRain.textContent = `${cur.saatlikToplamYagis} mm`;
-    if (this.dom.heroPressure) this.dom.heroPressure.textContent = `${cur.basinc} hPa`;
-    if (this.dom.heroCloud) this.dom.heroCloud.textContent = `%${cur.bulutKapaliligi}`;
-    
-    if (this.dom.heroCapeContainer) {
-      if (cur.cape != null) {
-        this.dom.heroCapeContainer.classList.remove('hidden');
-        if (this.dom.heroCape) this.dom.heroCape.textContent = `${cur.cape} J/kg`;
+    if (this.dom.heroWindName) {
+      this.dom.heroWindName.textContent = `${windDirFull} (${windDir})`;
+    }
+    if (this.dom.heroWindGust) {
+      if (cur.windGust != null && cur.windGust > cur.ruzgarHizi) {
+        this.dom.heroWindGust.textContent = `Hamle: ${cur.windGust} km/h`;
       } else {
-        this.dom.heroCapeContainer.classList.add('hidden');
+        this.dom.heroWindGust.textContent = 'Kararlı Rüzgar';
       }
     }
+    if (this.dom.heroWindBeaufort) {
+      this.dom.heroWindBeaufort.textContent = getBeaufortScale(cur.ruzgarHizi).name;
+    }
+
+    // 7. Nem ve Çiy Noktası (Bento 2)
+    if (this.dom.heroHumidity) this.dom.heroHumidity.textContent = `%${cur.nem}`;
+    if (this.dom.heroDewPointBento) {
+      this.dom.heroDewPointBento.textContent = cur.dewPoint != null ? `Çiy: ${Math.round(cur.dewPoint)}°C` : 'Çiy: --';
+    }
+    if (this.dom.heroHumidityComfort) {
+      this.dom.heroHumidityComfort.textContent = getHumidityComfort(cur.nem, cur.dewPoint);
+    }
+
+    // 8. Yağış & Yağış İhtimali & Kar (Bento 3)
+    if (this.dom.heroRain) this.dom.heroRain.textContent = `${cur.saatlikToplamYagis} mm`;
+    if (this.dom.heroRainProb) {
+      this.dom.heroRainProb.textContent = cur.precipProb != null ? `İhtimal: %${cur.precipProb}` : 'İhtimal: %0';
+    }
+    if (this.dom.heroRainSnow) {
+      if (cur.snowfall > 0) {
+        this.dom.heroRainSnow.textContent = `Kar: ${cur.snowfall} cm`;
+      } else if (cur.rain > 0) {
+        this.dom.heroRainSnow.textContent = `Yağmur: ${cur.rain} mm`;
+      } else {
+        this.dom.heroRainSnow.textContent = 'Yağış Beklenmiyor';
+      }
+    }
+
+    // 9. Barometre & Trend (Bento 4)
+    if (this.dom.heroPressure) this.dom.heroPressure.textContent = `${cur.basinc} hPa`;
+    if (this.dom.heroSurfacePressure) {
+      this.dom.heroSurfacePressure.textContent = cur.surfacePressure != null ? `Yüzey: ${cur.surfacePressure} hPa` : 'Deniz Seviyesi';
+    }
+    if (this.dom.heroPressureTrend) {
+      const curIdx = allRecs.findIndex(r => r.time === cur.time);
+      const prevRec = curIdx > 0 ? allRecs[curIdx - 1] : null;
+      this.dom.heroPressureTrend.textContent = getPressureTrend(cur.basinc, prevRec ? prevRec.basinc : null);
+    }
+
+    // 10. Bulut Tabakaları (Bento 5)
+    if (this.dom.heroCloud) this.dom.heroCloud.textContent = `%${cur.bulutKapaliligi}`;
+    if (this.dom.heroCloudDesc) {
+      if (cur.bulutKapaliligi > 80) this.dom.heroCloudDesc.textContent = 'Kapalı Bulutlu';
+      else if (cur.bulutKapaliligi > 45) this.dom.heroCloudDesc.textContent = 'Parçalı Bulutlu';
+      else if (cur.bulutKapaliligi > 15) this.dom.heroCloudDesc.textContent = 'Az Bulutlu';
+      else this.dom.heroCloudDesc.textContent = 'Açık Gökyüzü';
+    }
+    if (this.dom.heroCloudLayers) {
+      const low = cur.cloudLow != null ? `%${cur.cloudLow}` : '--';
+      const high = cur.cloudHigh != null ? `%${cur.cloudHigh}` : '--';
+      this.dom.heroCloudLayers.textContent = `Alçak: ${low} | Yüksek: ${high}`;
+    }
+
+    // 11. CAPE Radar (Bento 6)
+    if (this.dom.heroCape) {
+      this.dom.heroCape.textContent = cur.cape != null ? `${cur.cape} J/kg` : '-- J/kg';
+    }
+    if (this.dom.heroCapeStatus) {
+      this.dom.heroCapeStatus.textContent = getCapeRisk(cur.cape);
+    }
+
+    // 12. UV & Güneşlenme (Bento 7)
+    if (this.dom.heroUv) {
+      this.dom.heroUv.textContent = cur.uvIndex != null ? cur.uvIndex : (isNight ? '0 (Gece)' : '--');
+    }
+    if (this.dom.heroSunshine) {
+      this.dom.heroSunshine.textContent = cur.sunshine != null ? `Güneş: ${cur.sunshine} dk` : 'Güneş: --';
+    }
+    if (this.dom.heroUvAdvice) {
+      this.dom.heroUvAdvice.textContent = isNight ? 'Gece (Güneşsiz)' : getUvAdvice(cur.uvIndex);
+    }
+
+    // 13. Görüş Mesafesi & VPD (Bento 8)
+    if (this.dom.heroVisibility) {
+      this.dom.heroVisibility.textContent = cur.visibility != null ? `${cur.visibility} km` : '-- km';
+    }
+    if (this.dom.heroVpd) {
+      this.dom.heroVpd.textContent = cur.vpd != null ? `VPD: ${cur.vpd} kPa` : 'VPD: --';
+    }
+    if (this.dom.heroAirClarity) {
+      this.dom.heroAirClarity.textContent = getAirClarity(cur.visibility);
+    }
+  }
+
+  renderHourlyStrip(allRecs, cur) {
+    if (!this.dom.hourlyStripTrack || !allRecs || allRecs.length === 0) return;
+
+    const nowIdx = findCurrentHourIndex(allRecs);
+    const stripRecs = allRecs.slice(nowIdx, nowIdx + 24);
+    if (stripRecs.length === 0) return;
+
+    const curTime = cur ? cur.time : stripRecs[0].time;
+    let html = '';
+
+    stripRecs.forEach((r, idx) => {
+      const isNow = idx === 0;
+      const isActive = r.time === curTime;
+      const hInfo = r.hadise || { name: 'Hava Durumu', type: 'cloudy' };
+      const hourVal = Number(formatTurkeyDate(r.time, { hour: 'numeric', hourCycle: 'h23' }));
+      const isNight = r.isDay !== null && r.isDay !== undefined ? r.isDay === 0 : (hourVal < 6 || hourVal >= 20);
+      const hourStr = formatTurkeyDate(r.time, { hour: '2-digit', minute: '2-digit' });
+
+      html += `
+        <div class="hourly-strip-card shrink-0 p-2.5 rounded-2xl flex flex-col items-center justify-between gap-1.5 cursor-pointer select-none min-w-[76px] sm:min-w-[84px] text-center border ${isActive ? 'active' : ''}" data-time="${r.time}">
+          <span class="text-[11px] font-mono font-bold ${isNow ? 'text-blue-600 dark:text-sky-400 font-extrabold' : 'text-slate-500 dark:text-slate-400'}">
+            ${isNow ? 'Şimdi' : hourStr}
+          </span>
+          <div class="w-7 h-7 flex items-center justify-center my-0.5">
+            ${Meteocons.getSvg(hInfo.type, 28, isNight)}
+          </div>
+          <span class="text-xs font-mono font-black text-slate-800 dark:text-slate-100">
+            ${Math.round(r.sicaklik)}°
+          </span>
+          <div class="h-4 flex items-center justify-center">
+            ${r.saatlikToplamYagis > 0 ? `
+              <span class="text-[10px] font-mono font-bold text-blue-600 dark:text-sky-400">💧${r.saatlikToplamYagis}</span>
+            ` : (r.precipProb != null && r.precipProb >= 30 ? `
+              <span class="text-[10px] font-mono font-semibold text-slate-400">%${r.precipProb}</span>
+            ` : `
+              <span class="text-[9px] font-mono text-slate-400 dark:text-slate-500 flex items-center gap-0.5">
+                <span class="inline-block transform text-[8px]" style="transform: rotate(${r.ruzgarYonu}deg);">➤</span>${r.ruzgarHizi}
+              </span>
+            `)}
+          </div>
+        </div>
+      `;
+    });
+
+    this.dom.hourlyStripTrack.innerHTML = html;
   }
 
   render() {
@@ -1896,6 +2275,9 @@ class ModelsUIController {
     // Hero Card Render (Seçili Canlı Saat)
     const cur = filteredRecs[this.selectedIndex] || filteredRecs[0] || allRecs[0];
     this.renderHeroCard(cur);
+
+    // 24 Saatlik Yatay Carousel Şeridi
+    this.renderHourlyStrip(allRecs, cur);
 
     // Grafik Güncellemesi: Varsayılan tüm veriyi gösterir, seçili gün istenirse o güne odaklanır
     if (this.chartManager) {
