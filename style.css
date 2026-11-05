@@ -319,3 +319,157 @@ table th, table td {
     min-height: 36px;
   }
 }
+
+
+/* ==========================================
+   5. CHART METRICS & INTERACTIVE LEGEND PILLS
+   ========================================== */
+.chart-metric-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+}
+.dark .chart-metric-card {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.chart-legend-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+}
+.chart-legend-pill:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+.chart-legend-pill.is-hidden {
+  opacity: 0.4;
+  text-decoration: line-through;
+  background: transparent;
+}
+.dark .chart-legend-pill {
+  background: #1e293b;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+.dark .chart-legend-pill:hover {
+  background: #334155;
+  color: #f8fafc;
+}
+
+.legend-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.legend-swatch.swatch-bar {
+  border-radius: 3px;
+  width: 10px;
+  height: 10px;
+}
+.legend-swatch.swatch-dashed {
+  border-radius: 1px;
+  width: 14px;
+  height: 3px;
+  border-top: 2px dashed;
+  background: transparent !important;
+}
+.legend-swatch.swatch-line {
+  border-radius: 1px;
+  width: 14px;
+  height: 3px;
+}
+
+/* ==========================================
+   6. TABLE FILTER BUTTONS & DAY SEPARATORS
+   ========================================= */
+.table-filter-btn {
+  color: #475569;
+  font-weight: 700;
+  border-radius: 8px;
+  padding: 4px 10px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  touch-action: manipulation;
+  white-space: nowrap;
+}
+.table-filter-btn:hover {
+  color: #0f172a;
+  background: #e2e8f0;
+}
+.table-filter-btn.active {
+  background: #2563eb !important;
+  color: #ffffff !important;
+  border-color: #2563eb !important;
+}
+.dark .table-filter-btn {
+  color: #94a3b8;
+  background: #1e293b;
+  border-color: #334155;
+}
+.dark .table-filter-btn:hover {
+  color: #f8fafc;
+  background: #334155;
+}
+.dark .table-filter-btn.active {
+  background: #38bdf8 !important;
+  color: #020617 !important;
+  border-color: #38bdf8 !important;
+}
+
+/* Day Separator Header in Table */
+.day-separator-row td {
+  background: #f1f5f9 !important;
+  padding: 8px 14px !important;
+}
+.dark .day-separator-row td {
+  background: #1e293b !important;
+}
+
+/* Table Row Selection & Hover */
+.table-row {
+  cursor: pointer;
+  user-select: none;
+}
+.table-row:hover {
+  background-color: rgba(0, 0, 0, 0.03);
+}
+.dark .table-row:hover {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+.table-row.is-active-row {
+  background-color: #eff6ff !important;
+}
+.dark .table-row.is-active-row {
+  background-color: #1e293b !important;
+}
+
+/* Mobile Details Expandable Panel */
+.mobile-details-panel {
+  border-top: 1px solid #e2e8f0;
+  background: #f8fafc;
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+}
+.dark .mobile-details-panel {
+  border-top: 1px solid #1f2937;
+  background: #0f172a;
+}

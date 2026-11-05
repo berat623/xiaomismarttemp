@@ -268,6 +268,33 @@ function getCompassDirection(deg) {
   return directions[index];
 }
 
+function getCompassDirectionName(deg) {
+  if (deg == null || isNaN(deg)) return 'Kuzey';
+  const names = [
+    'Kuzey (Yıldız)', 'Kuzey-Kuzeydoğu', 'Kuzeydoğu (Poyraz)', 'Doğu-Kuzeydoğu',
+    'Doğu (Gündoğusu)', 'Doğu-Güneydoğu', 'Güneydoğu (Keşişleme)', 'Güney-Güneydoğu',
+    'Güney (Kıble)', 'Güney-Güneybatı', 'Güneybatı (Lodos)', 'Batı-Güneybatı',
+    'Batı (Günbatısı)', 'Batı-Kuzeybatı', 'Kuzeybatı (Karayel)', 'Kuzey-Kuzeybatı'
+  ];
+  const index = Math.round(((deg % 360) + 360) % 360 / 22.5) % 16;
+  return names[index];
+}
+
+function getTemperatureColorClass(temp) {
+  if (temp == null || isNaN(temp)) return { bg: 'bg-slate-100 dark:bg-slate-800', text: 'text-slate-700 dark:text-slate-300', border: 'border-slate-200 dark:border-slate-700', label: 'Bilinmiyor' };
+  if (temp <= 0) {
+    return { bg: 'bg-indigo-50 dark:bg-indigo-950/40', text: 'text-indigo-600 dark:text-indigo-400', border: 'border-indigo-200 dark:border-indigo-800/40', label: 'Dondurucu' };
+  } else if (temp < 10) {
+    return { bg: 'bg-sky-50 dark:bg-sky-950/40', text: 'text-sky-600 dark:text-sky-400', border: 'border-sky-200 dark:border-sky-800/40', label: 'Soğuk' };
+  } else if (temp < 19) {
+    return { bg: 'bg-emerald-50 dark:bg-emerald-950/40', text: 'text-emerald-700 dark:text-emerald-400', border: 'border-emerald-200 dark:border-emerald-800/40', label: 'Serin / Ilık' };
+  } else if (temp < 28) {
+    return { bg: 'bg-amber-50 dark:bg-amber-950/40', text: 'text-amber-700 dark:text-amber-400', border: 'border-amber-200 dark:border-amber-800/40', label: 'Ilık / Sıcak' };
+  } else {
+    return { bg: 'bg-rose-50 dark:bg-rose-950/40', text: 'text-rose-700 dark:text-rose-400', border: 'border-rose-200 dark:border-rose-800/40', label: 'Çok Sıcak' };
+  }
+}
+
 function formatTurkeyDate(timeInput, options = {}) {
   const d = typeof timeInput === 'string' ? new Date(timeInput) : timeInput;
   return d.toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', ...options });
@@ -485,17 +512,44 @@ const googleWindArrowsPlugin = {
   }
 };
 
+const crosshairGuidePlugin = {
+  id: 'crosshairGuide',
+  afterDatasetsDraw(chart) {
+    if (chart.tooltip && chart.tooltip._active && chart.tooltip._active.length) {
+      const activePoint = chart.tooltip._active[0];
+      const ctx = chart.ctx;
+      const x = activePoint.element.x;
+      const topY = chart.chartArea.top;
+      const bottomY = chart.chartArea.bottom;
+      const isDark = document.documentElement.classList.contains('dark');
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.setLineDash([4, 3]);
+      ctx.moveTo(x, topY);
+      ctx.lineTo(x, bottomY);
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = isDark ? 'rgba(148, 163, 184, 0.45)' : 'rgba(100, 116, 139, 0.35)';
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+};
+
 if (typeof Chart !== 'undefined') {
   Chart.register(googleWindArrowsPlugin);
+  Chart.register(crosshairGuidePlugin);
 }
 
 // ==========================================
-// 7. MODELS GRAFİK YÖNETİCİSİ (PARAMETRE İZOLASYONLU)
+// 7. MODELS GRAFİK YÖNETİCİSİ (İNTERAKTİF, ANLAŞILIR & METRİK KARTLI)
 // ==========================================
 class ModelsChartManager {
   constructor(canvasId) {
     this.canvas = document.getElementById(canvasId);
     this.statPill = document.getElementById('chartStatPill');
+    this.legendContainer = document.getElementById('chartInteractiveLegend');
+    this.metricsContainer = document.getElementById('chartMetricsSummary');
     this.chart = null;
     this.mode = 'temp';
     this.scope = 'all'; // 'all' (Tüm Günler) veya 'day' (Seçili Gün)
@@ -521,25 +575,33 @@ class ModelsChartManager {
         animation: false,
         normalized: true,
         spanGaps: true,
-        // Mobil dokunma optimizasyonu: touchmove'u Chart.js yakalamasın, sayfa kayması pürüzsüz aksın
         events: ['mousemove', 'mouseout', 'click', 'touchstart'],
         interaction: { mode: 'index', intersect: false },
+        onClick: (event, elements) => {
+          if (elements && elements.length > 0) {
+            const idx = elements[0].index;
+            const rec = this.records[idx];
+            if (rec && window.modelsUI && typeof window.modelsUI.selectRecordFromChart === 'function') {
+              window.modelsUI.selectRecordFromChart(idx, rec);
+            }
+          }
+        },
         plugins: {
           legend: { display: false },
           googleWindArrows: { display: false, windData: [], datasetIndex: 0 },
           tooltip: {
             enabled: true,
             animation: false,
-            backgroundColor: isDark ? 'rgba(23, 30, 41, 0.98)' : 'rgba(255, 255, 255, 0.98)',
-            borderColor: isDark ? '#283343' : '#cbd5e1',
+            backgroundColor: isDark ? 'rgba(15, 23, 42, 0.98)' : 'rgba(255, 255, 255, 0.98)',
+            borderColor: isDark ? '#334155' : '#cbd5e1',
             borderWidth: 1.5,
             titleColor: isDark ? '#f8fafc' : '#0f172a',
             bodyColor: isDark ? '#cbd5e1' : '#334155',
-            padding: { top: 8, bottom: 8, left: 12, right: 12 },
+            padding: { top: 9, bottom: 9, left: 13, right: 13 },
             cornerRadius: 12,
-            boxPadding: 5,
+            boxPadding: 6,
             usePointStyle: true,
-            titleFont: { family: 'Poppins', size: 12, weight: 700 },
+            titleFont: { family: 'Poppins', size: 12, weight: 800 },
             bodyFont: { family: 'Poppins', size: 11, weight: 600 },
             callbacks: {
               title: (items) => {
@@ -547,7 +609,7 @@ class ModelsChartManager {
                 const idx = items[0].dataIndex;
                 const rec = this.records[idx];
                 if (rec) {
-                  const dayStr = formatTurkeyDate(rec.time, { day: '2-digit', month: 'short' });
+                  const dayStr = formatTurkeyDate(rec.time, { weekday: 'short', day: '2-digit', month: 'short' });
                   const timeStr = formatTurkeyDate(rec.time, { hour: '2-digit', minute: '2-digit' });
                   const hName = rec.hadise ? rec.hadise.name : '';
                   return `${dayStr} ${timeStr} · ${hName}`;
@@ -559,13 +621,14 @@ class ModelsChartManager {
                 if (val === null || val === undefined) return '';
                 const label = context.dataset.label || '';
                 
-                // Rüzgar modunda yön bilgisini de ekle
+                // Rüzgar modunda pusula adı ve açısını açıkça ekle
                 if (this.mode === 'wind' && label.includes('Rüzgar Hızı')) {
                   const idx = context.dataIndex;
                   const rec = this.records[idx];
                   if (rec && rec.ruzgarYonu != null) {
                     const dir = getCompassDirection(rec.ruzgarYonu);
-                    return ` ${label}: ${val} (${dir} ${rec.ruzgarYonu}°)`;
+                    const dirFull = getCompassDirectionName(rec.ruzgarYonu);
+                    return ` ${label}: ${val} (${dir} ${rec.ruzgarYonu}° - ${dirFull})`;
                   }
                 }
                 return ` ${label}: ${val}`;
@@ -576,7 +639,7 @@ class ModelsChartManager {
         scales: {
           x: {
             grid: {
-              color: isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.04)',
+              color: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
               borderDash: [3, 3]
             },
             ticks: {
@@ -586,8 +649,14 @@ class ModelsChartManager {
             }
           },
           y: {
+            title: {
+              display: true,
+              text: 'Sıcaklık (°C)',
+              color: isDark ? '#94a3b8' : '#64748b',
+              font: { family: 'Poppins', size: 10, weight: 700 }
+            },
             grid: {
-              color: isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.04)',
+              color: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
               borderDash: [3, 3]
             },
             ticks: {
@@ -595,10 +664,57 @@ class ModelsChartManager {
               font: { family: 'Poppins', size: 10, weight: 600 }
             },
             grace: '10%'
+          },
+          y1: {
+            display: false,
+            position: 'right',
+            title: {
+              display: true,
+              text: '',
+              color: isDark ? '#94a3b8' : '#64748b',
+              font: { family: 'Poppins', size: 10, weight: 700 }
+            },
+            grid: { drawOnChartArea: false },
+            ticks: {
+              color: isDark ? '#94a3b8' : '#64748b',
+              font: { family: 'Poppins', size: 10, weight: 600 }
+            }
           }
         }
       }
     });
+  }
+
+  updateTheme() {
+    if (!this.chart) return;
+    const isDark = document.documentElement.classList.contains('dark');
+    
+    // Tooltip renklerini tema uyumlu yap
+    if (this.chart.options.plugins.tooltip) {
+      this.chart.options.plugins.tooltip.backgroundColor = isDark ? 'rgba(15, 23, 42, 0.98)' : 'rgba(255, 255, 255, 0.98)';
+      this.chart.options.plugins.tooltip.borderColor = isDark ? '#334155' : '#cbd5e1';
+      this.chart.options.plugins.tooltip.titleColor = isDark ? '#f8fafc' : '#0f172a';
+      this.chart.options.plugins.tooltip.bodyColor = isDark ? '#cbd5e1' : '#334155';
+    }
+
+    const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
+    const tickColor = isDark ? '#94a3b8' : '#64748b';
+
+    if (this.chart.options.scales.x) {
+      this.chart.options.scales.x.grid.color = gridColor;
+      this.chart.options.scales.x.ticks.color = tickColor;
+    }
+    if (this.chart.options.scales.y) {
+      this.chart.options.scales.y.grid.color = gridColor;
+      this.chart.options.scales.y.ticks.color = tickColor;
+      if (this.chart.options.scales.y.title) this.chart.options.scales.y.title.color = tickColor;
+    }
+    if (this.chart.options.scales.y1) {
+      this.chart.options.scales.y1.ticks.color = tickColor;
+      if (this.chart.options.scales.y1.title) this.chart.options.scales.y1.title.color = tickColor;
+    }
+
+    this.update(this.allRecords, this.dayRecords);
   }
 
   setMode(mode) {
@@ -609,6 +725,193 @@ class ModelsChartManager {
   setScope(scope) {
     this.scope = scope;
     this.update(this.allRecords, this.dayRecords);
+  }
+
+  renderMetricsSummary(recs) {
+    if (!this.metricsContainer || !recs || recs.length === 0) return;
+    let cards = [];
+
+    if (this.mode === 'temp') {
+      const temps = recs.map(r => r.sicaklik);
+      const minT = Math.min(...temps);
+      const maxT = Math.max(...temps);
+      const avgT = (temps.reduce((a, b) => a + b, 0) / temps.length).toFixed(1);
+      const rangeT = (maxT - minT).toFixed(1);
+
+      cards = [
+        { icon: '🌡️', label: 'En Yüksek Sıcaklık', val: `${maxT}°C`, sub: 'Zirve Değeri', color: 'text-rose-600 dark:text-rose-400' },
+        { icon: '❄️', label: 'En Düşük Sıcaklık', val: `${minT}°C`, sub: 'Gece / Sabah', color: 'text-sky-600 dark:text-sky-400' },
+        { icon: '📊', label: 'Ortalama Sıcaklık', val: `${avgT}°C`, sub: 'Dönem Ortalaması', color: 'text-emerald-600 dark:text-emerald-400' },
+        { icon: '↔️', label: 'Sıcaklık Salınımı', val: `${rangeT}°C`, sub: 'Gece-Gündüz Farkı', color: 'text-slate-600 dark:text-slate-300' }
+      ];
+    } else if (this.mode === 'rain') {
+      const rains = recs.map(r => r.saatlikToplamYagis);
+      const totalR = rains.reduce((a, b) => a + b, 0).toFixed(1);
+      const maxR = Math.max(...rains);
+      const rainHours = rains.filter(r => r > 0).length;
+      const probs = recs.map(r => r.precipProb != null ? r.precipProb : 0);
+      const maxProb = Math.max(...probs);
+      const totalSnow = recs.reduce((a, b) => a + (b.snowfall || 0), 0).toFixed(1);
+
+      cards = [
+        { icon: '💧', label: 'Toplam Yağış', val: `${totalR} mm`, sub: 'Dönem Toplamı', color: 'text-blue-600 dark:text-sky-400' },
+        { icon: '🌧️', label: 'En Yoğun Saat', val: `${maxR} mm`, sub: 'Saatlik Zirve', color: 'text-indigo-600 dark:text-indigo-400' },
+        { icon: '⏱️', label: 'Yağışlı Süre', val: `${rainHours} sa`, sub: 'Yağış Beklenen Saatler', color: 'text-teal-600 dark:text-teal-400' },
+        { icon: Number(totalSnow) > 0 ? '❄️' : '🎯', label: Number(totalSnow) > 0 ? 'Toplam Kar' : 'Maksimum İhtimal', val: Number(totalSnow) > 0 ? `${totalSnow} cm` : `%${maxProb}`, sub: Number(totalSnow) > 0 ? 'Kar Örtüsü' : 'Model Yağış Olasılığı', color: 'text-emerald-600 dark:text-emerald-400' }
+      ];
+    } else if (this.mode === 'wind') {
+      const winds = recs.map(r => r.ruzgarHizi);
+      const maxW = Math.max(...winds);
+      const avgW = (winds.reduce((a, b) => a + b, 0) / winds.length).toFixed(1);
+      const gusts = recs.map(r => r.windGust || 0);
+      const maxGust = Math.max(...gusts);
+      
+      const dirCounts = {};
+      recs.forEach(r => {
+        const d = getCompassDirection(r.ruzgarYonu);
+        dirCounts[d] = (dirCounts[d] || 0) + 1;
+      });
+      let predomDir = 'K';
+      let maxCnt = 0;
+      for (const [k, v] of Object.entries(dirCounts)) {
+        if (v > maxCnt) { maxCnt = v; predomDir = k; }
+      }
+
+      cards = [
+        { icon: '🌪️', label: 'En Sert Hamle (Gust)', val: `${maxGust > 0 ? maxGust : maxW} km/h`, sub: 'Anlık Rüzgar Darbesi', color: 'text-amber-600 dark:text-amber-400' },
+        { icon: '💨', label: 'Maks. Ortalama Hız', val: `${maxW} km/h`, sub: '10m Sürekli Rüzgar', color: 'text-emerald-600 dark:text-emerald-400' },
+        { icon: '🧭', label: 'Hakim Rüzgar Yönü', val: predomDir, sub: 'En Sık Esen Yön', color: 'text-purple-600 dark:text-purple-400' },
+        { icon: '📊', label: 'Ortalama Rüzgar', val: `${avgW} km/h`, sub: 'Dönem Ortalama Hızı', color: 'text-slate-600 dark:text-slate-300' }
+      ];
+    } else if (this.mode === 'hum_cloud') {
+      const hums = recs.map(r => r.nem);
+      const avgHum = Math.round(hums.reduce((a, b) => a + b, 0) / hums.length);
+      const minHum = Math.min(...hums);
+      const maxHum = Math.max(...hums);
+      const clouds = recs.map(r => r.bulutKapaliligi);
+      const avgCloud = Math.round(clouds.reduce((a, b) => a + b, 0) / clouds.length);
+
+      cards = [
+        { icon: '💧', label: 'Ortalama Bağıl Nem', val: `%${avgHum}`, sub: `Aralık: %${minHum} - %${maxHum}`, color: 'text-teal-600 dark:text-teal-400' },
+        { icon: '☁️', label: 'Ortalama Bulut', val: `%${avgCloud}`, sub: avgCloud > 70 ? 'Genelde Kapalı' : (avgCloud > 35 ? 'Parçalı Bulutlu' : 'Genelde Açık'), color: 'text-slate-600 dark:text-slate-300' },
+        { icon: '🔻', label: 'En Düşük Nem', val: `%${minHum}`, sub: 'Günün En Kuru Saati', color: 'text-amber-600 dark:text-amber-400' },
+        { icon: '🔺', label: 'En Yüksek Nem', val: `%${maxHum}`, sub: 'Gece / Sabah Nemi', color: 'text-cyan-600 dark:text-cyan-400' }
+      ];
+    } else if (this.mode === 'pressure') {
+      const pressures = recs.map(r => r.basinc);
+      const minP = Math.min(...pressures);
+      const maxP = Math.max(...pressures);
+      const diffP = (maxP - minP).toFixed(1);
+      const trend = pressures[pressures.length - 1] > pressures[0] ? 'Yükselişte ↗' : (pressures[pressures.length - 1] < pressures[0] ? 'Düşüşte ↘' : 'Dengeli →');
+
+      cards = [
+        { icon: '⏱️', label: 'Maks. Basınç (MSL)', val: `${maxP} hPa`, sub: 'En Yüksek Değer', color: 'text-purple-600 dark:text-purple-400' },
+        { icon: '⏱️', label: 'Min. Basınç (MSL)', val: `${minP} hPa`, sub: 'En Düşük Değer', color: 'text-indigo-600 dark:text-indigo-400' },
+        { icon: '↔️', label: 'Basınç Değişimi', val: `${diffP} hPa`, sub: 'Toplam Fark', color: 'text-slate-600 dark:text-slate-300' },
+        { icon: '📈', label: 'Basınç Eğilimi', val: trend, sub: minP < 1010 ? 'Alçak Basınç Alanı' : (maxP > 1020 ? 'Yüksek Basınç' : 'Normal Basınç (1013)'), color: 'text-fuchsia-600 dark:text-fuchsia-400' }
+      ];
+    } else if (this.mode === 'cape') {
+      const capes = recs.map(r => r.cape || 0);
+      const maxCape = Math.max(...capes);
+      const capeRiskHours = capes.filter(c => c >= 300).length;
+      const cins = recs.map(r => r.cin != null ? r.cin : 0);
+      const minCin = Math.min(...cins);
+
+      let riskText = 'Sakin / Fırtına Yok';
+      let riskColor = 'text-emerald-600 dark:text-emerald-400';
+      if (maxCape > 1000) {
+        riskText = 'Şiddetli Fırtına & Dolu Riski';
+        riskColor = 'text-rose-600 dark:text-rose-400';
+      } else if (maxCape >= 300) {
+        riskText = 'Gök Gürültüsü / Fırtına Olası';
+        riskColor = 'text-amber-600 dark:text-amber-400';
+      }
+
+      cards = [
+        { icon: '⚡', label: 'Maks. CAPE Değeri', val: `${maxCape} J/kg`, sub: 'Tepe Kararsızlık', color: riskColor },
+        { icon: '⚠️', label: 'Fırtına Tehlikesi', val: maxCape > 1000 ? 'Yüksek Risk' : (maxCape >= 300 ? 'Orta Risk' : 'Düşük Risk'), sub: riskText, color: riskColor },
+        { icon: '⏱️', label: 'Kararsız Saatler', val: `${capeRiskHours} sa`, sub: 'CAPE >= 300 J/kg', color: 'text-amber-600 dark:text-amber-400' },
+        { icon: '🛑', label: 'CIN (Bastırma)', val: `${minCin} J/kg`, sub: 'Konveksiyon Engeli', color: 'text-slate-600 dark:text-slate-300' }
+      ];
+    } else if (this.mode === 'solar_uv') {
+      const uvs = recs.map(r => r.uvIndex != null ? r.uvIndex : 0);
+      const maxUv = Math.max(...uvs);
+      const totalSun = recs.reduce((a, b) => a + (b.sunshine || 0), 0);
+      const sunHours = recs.filter(r => (r.sunshine || 0) > 10).length;
+
+      let uvAdvice = 'Güvenli (Koruma gerekmez)';
+      if (maxUv >= 8) uvAdvice = 'Çok Yüksek (Gölge & Şapka)';
+      else if (maxUv >= 6) uvAdvice = 'Yüksek (Güneş kremi)';
+      else if (maxUv >= 3) uvAdvice = 'Orta (Önlem önerilir)';
+
+      cards = [
+        { icon: '☀️', label: 'Maks. UV İndeksi', val: `${maxUv}`, sub: uvAdvice, color: maxUv >= 6 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400' },
+        { icon: '⏳', label: 'Toplam Güneşlenme', val: `${Math.round(totalSun / 60)} sa`, sub: `${totalSun} dakika güneş`, color: 'text-yellow-600 dark:text-yellow-400' },
+        { icon: '☀️', label: 'Açık Güneşli Saat', val: `${sunHours} sa`, sub: 'Direkt Işıma Alan', color: 'text-amber-600 dark:text-amber-400' },
+        { icon: '🛡️', label: 'UV Koruma Durumu', val: maxUv >= 3 ? 'Koruma Gerekli' : 'Güvenli Aralık', sub: 'Cilt ve Göz Sağlığı', color: 'text-slate-600 dark:text-slate-300' }
+      ];
+    } else if (this.mode === 'visibility') {
+      const vis = recs.map(r => r.visibility != null ? r.visibility : 10);
+      const minVis = Math.min(...vis);
+      const avgVis = (vis.reduce((a, b) => a + b, 0) / vis.length).toFixed(1);
+      const vpds = recs.map(r => r.vpd != null ? r.vpd : 0);
+      const maxVpd = Math.max(...vpds);
+
+      cards = [
+        { icon: '👁️', label: 'En Düşük Görüş', val: `${minVis} km`, sub: minVis < 1 ? 'Yoğun Sis' : (minVis < 4 ? 'Pus / Hafif Sis' : 'Net Görüş'), color: minVis < 4 ? 'text-amber-600 dark:text-amber-400' : 'text-sky-600 dark:text-sky-400' },
+        { icon: '🌫️', label: 'Sis Riski', val: minVis < 2 ? 'Yüksek' : (minVis < 5 ? 'Orta' : 'Yok'), sub: 'Ulaşım ve Sürüş', color: minVis < 5 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400' },
+        { icon: '💨', label: 'Maks. Buhar Açığı (VPD)', val: `${maxVpd} kPa`, sub: 'Kuruluk / Terleme İndeksi', color: 'text-orange-600 dark:text-orange-400' },
+        { icon: '📊', label: 'Ortalama Görüş', val: `${avgVis} km`, sub: 'Atmosferik Açıklık', color: 'text-slate-600 dark:text-slate-300' }
+      ];
+    }
+
+    this.metricsContainer.innerHTML = cards.map(c => `
+      <div class="chart-metric-card">
+        <div class="flex items-center justify-between gap-1">
+          <span class="text-[9px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider truncate">${c.label}</span>
+          <span class="text-xs shrink-0">${c.icon}</span>
+        </div>
+        <div class="text-base sm:text-lg font-black font-mono ${c.color} tracking-tight mt-0.5 truncate">${c.val}</div>
+        <div class="text-[9px] text-slate-400 dark:text-slate-500 font-semibold truncate mt-0.5">${c.sub}</div>
+      </div>
+    `).join('');
+  }
+
+  renderInteractiveLegend() {
+    if (!this.legendContainer || !this.chart) return;
+    const datasets = this.chart.data.datasets || [];
+    if (datasets.length === 0) {
+      this.legendContainer.innerHTML = '';
+      return;
+    }
+
+    this.legendContainer.innerHTML = datasets.map((ds, idx) => {
+      const isVisible = this.chart.isDatasetVisible(idx);
+      const color = ds.borderColor || ds.backgroundColor || '#2563eb';
+      const isBar = ds.type === 'bar';
+      const isDashed = Array.isArray(ds.borderDash) && ds.borderDash.length > 0;
+
+      let swatchClass = 'swatch-line';
+      if (isBar) swatchClass = 'swatch-bar';
+      else if (isDashed) swatchClass = 'swatch-dashed';
+
+      return `
+        <button class="chart-legend-pill ${!isVisible ? 'is-hidden' : ''}" data-dataset="${idx}" title="Eğriyi grafikte aç / kapat">
+          <span class="legend-swatch ${swatchClass}" style="background-color: ${color}; border-color: ${color};"></span>
+          <span class="legend-label">${ds.label || 'Veri ' + (idx + 1)}</span>
+        </button>
+      `;
+    }).join('');
+
+    this.legendContainer.querySelectorAll('.chart-legend-pill').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const dsIdx = Number(e.currentTarget.dataset.dataset);
+        const curVis = this.chart.isDatasetVisible(dsIdx);
+        this.chart.setDatasetVisibility(dsIdx, !curVis);
+        this.chart.update('none');
+        e.currentTarget.classList.toggle('is-hidden', curVis);
+      });
+    });
   }
 
   update(allRecords, dayRecords) {
@@ -636,7 +939,7 @@ class ModelsChartManager {
       return timeStr;
     });
 
-    // Renk Paleti (Poppins & Apple Flat Tasarım)
+    // Renk Paleti (Poppins & Modern Tasarım)
     const tempColor = isDark ? '#f87171' : '#ef4444';
     const feelsColor = isDark ? '#fbbf24' : '#f59e0b';
     const rainColor = isDark ? '#38bdf8' : '#0284c7';
@@ -720,6 +1023,7 @@ class ModelsChartManager {
         }
       ];
 
+      this.chart.options.scales.y.title.text = 'Sıcaklık (°C)';
       this.chart.options.scales.y.ticks.callback = (v) => `${v}°C`;
 
     } else if (this.mode === 'rain') {
@@ -772,6 +1076,12 @@ class ModelsChartManager {
           position: 'right',
           min: 0,
           max: 100,
+          title: {
+            display: true,
+            text: 'Yağış İhtimali (%)',
+            color: isDark ? '#34d399' : '#10b981',
+            font: { family: 'Poppins', size: 10, weight: 700 }
+          },
           grid: { drawOnChartArea: false },
           ticks: {
             color: isDark ? '#34d399' : '#10b981',
@@ -781,6 +1091,7 @@ class ModelsChartManager {
         };
       }
 
+      this.chart.options.scales.y.title.text = 'Saatlik Yağış (mm)';
       this.chart.options.scales.y.ticks.callback = (v) => `${v} mm`;
 
     } else if (this.mode === 'wind') {
@@ -822,6 +1133,7 @@ class ModelsChartManager {
         });
       }
 
+      this.chart.options.scales.y.title.text = 'Rüzgar Hızı (km/h)';
       this.chart.options.scales.y.ticks.callback = (v) => `${v} km/h`;
 
     } else if (this.mode === 'hum_cloud') {
@@ -898,6 +1210,7 @@ class ModelsChartManager {
         });
       }
 
+      this.chart.options.scales.y.title.text = 'Oran (%)';
       this.chart.options.scales.y.ticks.callback = (v) => `%${v}`;
 
     } else if (this.mode === 'pressure') {
@@ -937,6 +1250,7 @@ class ModelsChartManager {
         });
       }
 
+      this.chart.options.scales.y.title.text = 'Basınç (hPa)';
       this.chart.options.scales.y.ticks.callback = (v) => `${v} hPa`;
 
     } else if (this.mode === 'cape') {
@@ -975,6 +1289,7 @@ class ModelsChartManager {
         });
       }
 
+      this.chart.options.scales.y.title.text = 'Kararsızlık Enerjisi (J/kg)';
       this.chart.options.scales.y.ticks.callback = (v) => `${v} J/kg`;
 
     } else if (this.mode === 'solar_uv') {
@@ -1019,6 +1334,12 @@ class ModelsChartManager {
           position: 'right',
           min: 0,
           max: 60,
+          title: {
+            display: true,
+            text: 'Güneşlenme (dk)',
+            color: isDark ? '#fbbf24' : '#d97706',
+            font: { family: 'Poppins', size: 10, weight: 700 }
+          },
           grid: { drawOnChartArea: false },
           ticks: {
             color: isDark ? '#fbbf24' : '#d97706',
@@ -1028,6 +1349,7 @@ class ModelsChartManager {
         };
       }
 
+      this.chart.options.scales.y.title.text = 'UV İndeksi';
       this.chart.options.scales.y.ticks.callback = (v) => `${v}`;
 
     } else if (this.mode === 'visibility') {
@@ -1036,7 +1358,7 @@ class ModelsChartManager {
       const minVis = Math.min(...visibilities);
       const vpds = recs.map(r => r.vpd != null ? r.vpd : 0);
       const maxVpd = Math.max(...vpds);
-      statText = `Min Görüş Mesafesi: ${minVis} km${maxVpd > 0 ? ` · Maks Buhar Açığı (VPD): ${maxVpd} kPa` : ''}`;
+      statText = `Min Görüş: ${minVis} km${maxVpd > 0 ? ` · Maks Buhar Açığı (VPD): ${maxVpd} kPa` : ''}`;
 
       datasets = [
         {
@@ -1071,6 +1393,12 @@ class ModelsChartManager {
         this.chart.options.scales.y1 = {
           display: true,
           position: 'right',
+          title: {
+            display: true,
+            text: 'Buhar Açığı (kPa)',
+            color: isDark ? '#fb923c' : '#ea580c',
+            font: { family: 'Poppins', size: 10, weight: 700 }
+          },
           grid: { drawOnChartArea: false },
           ticks: {
             color: isDark ? '#fb923c' : '#ea580c',
@@ -1080,6 +1408,7 @@ class ModelsChartManager {
         };
       }
 
+      this.chart.options.scales.y.title.text = 'Görüş Mesafesi (km)';
       this.chart.options.scales.y.ticks.callback = (v) => `${v} km`;
     }
 
@@ -1096,6 +1425,10 @@ class ModelsChartManager {
     };
 
     this.chart.update('none');
+
+    // İnteraktif Gösterge ve Özet Metrik Kartlarını Güncelle
+    this.renderMetricsSummary(recs);
+    this.renderInteractiveLegend();
   }
 }
 
@@ -1105,13 +1438,13 @@ class ModelsChartManager {
 class ModelsUIController {
   constructor() {
     this.activeModelKey = localStorage.getItem('models_active_model') || 'ecmwf';
-    // Eğer localStorage'da eski mgm kalmışsa varsayılan ecmwf'e geçir
     if (this.activeModelKey === 'mgm') {
       this.activeModelKey = 'ecmwf';
       localStorage.setItem('models_active_model', 'ecmwf');
     }
 
     this.selectedDay = null; // null ise otomatik olarak bugünün tarihine ayarlanır
+    this.tableFilter = 'all'; // 'all', 'rain', 'daytime', 'nighttime'
     this.selectedIndex = 0;
     this.chartManager = null;
     this.dom = {};
@@ -1188,8 +1521,10 @@ class ModelsUIController {
       heroCape: document.getElementById('heroCape'),
       heroCapeContainer: document.getElementById('heroCapeContainer'),
 
-      // Günlük Filtreleme Şeridi
+      // Günlük Filtreleme Şeridi & Tablo Filtresi
       dayFilterTrack: document.getElementById('dayFilterTrack'),
+      tableFilterTrack: document.getElementById('tableFilterTrack'),
+      tableRecordCountBadge: document.getElementById('tableRecordCountBadge'),
 
       // Desktop Tablo & Mobil Liste
       desktopTableBody: document.getElementById('desktopTableBody'),
@@ -1230,6 +1565,33 @@ class ModelsUIController {
         this.render();
       });
     }
+
+    // Hızlı Saat / Hadise Filtreleme Sekmeleri (Tümü / Yağışlı / Gündüz / Gece)
+    if (this.dom.tableFilterTrack) {
+      this.dom.tableFilterTrack.addEventListener('click', (e) => {
+        const btn = e.target.closest('.table-filter-btn');
+        if (!btn) return;
+        this.tableFilter = btn.dataset.filter || 'all';
+        this.dom.tableFilterTrack.querySelectorAll('.table-filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        const filtered = this.getFilteredRecords();
+        this.selectedIndex = 0;
+        this.renderTable(filtered);
+        this.renderMobileList(filtered);
+      });
+    }
+
+    // Ekran boyutu değiştiğinde masaüstü tablo / mobil liste geçişini optimize et
+    let resizeTimer = null;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        const filtered = this.getFilteredRecords();
+        this.renderTable(filtered);
+        this.renderMobileList(filtered);
+      }, 150);
+    });
 
     // Mobil Liste Olay Delegasyonu (Tek bir dinleyici ile ultra-hızlı seçim)
     if (this.dom.mobileListContainer) {
@@ -1330,9 +1692,44 @@ class ModelsUIController {
   getFilteredRecords() {
     const all = this.activeService.records;
     if (!all || all.length === 0) return [];
-    if (this.selectedDay === 'all') return all;
+    
+    let res = all;
+    // 1. Gün filtresi
+    if (this.selectedDay && this.selectedDay !== 'all') {
+      res = res.filter(r => getTurkeyDayKey(r.time) === this.selectedDay);
+    }
 
-    return all.filter(r => getTurkeyDayKey(r.time) === this.selectedDay);
+    // 2. Saat / Hadise filtresi (Tümü, Yağışlı, Gündüz, Gece)
+    if (this.tableFilter === 'rain') {
+      res = res.filter(r => (r.saatlikToplamYagis > 0 || r.snowfall > 0 || (r.precipProb != null && r.precipProb >= 35)));
+    } else if (this.tableFilter === 'daytime') {
+      res = res.filter(r => {
+        if (r.isDay != null) return r.isDay === 1;
+        const h = Number(formatTurkeyDate(r.time, { hour: 'numeric', hourCycle: 'h23' }));
+        return h >= 6 && h < 20;
+      });
+    } else if (this.tableFilter === 'nighttime') {
+      res = res.filter(r => {
+        if (r.isDay != null) return r.isDay === 0;
+        const h = Number(formatTurkeyDate(r.time, { hour: 'numeric', hourCycle: 'h23' }));
+        return h < 6 || h >= 20;
+      });
+    }
+
+    return res;
+  }
+
+  resetTableFilter() {
+    this.tableFilter = 'all';
+    if (this.dom.tableFilterTrack) {
+      this.dom.tableFilterTrack.querySelectorAll('.table-filter-btn').forEach(btn => {
+        if (btn.dataset.filter === 'all') btn.classList.add('active');
+        else btn.classList.remove('active');
+      });
+    }
+    const filtered = this.getFilteredRecords();
+    this.renderTable(filtered);
+    this.renderMobileList(filtered);
   }
 
   selectRecord(idx) {
@@ -1340,32 +1737,46 @@ class ModelsUIController {
     if (!filteredRecs || filteredRecs.length === 0) return;
     this.selectedIndex = Math.max(0, Math.min(idx, filteredRecs.length - 1));
 
-    // Sadece Hero Card ve satır seçim sınıflarını güncelle (sıfır DOM reflow)
+    // Sadece Hero Card ve satır seçim sınıflarını güncelle
     const cur = filteredRecs[this.selectedIndex];
     if (cur) {
       this.renderHeroCard(cur);
     }
 
-    if (this.dom.mobileListContainer) {
-      this.dom.mobileListContainer.querySelectorAll('.mobile-forecast-row').forEach(row => {
-        const rIdx = Number(row.dataset.index);
-        if (rIdx === this.selectedIndex) {
-          row.classList.add('selected');
-        } else {
-          row.classList.remove('selected');
-        }
-      });
-    }
+    // Mobilde seçili satırın detay panelini güncelle
+    this.renderMobileList(filteredRecs);
 
     if (this.dom.desktopTableBody) {
       this.dom.desktopTableBody.querySelectorAll('.table-row').forEach(row => {
         const rIdx = Number(row.dataset.index);
         if (rIdx === this.selectedIndex) {
-          row.classList.add('bg-blue-500/15', 'dark:bg-sky-400/20', 'font-bold');
+          row.classList.add('bg-blue-500/15', 'dark:bg-sky-400/20', 'font-bold', 'is-active-row');
         } else {
-          row.classList.remove('bg-blue-500/15', 'dark:bg-sky-400/20', 'font-bold');
+          row.classList.remove('bg-blue-500/15', 'dark:bg-sky-400/20', 'font-bold', 'is-active-row');
         }
       });
+    }
+  }
+
+  selectRecordFromChart(idx, rec) {
+    if (!rec) return;
+    const filtered = this.getFilteredRecords();
+    const foundIdx = filtered.findIndex(r => r.time === rec.time);
+    if (foundIdx !== -1) {
+      this.selectRecord(foundIdx);
+
+      // İlgili satıra yumuşakça odaklan
+      if (window.innerWidth >= 768 && this.dom.desktopTableBody) {
+        const row = this.dom.desktopTableBody.querySelector(`[data-index="${foundIdx}"]`);
+        if (row) {
+          row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      } else if (this.dom.mobileListContainer) {
+        const card = this.dom.mobileListContainer.querySelector(`[data-index="${foundIdx}"]`);
+        if (card) {
+          card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }
     }
   }
 
@@ -1395,7 +1806,8 @@ class ModelsUIController {
 
     // Rüzgar ve Pusula
     const windDir = getCompassDirection(cur.ruzgarYonu);
-    if (this.dom.heroWind) this.dom.heroWind.textContent = `${cur.ruzgarHizi} km/h (${windDir} ${cur.ruzgarYonu}°)`;
+    const windDirFull = getCompassDirectionName(cur.ruzgarYonu);
+    if (this.dom.heroWind) this.dom.heroWind.textContent = `${cur.ruzgarHizi} km/h (${windDir} ${cur.ruzgarYonu}° - ${windDirFull})`;
     
     if (this.dom.heroWindGust) {
       if (cur.windGust != null && cur.windGust > 0) {
@@ -1487,10 +1899,14 @@ class ModelsUIController {
 
     // Grafik Güncellemesi: Varsayılan tüm veriyi gösterir, seçili gün istenirse o güne odaklanır
     if (this.chartManager) {
-      this.chartManager.update(allRecs, filteredRecs);
+      // Gün verisi olarak o günün tüm 24 saatini gönder (saat filtresinden bağımsız tam eğri)
+      const dayAllRecs = this.selectedDay && this.selectedDay !== 'all' 
+        ? allRecs.filter(r => getTurkeyDayKey(r.time) === this.selectedDay) 
+        : allRecs;
+      this.chartManager.update(allRecs, dayAllRecs);
     }
 
-    // Tablo ve Mobil Liste Render (Seçili Güne Göre)
+    // Tablo ve Mobil Liste Render (Filtrelenmiş verilere göre)
     this.renderTable(filteredRecs);
     this.renderMobileList(filteredRecs);
 
@@ -1547,7 +1963,11 @@ class ModelsUIController {
   renderTable(recs) {
     if (!this.dom.desktopTableBody) return;
 
-    // Mobil optimizasyonu: Mobil ekranda gizli olan geniş tablonun DOM'unu oluşturmayı atla
+    if (this.dom.tableRecordCountBadge) {
+      this.dom.tableRecordCountBadge.textContent = `${recs.length} saat`;
+    }
+
+    // Mobil ekranda geniş tablonun DOM'unu oluşturmayı atla
     if (window.innerWidth < 768) {
       this.dom.desktopTableBody.innerHTML = '';
       return;
@@ -1556,63 +1976,165 @@ class ModelsUIController {
     if (!recs || recs.length === 0) {
       this.dom.desktopTableBody.innerHTML = `
         <tr>
-          <td colspan="9" class="py-6 text-center text-[#475569] dark:text-[#94a3b8] font-bold">
-            Bu gün için model tahmini bulunmuyor.
+          <td colspan="9" class="py-8 text-center text-slate-500 dark:text-slate-400 font-bold">
+            <div class="flex flex-col items-center justify-center gap-1.5">
+              <span class="text-xl">🔍</span>
+              <span>Bu filtre kriterine uyan saatlik tahmin kaydı bulunmuyor.</span>
+              <button class="text-blue-600 dark:text-sky-400 text-xs font-semibold underline mt-1 cursor-pointer" onclick="window.modelsUI.resetTableFilter()">Tüm saatleri göster</button>
+            </div>
           </td>
         </tr>
       `;
       return;
     }
 
-    this.dom.desktopTableBody.innerHTML = recs.map((r, i) => {
+    let lastDayKey = null;
+    let html = '';
+
+    recs.forEach((r, i) => {
       const hInfo = r.hadise || { name: 'Hava Durumu', type: 'cloudy' };
-      const timeStr = `${formatTurkeyDate(r.time, { weekday: 'short', day: '2-digit', month: '2-digit' })} ${formatTurkeyDate(r.time, { hour: '2-digit', minute: '2-digit' })}`;
+      const dKey = getTurkeyDayKey(r.time);
+      const isMultiDay = this.selectedDay === 'all';
+
+      // Eğer "Tüm Günler" seçiliyse, gün değişimlerinde şık gün ayracı satırı ekle
+      if (isMultiDay && dKey !== lastDayKey) {
+        lastDayKey = dKey;
+        const dayDate = formatTurkeyDate(r.time, { day: 'numeric', month: 'long', weekday: 'long' });
+        const daySubset = recs.filter(x => getTurkeyDayKey(x.time) === dKey);
+        const dayTemps = daySubset.map(x => x.sicaklik);
+        const dayMinT = Math.round(Math.min(...dayTemps));
+        const dayMaxT = Math.round(Math.max(...dayTemps));
+        const dayTotalRain = daySubset.reduce((sum, x) => sum + (x.saatlikToplamYagis || 0), 0).toFixed(1);
+        const dayMaxWind = Math.round(Math.max(...daySubset.map(x => x.ruzgarHizi || 0)));
+
+        html += `
+          <tr class="day-separator-row border-y border-slate-200 dark:border-slate-700/80">
+            <td colspan="9" class="py-2.5 px-3 bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-extrabold">
+              <div class="flex items-center justify-between gap-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm">📅</span>
+                  <span class="text-xs uppercase tracking-wide font-extrabold text-blue-700 dark:text-sky-400">${dayDate}</span>
+                  <span class="text-[10px] font-semibold text-slate-500 dark:text-slate-400">(${daySubset.length} Saat)</span>
+                </div>
+                <div class="flex items-center gap-2.5 text-[11px] font-mono">
+                  <span class="px-2 py-0.5 rounded-full bg-slate-200/80 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold">🌡️ ${dayMinT}° / ${dayMaxT}°C</span>
+                  ${Number(dayTotalRain) > 0 ? `<span class="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-sky-300 font-bold">💧 ${dayTotalRain} mm</span>` : ''}
+                  <span class="px-2 py-0.5 rounded-full bg-slate-200/80 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold">💨 Maks ${dayMaxWind} km/h</span>
+                </div>
+              </div>
+            </td>
+          </tr>
+        `;
+      }
+
       const hourVal = Number(formatTurkeyDate(r.time, { hour: 'numeric', hourCycle: 'h23' }));
       const isNight = r.isDay !== null && r.isDay !== undefined ? r.isDay === 0 : (hourVal < 6 || hourVal >= 20);
-      const windDir = getCompassDirection(r.ruzgarYonu);
+      const hourStr = formatTurkeyDate(r.time, { hour: '2-digit', minute: '2-digit' });
+      const dateStr = formatTurkeyDate(r.time, { weekday: 'short', day: '2-digit', month: 'short' });
       const isSelected = i === this.selectedIndex;
+      const windDir = getCompassDirection(r.ruzgarYonu);
+      const windDirFullName = getCompassDirectionName(r.ruzgarYonu);
+      const tempStyle = getTemperatureColorClass(r.sicaklik);
 
-      return `
-        <tr class="table-row cursor-pointer select-none border-b border-black/5 dark:border-white/5 ${isSelected ? 'bg-blue-500/15 dark:bg-sky-400/20 font-bold' : 'hover:bg-black/5 dark:hover:bg-white/5'}" data-index="${i}">
-          <td class="py-2 px-3 text-[#0f172a] dark:text-[#f8fafc] font-mono text-[11px] font-bold whitespace-nowrap">${timeStr}</td>
-          <td class="py-2 px-3 whitespace-nowrap">
+      // CAPE Stili
+      let capeHtml = '<span class="text-slate-400 font-mono text-[10px]">-</span>';
+      if (r.cape != null && r.cape > 0) {
+        if (r.cape >= 1000) {
+          capeHtml = `<span class="px-1.5 py-0.5 rounded bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800/40 font-mono font-extrabold text-[10px]" title="Şiddetli fırtına ve dolu tehlikesi">⚠️ ${r.cape} J/kg</span>`;
+        } else if (r.cape >= 300) {
+          capeHtml = `<span class="px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40 font-mono font-bold text-[10px]" title="Orta fırtına / gökgürültüsü riski">⚡ ${r.cape} J/kg</span>`;
+        } else {
+          capeHtml = `<span class="text-slate-500 dark:text-slate-400 font-mono text-[10px]">${r.cape} J/kg</span>`;
+        }
+      }
+
+      // Yağış Stili
+      let rainHtml = '';
+      if (r.saatlikToplamYagis > 0) {
+        rainHtml = `
+          <div class="flex items-center gap-1 font-mono">
+            <span class="px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-[#2563eb] dark:text-[#60a5fa] font-extrabold border border-blue-200 dark:border-blue-800/50 whitespace-nowrap">
+              💧 ${r.saatlikToplamYagis} mm
+            </span>
+            ${r.precipProb != null ? `<span class="px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 text-[10px] font-bold border border-emerald-200 dark:border-emerald-800/40" title="Yağış ihtimali">%${r.precipProb}</span>` : ''}
+            ${r.snowfall > 0 ? `<span class="px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400 text-[10px] font-bold border border-indigo-200 dark:border-indigo-800/40" title="Kar miktarı">❄️ ${r.snowfall}cm</span>` : ''}
+          </div>
+        `;
+      } else {
+        rainHtml = `
+          <div class="flex items-center gap-1 font-mono text-slate-400 dark:text-slate-500 text-[11px]">
+            <span>0 mm</span>
+            ${(r.precipProb != null && r.precipProb >= 30) ? `<span class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] font-bold border border-slate-200 dark:border-slate-700" title="Yağış ihtimali">%${r.precipProb} iht.</span>` : ''}
+          </div>
+        `;
+      }
+
+      // Bulut Açıklaması
+      let cloudDesc = 'Açık';
+      if (r.bulutKapaliligi > 80) cloudDesc = 'Kapalı';
+      else if (r.bulutKapaliligi > 45) cloudDesc = 'Parçalı';
+      else if (r.bulutKapaliligi > 15) cloudDesc = 'Az Bulutlu';
+
+      html += `
+        <tr class="table-row cursor-pointer select-none border-b border-black/5 dark:border-white/5 ${isSelected ? 'bg-blue-500/15 dark:bg-sky-400/20 font-bold is-active-row' : 'hover:bg-black/5 dark:hover:bg-white/5'}" data-index="${i}">
+          <td class="py-2.5 px-3 whitespace-nowrap">
             <div class="flex items-center gap-1.5">
-              ${Meteocons.getSvg(hInfo.type, 22, isNight)}
+              <span class="text-xs font-mono font-black text-[#0f172a] dark:text-[#f8fafc]">${hourStr}</span>
+              <span class="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">(${dateStr})</span>
+            </div>
+          </td>
+          <td class="py-2.5 px-3 whitespace-nowrap">
+            <div class="flex items-center gap-2">
+              <div class="w-6 h-6 flex items-center justify-center shrink-0">
+                ${Meteocons.getSvg(hInfo.type, 24, isNight)}
+              </div>
               <span class="font-extrabold text-[#0f172a] dark:text-[#f8fafc]">${hInfo.name}</span>
             </div>
           </td>
-          <td class="py-2 px-3 font-mono whitespace-nowrap">
-            <span class="text-xs font-black text-[#0f172a] dark:text-[#f8fafc]">${Math.round(r.sicaklik)}°</span>
-            <span class="text-[10px] text-[#475569] dark:text-[#94a3b8] font-bold">(${Math.round(r.hissedilenSicaklik)}°)</span>
-          </td>
-          <td class="py-2 px-3 font-mono whitespace-nowrap">
-            ${r.saatlikToplamYagis > 0
-              ? `<span class="font-extrabold text-[#2563eb] dark:text-[#60a5fa]">${r.saatlikToplamYagis} mm</span>`
-              : `<span class="text-[#64748b] dark:text-[#94a3b8]">0 mm</span>`
-            }
-          </td>
-          <td class="py-2 px-3 whitespace-nowrap">
-            <div class="flex items-center gap-1 font-mono text-[#15803d] dark:text-[#4ade80] font-extrabold">
-              <span class="inline-block transform" style="transform: rotate(${r.ruzgarYonu}deg);">➤</span>
-              <span>${r.ruzgarHizi} km/h</span>
-              <span class="text-[10px] text-[#475569] dark:text-[#94a3b8]">(${windDir})</span>
-              ${r.windGust ? `<span class="text-[10px] text-[#d97706] font-bold">[${r.windGust}]</span>` : ''}
+          <td class="py-2.5 px-3 whitespace-nowrap">
+            <div class="flex items-center gap-1.5">
+              <span class="px-2 py-0.5 rounded-lg ${tempStyle.bg} ${tempStyle.text} border ${tempStyle.border} font-mono font-black text-xs">
+                ${Math.round(r.sicaklik)}°C
+              </span>
+              <span class="text-[10px] text-slate-500 dark:text-slate-400 font-mono font-bold" title="Hissedilen sıcaklık">
+                His: ${Math.round(r.hissedilenSicaklik)}°
+              </span>
             </div>
           </td>
-          <td class="py-2 px-3 font-mono text-[#0f766e] dark:text-[#2dd4bf] font-extrabold whitespace-nowrap">
-            %${r.nem}
-            ${r.dewPoint != null ? `<span class="text-[10px] text-[#475569] dark:text-[#94a3b8] font-bold">(${Math.round(r.dewPoint)}°)</span>` : ''}
+          <td class="py-2.5 px-3 whitespace-nowrap">
+            ${rainHtml}
           </td>
-          <td class="py-2 px-3 font-mono text-[#7e22ce] dark:text-[#c084fc] font-extrabold whitespace-nowrap">${r.basinc} hPa</td>
-          <td class="py-2 px-3 font-mono text-[#475569] dark:text-[#94a3b8] font-extrabold whitespace-nowrap">%${r.bulutKapaliligi}</td>
-          ${r.cape != null ? `
-            <td class="py-2 px-3 font-mono ${r.cape > 300 ? 'text-[#ea580c] font-black' : 'text-[#64748b] dark:text-[#94a3b8] font-bold'} whitespace-nowrap">
-              ${r.cape} J/kg
-            </td>
-          ` : '<td class="py-2 px-3 font-mono text-[#64748b] text-[10px]">--</td>'}
+          <td class="py-2.5 px-3 whitespace-nowrap">
+            <div class="flex items-center gap-1.5 font-mono">
+              <span class="inline-block transform text-[#15803d] dark:text-[#4ade80] text-xs font-extrabold" style="transform: rotate(${r.ruzgarYonu}deg);">➤</span>
+              <span class="text-[#15803d] dark:text-[#4ade80] font-black text-xs">${r.ruzgarHizi} km/h</span>
+              <span class="text-[10px] text-slate-500 dark:text-slate-400 font-bold" title="${windDirFullName} (${r.ruzgarYonu}°)">${windDir}</span>
+              ${(r.windGust != null && r.windGust > r.ruzgarHizi + 4) ? `<span class="px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 font-bold text-[10px] border border-amber-200 dark:border-amber-800/40" title="En yüksek anlık hamle">Hamle: ${r.windGust}</span>` : ''}
+            </div>
+          </td>
+          <td class="py-2.5 px-3 whitespace-nowrap font-mono">
+            <div class="flex items-center gap-1.5">
+              <span class="text-[#0f766e] dark:text-[#2dd4bf] font-extrabold text-xs">%${r.nem}</span>
+              ${r.dewPoint != null ? `<span class="text-[10px] px-1 py-0.5 rounded bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-400 border border-teal-200 dark:border-teal-800/40 font-bold" title="Çiy noktası sıcaklığı">Çiy: ${Math.round(r.dewPoint)}°</span>` : ''}
+            </div>
+          </td>
+          <td class="py-2.5 px-3 font-mono text-[#7e22ce] dark:text-[#c084fc] font-bold whitespace-nowrap">
+            ${r.basinc} hPa
+          </td>
+          <td class="py-2.5 px-3 font-mono whitespace-nowrap">
+            <div class="flex items-center gap-1">
+              <span class="text-[#475569] dark:text-[#94a3b8] font-black text-xs">%${r.bulutKapaliligi}</span>
+              <span class="text-[10px] text-slate-400 dark:text-slate-500 font-semibold">(${cloudDesc})</span>
+            </div>
+          </td>
+          <td class="py-2.5 px-3 whitespace-nowrap">
+            ${capeHtml}
+          </td>
         </tr>
       `;
-    }).join('');
+    });
+
+    this.dom.desktopTableBody.innerHTML = html;
 
     this.dom.desktopTableBody.querySelectorAll('.table-row').forEach(row => {
       row.addEventListener('click', (e) => {
@@ -1627,53 +2149,131 @@ class ModelsUIController {
 
     if (!recs || recs.length === 0) {
       this.dom.mobileListContainer.innerHTML = `
-        <div class="p-4 text-center text-xs text-[#475569] dark:text-[#94a3b8] font-bold">
-          Bu gün için model tahmini bulunmuyor.
+        <div class="p-6 text-center text-xs text-slate-500 dark:text-slate-400 font-bold">
+          <div class="flex flex-col items-center justify-center gap-1.5">
+            <span class="text-xl">🔍</span>
+            <span>Bu filtre kriterine uyan saatlik tahmin kaydı bulunmuyor.</span>
+            <button class="text-blue-600 dark:text-sky-400 text-xs font-semibold underline mt-1 cursor-pointer" onclick="window.modelsUI.resetTableFilter()">Tüm saatleri göster</button>
+          </div>
         </div>
       `;
       return;
     }
 
-    const html = recs.map((r, i) => {
+    let lastDayKey = null;
+    let html = '';
+
+    recs.forEach((r, i) => {
       const hInfo = r.hadise || { name: 'Hava Durumu', type: 'cloudy' };
-      const hourStr = formatTurkeyDate(r.time, { hour: '2-digit', minute: '2-digit' });
-      const dayStr = formatTurkeyDate(r.time, { weekday: 'short', day: 'numeric', month: 'short' });
+      const dKey = getTurkeyDayKey(r.time);
+      const isMultiDay = this.selectedDay === 'all';
+
+      // Eğer "Tüm Günler" seçiliyse, gün değişimlerinde şık gün ayracı ekle
+      if (isMultiDay && dKey !== lastDayKey) {
+        lastDayKey = dKey;
+        const dayDate = formatTurkeyDate(r.time, { day: 'numeric', month: 'long', weekday: 'long' });
+        const daySubset = recs.filter(x => getTurkeyDayKey(x.time) === dKey);
+        const dayTemps = daySubset.map(x => x.sicaklik);
+        const dayMinT = Math.round(Math.min(...dayTemps));
+        const dayMaxT = Math.round(Math.max(...dayTemps));
+        const dayTotalRain = daySubset.reduce((sum, x) => sum + (x.saatlikToplamYagis || 0), 0).toFixed(1);
+
+        html += `
+          <div class="day-separator-header p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-between text-xs font-bold text-slate-800 dark:text-slate-100 my-1">
+            <div class="flex items-center gap-1.5">
+              <span>📅</span>
+              <span class="uppercase tracking-wide text-blue-700 dark:text-sky-400 font-extrabold">${dayDate}</span>
+            </div>
+            <div class="flex items-center gap-2 text-[11px] font-mono">
+              <span>🌡️ ${dayMinT}° / ${dayMaxT}°</span>
+              ${Number(dayTotalRain) > 0 ? `<span class="text-blue-600 dark:text-sky-400 font-bold">💧 ${dayTotalRain} mm</span>` : ''}
+            </div>
+          </div>
+        `;
+      }
+
       const hourVal = Number(formatTurkeyDate(r.time, { hour: 'numeric', hourCycle: 'h23' }));
       const isNight = r.isDay !== null && r.isDay !== undefined ? r.isDay === 0 : (hourVal < 6 || hourVal >= 20);
+      const hourStr = formatTurkeyDate(r.time, { hour: '2-digit', minute: '2-digit' });
+      const dayStr = formatTurkeyDate(r.time, { weekday: 'short', day: 'numeric', month: 'short' });
       const isSelected = i === this.selectedIndex;
       const windDir = getCompassDirection(r.ruzgarYonu);
+      const windDirFullName = getCompassDirectionName(r.ruzgarYonu);
+      const tempStyle = getTemperatureColorClass(r.sicaklik);
 
-      return `
-        <div class="mobile-forecast-row px-2.5 py-2 rounded-xl cursor-pointer select-none flex items-center justify-between gap-1.5 w-full ${isSelected ? 'selected' : ''}" data-index="${i}">
-          <!-- Sol: Saat + İkon + Hadise Adı -->
-          <div class="flex items-center gap-2 min-w-0 flex-1">
-            <span class="text-xs font-mono font-bold text-[#475569] dark:text-[#94a3b8] w-11 shrink-0">${hourStr}</span>
-            <div class="shrink-0 w-7 h-7 flex items-center justify-center">
-              ${Meteocons.getSvg(hInfo.type, 26, isNight)}
+      html += `
+        <div class="mobile-forecast-row rounded-xl cursor-pointer select-none overflow-hidden ${isSelected ? 'selected' : ''}" data-index="${i}">
+          <div class="p-2.5 flex items-center justify-between gap-2 w-full">
+            <!-- Sol: Saat + İkon + Hadise Adı -->
+            <div class="flex items-center gap-2 min-w-0 flex-1">
+              <span class="text-xs font-mono font-black text-[#0f172a] dark:text-[#f8fafc] w-11 shrink-0">${hourStr}</span>
+              <div class="shrink-0 w-8 h-8 flex items-center justify-center">
+                ${Meteocons.getSvg(hInfo.type, 28, isNight)}
+              </div>
+              <div class="min-w-0 flex-1">
+                <div class="text-xs font-black text-[#0f172a] dark:text-[#f8fafc] truncate leading-tight">${hInfo.name}</div>
+                <div class="text-[10px] text-slate-500 dark:text-slate-400 font-semibold truncate">${dayStr}</div>
+              </div>
             </div>
-            <div class="min-w-0 flex-1">
-              <div class="text-xs font-bold text-[#0f172a] dark:text-[#f8fafc] truncate leading-tight">${hInfo.name}</div>
-              <div class="text-[10px] text-[#64748b] dark:text-[#94a3b8] font-semibold truncate">${dayStr}</div>
+
+            <!-- Orta: Yağış & Rüzgar Rozetleri -->
+            <div class="flex items-center gap-1.5 shrink-0 text-[11px] font-mono">
+              ${r.saatlikToplamYagis > 0 ? `<span class="text-[#2563eb] dark:text-[#38bdf8] font-black whitespace-nowrap bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800/50 px-1.5 py-0.5 rounded-md">💧${r.saatlikToplamYagis}mm</span>` : ''}
+              <span class="text-[#15803d] dark:text-[#4ade80] font-black whitespace-nowrap flex items-center gap-1 bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-800/40 px-1.5 py-0.5 rounded-md">
+                <span class="inline-block transform" style="transform: rotate(${r.ruzgarYonu}deg);">➤</span>
+                <span>${r.ruzgarHizi}</span>
+                <span class="text-[9px] font-bold text-slate-500 dark:text-slate-400">${windDir}</span>
+              </span>
+            </div>
+
+            <!-- Sağ: Sıcaklık & Hissedilen -->
+            <div class="text-right shrink-0 min-w-[50px]">
+              <span class="px-2 py-0.5 rounded-lg ${tempStyle.bg} ${tempStyle.text} border ${tempStyle.border} text-xs font-mono font-black block">
+                ${Math.round(r.sicaklik)}°C
+              </span>
+              <span class="text-[10px] font-mono text-slate-500 dark:text-slate-400 font-bold block leading-none mt-1">
+                His: ${Math.round(r.hissedilenSicaklik)}°
+              </span>
             </div>
           </div>
 
-          <!-- Orta: Yağış & Rüzgar -->
-          <div class="flex items-center gap-1 shrink-0 text-[11px] font-mono">
-            ${r.saatlikToplamYagis > 0 ? `<span class="text-[#2563eb] dark:text-[#38bdf8] font-extrabold whitespace-nowrap bg-blue-50 dark:bg-blue-950/40 px-1.5 py-0.5 rounded">💧${r.saatlikToplamYagis}mm</span>` : ''}
-            <span class="text-[#15803d] dark:text-[#4ade80] font-extrabold whitespace-nowrap flex items-center gap-0.5">
-              <span class="inline-block transform" style="transform: rotate(${r.ruzgarYonu}deg);">➤</span>
-              ${r.ruzgarHizi} <span class="text-[9px] font-normal text-[#64748b] dark:text-[#94a3b8]">(${windDir})</span>
-            </span>
-          </div>
-
-          <!-- Sağ: Sıcaklık & Hissedilen -->
-          <div class="text-right shrink-0 min-w-[44px]">
-            <span class="text-sm font-black font-mono text-[#0f172a] dark:text-[#f8fafc]">${Math.round(r.sicaklik)}°</span>
-            <span class="text-[10px] font-mono text-[#64748b] dark:text-[#94a3b8] font-bold block leading-none">(${Math.round(r.hissedilenSicaklik)}°)</span>
-          </div>
+          <!-- Seçili Kart Altında Genişleyen 6 Parametreli Detay Paneli -->
+          ${isSelected ? `
+            <div class="mobile-details-panel p-2.5 border-t border-slate-200 dark:border-slate-800/80">
+              <div class="grid grid-cols-3 gap-1.5 text-[10px] font-mono">
+                <div class="p-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60">
+                  <span class="text-[9px] text-slate-400 uppercase font-bold block">Bağıl Nem</span>
+                  <span class="font-extrabold text-[#0f766e] dark:text-[#2dd4bf]">%${r.nem}</span>
+                  ${r.dewPoint != null ? `<span class="text-[8px] text-slate-500 block">Çiy: ${Math.round(r.dewPoint)}°</span>` : ''}
+                </div>
+                <div class="p-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60">
+                  <span class="text-[9px] text-slate-400 uppercase font-bold block">Basınç</span>
+                  <span class="font-extrabold text-[#7e22ce] dark:text-[#c084fc]">${r.basinc} hPa</span>
+                  ${r.surfacePressure != null ? `<span class="text-[8px] text-slate-500 block">Yüzey: ${r.surfacePressure}</span>` : ''}
+                </div>
+                <div class="p-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60">
+                  <span class="text-[9px] text-slate-400 uppercase font-bold block">Bulut</span>
+                  <span class="font-extrabold text-[#475569] dark:text-[#94a3b8]">%${r.bulutKapaliligi}</span>
+                </div>
+                <div class="p-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60">
+                  <span class="text-[9px] text-slate-400 uppercase font-bold block">Rüzgar Hamle</span>
+                  <span class="font-extrabold text-[#d97706] dark:text-[#f59e0b]">${r.windGust ? r.windGust + ' km/h' : '--'}</span>
+                  <span class="text-[8px] text-slate-500 block truncate">${windDirFullName}</span>
+                </div>
+                <div class="p-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60">
+                  <span class="text-[9px] text-slate-400 uppercase font-bold block">CAPE</span>
+                  <span class="font-extrabold ${r.cape > 300 ? 'text-[#ea580c]' : 'text-slate-600 dark:text-slate-300'}">${r.cape != null ? r.cape + ' J/kg' : '--'}</span>
+                </div>
+                <div class="p-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60">
+                  <span class="text-[9px] text-slate-400 uppercase font-bold block">Görüş / UV</span>
+                  <span class="font-extrabold text-sky-600 dark:text-sky-400">${r.visibility != null ? r.visibility + ' km' : (r.uvIndex != null ? 'UV: ' + r.uvIndex : '--')}</span>
+                </div>
+              </div>
+            </div>
+          ` : ''}
         </div>
       `;
-    }).join('');
+    });
 
     this.dom.mobileListContainer.innerHTML = html;
   }
