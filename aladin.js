@@ -476,6 +476,331 @@ function updateAmbientWeatherGlow(glowEl, cur) {
 }
 
 // ==========================================
+// 4.2 ASTRONOMİ, KRİTİK UYARILAR VE BİYOMETEOROLOJİ MOTORU
+// ==========================================
+function getSunAndMoon(date, lat = 40.2311, lon = 28.8402) {
+  const dObj = typeof date === 'string' ? new Date(date) : date;
+  const time = dObj.getTime();
+  const jd = (time / 86400000) + 2440587.5;
+  const d = jd - 2451545.0;
+
+  const g = (357.529 + 0.98560028 * d) % 360;
+  const q = (280.459 + 0.98564736 * d) % 360;
+  const L = (q + 1.915 * Math.sin(g * Math.PI / 180) + 0.020 * Math.sin(2 * g * Math.PI / 180)) % 360;
+  const e = 23.439 - 0.00000036 * d;
+  const sinDec = Math.sin(e * Math.PI / 180) * Math.sin(L * Math.PI / 180);
+  const dec = Math.asin(sinDec) * 180 / Math.PI;
+
+  const RA = Math.atan2(Math.cos(e * Math.PI / 180) * Math.sin(L * Math.PI / 180), Math.cos(L * Math.PI / 180)) * 180 / Math.PI;
+  let eqTime = (q - RA);
+  while (eqTime > 180) eqTime -= 360;
+  while (eqTime < -180) eqTime += 360;
+  eqTime *= 4; // dakika
+
+  const solarNoonUtc = (720 - (4 * lon) - eqTime) / 60;
+  const zenith = 90.833 * Math.PI / 180;
+  const latRad = lat * Math.PI / 180;
+  const decRad = dec * Math.PI / 180;
+  const cosHA = (Math.cos(zenith) - Math.sin(latRad) * Math.sin(decRad)) / (Math.cos(latRad) * Math.cos(decRad));
+
+  if (cosHA < -1 || cosHA > 1) {
+    return { sunrise: '06:00', sunset: '18:00', daylight: '12 sa 00 dk', isDaylight: true, sunProgress: 50, moonPhaseName: 'Hilal', moonIcon: '🌒', illumination: '50%' };
+  }
+
+  const ha = Math.acos(cosHA) * 180 / Math.PI;
+  const haHours = ha / 15;
+  const sunriseUtc = solarNoonUtc - haHours;
+  const sunsetUtc = solarNoonUtc + haHours;
+
+  const tzOffset = 3;
+  const sunriseLocalHours = (sunriseUtc + tzOffset + 24) % 24;
+  const sunsetLocalHours = (sunsetUtc + tzOffset + 24) % 24;
+
+  const fmtTime = (hFrac) => {
+    const h = Math.floor(hFrac);
+    const m = Math.floor((hFrac - h) * 60);
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  };
+
+  const daylightHours = sunsetUtc - sunriseUtc;
+  const dlH = Math.floor(daylightHours);
+  const dlM = Math.floor((daylightHours - dlH) * 60);
+
+  const nowHours = dObj.getUTCHours() + dObj.getUTCMinutes() / 60 + tzOffset;
+  let sunProgress = 0;
+  let isDaylight = false;
+  if (nowHours >= sunriseLocalHours && nowHours <= sunsetLocalHours) {
+    isDaylight = true;
+    sunProgress = ((nowHours - sunriseLocalHours) / (sunsetLocalHours - sunriseLocalHours)) * 100;
+  }
+
+  // Ay Evresi Hesabı
+  const knownNewMoon = 1704974220000; // 11 Ocak 2024 11:57 UTC
+  const synodicMonth = 29.53058867 * 86400000;
+  const phaseCycle = ((time - knownNewMoon) % synodicMonth + synodicMonth) % synodicMonth;
+  const phaseFraction = phaseCycle / synodicMonth;
+  const illumination = Math.round((1 - Math.cos(phaseFraction * 2 * Math.PI)) / 2 * 100);
+
+  let moonPhaseName = 'Yeni Ay';
+  let moonIcon = '🌑';
+  if (phaseFraction >= 0.03 && phaseFraction < 0.22) {
+    moonPhaseName = 'Hilal (Büyüyen)';
+    moonIcon = '🌒';
+  } else if (phaseFraction >= 0.22 && phaseFraction < 0.28) {
+    moonPhaseName = 'İlk Dördün';
+    moonIcon = '🌓';
+  } else if (phaseFraction >= 0.28 && phaseFraction < 0.47) {
+    moonPhaseName = 'Şişkin Ay (Büyüyen)';
+    moonIcon = '🌔';
+  } else if (phaseFraction >= 0.47 && phaseFraction < 0.53) {
+    moonPhaseName = 'Dolunay';
+    moonIcon = '🌕';
+  } else if (phaseFraction >= 0.53 && phaseFraction < 0.72) {
+    moonPhaseName = 'Şişkin Ay (Küçülen)';
+    moonIcon = '🌖';
+  } else if (phaseFraction >= 0.72 && phaseFraction < 0.78) {
+    moonPhaseName = 'Son Dördün';
+    moonIcon = '🌗';
+  } else if (phaseFraction >= 0.78 && phaseFraction < 0.97) {
+    moonPhaseName = 'Hilal (Küçülen)';
+    moonIcon = '🌘';
+  }
+
+  return {
+    sunrise: fmtTime(sunriseLocalHours),
+    sunset: fmtTime(sunsetLocalHours),
+    daylight: `${dlH} sa ${dlM} dk`,
+    isDaylight,
+    sunProgress: Math.min(100, Math.max(0, Math.round(sunProgress))),
+    moonPhaseName,
+    moonIcon,
+    illumination: `${illumination}%`
+  };
+}
+
+function scanSevereWeatherAlerts(records) {
+  if (!records || records.length === 0) return [];
+  const nowMs = Date.now();
+  const upcoming = records.filter(r => {
+    const t = new Date(r.time).getTime();
+    return t >= nowMs - 3600000 && t <= nowMs + 72 * 3600000;
+  });
+
+  const alerts = [];
+
+  // 1. Fırtına / CAPE
+  const stormRec = upcoming.find(r => (r.cape != null && r.cape >= 800) || (r.hadise && (r.hadise.type === 'thunderstorm' || r.hadise.type === 'severe-thunderstorm')));
+  if (stormRec) {
+    alerts.push({
+      type: 'storm',
+      icon: '⚡',
+      title: 'Gökgürültülü Fırtına & Dolu Riski',
+      timeStr: formatTurkeyDate(stormRec.time, { weekday: 'short', hour: '2-digit', minute: '2-digit' }),
+      value: stormRec.cape ? `${stormRec.cape} J/kg CAPE` : 'Kuvvetli Fırtına',
+      desc: 'Şiddetli konvektif kararsızlık; yıldırım, hamleli fırtına ve yerel dolu ihtimali.',
+      border: 'border-purple-300 dark:border-purple-800/80',
+      bg: 'bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300'
+    });
+  }
+
+  // 2. Şiddetli Rüzgar Hamlesi
+  const maxGustRec = upcoming.reduce((max, r) => (r.windGust != null && r.windGust > (max ? max.windGust : 0)) ? r : max, null);
+  if (maxGustRec && maxGustRec.windGust >= 50) {
+    alerts.push({
+      type: 'wind',
+      icon: '💨',
+      title: 'Kuvvetli Rüzgar & Fırtına Hamlesi',
+      timeStr: formatTurkeyDate(maxGustRec.time, { weekday: 'short', hour: '2-digit', minute: '2-digit' }),
+      value: `Hamle ${maxGustRec.windGust} km/h`,
+      desc: 'Çatı uçması, ağaç devrilmesi ve ulaşımda aksamalara karşı tedbirli olun.',
+      border: 'border-amber-300 dark:border-amber-800/80',
+      bg: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300'
+    });
+  }
+
+  // 3. Kuvvetli Yağış / Su Baskını
+  const heavyRainRec = upcoming.find(r => r.saatlikToplamYagis >= 4);
+  if (heavyRainRec) {
+    alerts.push({
+      type: 'rain',
+      icon: '🌧️',
+      title: 'Kuvvetli Sağanak & Su Birikintisi Riski',
+      timeStr: formatTurkeyDate(heavyRainRec.time, { weekday: 'short', hour: '2-digit', minute: '2-digit' }),
+      value: `${heavyRainRec.saatlikToplamYagis} mm/saat`,
+      desc: 'Kısa sürede yüksek yağış birikimi; düşük kotlarda su baskını riski.',
+      border: 'border-blue-300 dark:border-blue-800/80',
+      bg: 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-sky-300'
+    });
+  }
+
+  // 4. Don ve Buzlanma
+  const freezeRec = upcoming.find(r => r.sicaklik <= 0 || (r.dewPoint != null && r.dewPoint <= -2));
+  if (freezeRec) {
+    alerts.push({
+      type: 'freeze',
+      icon: '❄️',
+      title: 'Zirai Don ve Gizli Buzlanma Uyarısı',
+      timeStr: formatTurkeyDate(freezeRec.time, { weekday: 'short', hour: '2-digit', minute: '2-digit' }),
+      value: `${Math.round(freezeRec.sicaklik)}°C`,
+      desc: 'Sıcaklık sıfırın altına iniyor; yollarda gizli buzlanma ve tarımsal don tehlikesi.',
+      border: 'border-cyan-300 dark:border-cyan-800/80',
+      bg: 'bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300'
+    });
+  }
+
+  // 5. Yüksek UV
+  const highUvRec = upcoming.find(r => r.uvIndex != null && r.uvIndex >= 7);
+  if (highUvRec) {
+    alerts.push({
+      type: 'uv',
+      icon: '☀️',
+      title: 'Yüksek Solar UV Radyasyonu Riski',
+      timeStr: formatTurkeyDate(highUvRec.time, { weekday: 'short', hour: '2-digit', minute: '2-digit' }),
+      value: `UV ${highUvRec.uvIndex}`,
+      desc: 'Güneş altında korunmasız kalmayın; güneş kremi ve şapka kullanın.',
+      border: 'border-orange-300 dark:border-orange-800/80',
+      bg: 'bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300'
+    });
+  }
+
+  return alerts;
+}
+
+function getBiometeorologyIndices(cur, prevRec, next48Recs) {
+  if (!cur) return {};
+
+  let migraineLevel = 'Düşük Risk';
+  let migraineColor = 'text-emerald-600 dark:text-emerald-400';
+  let migraineDesc = 'Barometre kararlı; basınç kaynaklı baş ağrısı riski düşük.';
+  if (prevRec && cur.basinc && prevRec.basinc) {
+    const diff = Math.abs(cur.basinc - prevRec.basinc);
+    if (diff >= 1.5) {
+      migraineLevel = 'Yüksek Risk';
+      migraineColor = 'text-rose-600 dark:text-rose-400';
+      migraineDesc = 'Hızlı basınç dalgalanması migren ve sinüzit ağrılarını tetikleyebilir.';
+    } else if (diff >= 0.8) {
+      migraineLevel = 'Orta Risk';
+      migraineColor = 'text-amber-600 dark:text-amber-400';
+      migraineDesc = 'Hafif basınç oynaması; hassas kişilerde gerginlik yapabilir.';
+    }
+  }
+
+  let jointLevel = 'Rahat';
+  let jointColor = 'text-emerald-600 dark:text-emerald-400';
+  let jointDesc = 'Nem ve sıcaklık dengesi eklem sızıları için konforlu.';
+  if (cur.sicaklik <= 12 && cur.nem >= 75) {
+    jointLevel = 'Yüksek Hassasiyet';
+    jointColor = 'text-rose-600 dark:text-rose-400';
+    jointDesc = 'Soğuk ve yüksek nem eklem ve kas ağrılarını artırabilir.';
+  } else if (cur.sicaklik <= 16 && cur.nem >= 65) {
+    jointLevel = 'Orta Hassasiyet';
+    jointColor = 'text-amber-600 dark:text-amber-400';
+    jointDesc = 'Serin ve rutubetli hava; sıcak tutunacak giysiler tercih edilmeli.';
+  }
+
+  let sportsScore = 95;
+  if (cur.saatlikToplamYagis > 0) sportsScore -= 45;
+  if (cur.precipProb && cur.precipProb >= 40) sportsScore -= 20;
+  if (cur.sicaklik < 5) sportsScore -= (5 - cur.sicaklik) * 4;
+  else if (cur.sicaklik > 28) sportsScore -= (cur.sicaklik - 28) * 5;
+  if (cur.ruzgarHizi > 30) sportsScore -= (cur.ruzgarHizi - 30) * 1.5;
+  if (cur.nem > 80 && cur.sicaklik > 22) sportsScore -= 15;
+  sportsScore = Math.max(10, Math.min(100, Math.round(sportsScore)));
+
+  let sportsLevel = 'Mükemmel';
+  let sportsColor = 'text-emerald-600 dark:text-emerald-400';
+  if (sportsScore < 40) {
+    sportsLevel = 'Zorlayıcı';
+    sportsColor = 'text-rose-600 dark:text-rose-400';
+  } else if (sportsScore < 75) {
+    sportsLevel = 'Orta Uygunluk';
+    sportsColor = 'text-amber-600 dark:text-amber-400';
+  }
+
+  let carWashStatus = 'Çok Uygun';
+  let carWashColor = 'text-emerald-600 dark:text-emerald-400';
+  let carWashDesc = 'Önümüzdeki 48 saat tamamen kuru; aracınız temiz kalır.';
+  if (next48Recs && next48Recs.length > 0) {
+    const totalRain48 = next48Recs.reduce((sum, r) => sum + (r.saatlikToplamYagis || 0), 0);
+    const hasSnow = next48Recs.some(r => r.snowfall > 0);
+    if (totalRain48 >= 2 || hasSnow) {
+      carWashStatus = 'Yıkamayın (Yağış Var)';
+      carWashColor = 'text-rose-600 dark:text-rose-400';
+      carWashDesc = `Önümüzdeki günlerde yağış (${totalRain48.toFixed(1)} mm) bekleniyor.`;
+    } else if (totalRain48 > 0 || next48Recs.some(r => r.precipProb >= 40)) {
+      carWashStatus = 'Riskli / Bekleyin';
+      carWashColor = 'text-amber-600 dark:text-amber-400';
+      carWashDesc = 'Aralıklı hafif yağış ihtimali mevcut.';
+    }
+  }
+
+  let laundryStatus = 'İdeal / Hızlı';
+  let laundryColor = 'text-emerald-600 dark:text-emerald-400';
+  let laundryDesc = 'Düşük nem ve açık hava çamaşırların hızla kurumasını sağlar.';
+  if (cur.saatlikToplamYagis > 0 || (cur.precipProb && cur.precipProb >= 50)) {
+    laundryStatus = 'Dışarı Asmayın';
+    laundryColor = 'text-rose-600 dark:text-rose-400';
+    laundryDesc = 'Yağış riski nedeniyle açık alana asılması önerilmez.';
+  } else if (cur.nem >= 75 || cur.bulutKapaliligi > 85) {
+    laundryStatus = 'Yavaş Kurur';
+    laundryColor = 'text-amber-600 dark:text-amber-400';
+    laundryDesc = 'Yüksek nem ve kapalı hava kuruma süresini uzatır.';
+  }
+
+  let stargazingStatus = 'Harika';
+  let stargazingColor = 'text-indigo-600 dark:text-indigo-400';
+  let stargazingDesc = 'Berrak ve bulutsuz gökyüzü, Samanyolu ve yıldızlar net görünür.';
+  if (cur.bulutKapaliligi > 70 || cur.saatlikToplamYagis > 0) {
+    stargazingStatus = 'Kapalı / Görünmez';
+    stargazingColor = 'text-slate-500 dark:text-slate-400';
+    stargazingDesc = 'Yoğun bulut tabakası gökyüzü gözlemini tamamen engelliyor.';
+  } else if (cur.bulutKapaliligi > 25 || (cur.visibility && cur.visibility < 10)) {
+    stargazingStatus = 'Orta / Parçalı';
+    stargazingColor = 'text-amber-600 dark:text-amber-400';
+    stargazingDesc = 'Yer yer bulut geçişleri veya hafif pus görüşü kısıtlayabilir.';
+  }
+
+  return {
+    migraine: { level: migraineLevel, color: migraineColor, desc: migraineDesc },
+    joint: { level: jointLevel, color: jointColor, desc: jointDesc },
+    sports: { score: sportsScore, level: sportsLevel, color: sportsColor },
+    carWash: { status: carWashStatus, color: carWashColor, desc: carWashDesc },
+    laundry: { status: laundryStatus, color: laundryColor, desc: laundryDesc },
+    stargazing: { status: stargazingStatus, color: stargazingColor, desc: stargazingDesc }
+  };
+}
+
+function formatForecastSummaryForSharing(cur, activeConfig, allRecs) {
+  if (!cur) return '';
+  const dateStr = formatTurkeyDate(cur.time, { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+  const windDir = getCompassDirection(cur.ruzgarYonu);
+  const hadise = cur.hadise || { name: 'Açık' };
+
+  let dayMin = '--';
+  let dayMax = '--';
+  if (allRecs && allRecs.length > 0) {
+    const curDay = getTurkeyDayKey(cur.time);
+    const dayTemps = allRecs.filter(r => getTurkeyDayKey(r.time) === curDay).map(r => r.sicaklik);
+    if (dayTemps.length > 0) {
+      dayMin = Math.round(Math.min(...dayTemps));
+      dayMax = Math.round(Math.max(...dayTemps));
+    }
+  }
+
+  return `📍 Bursa Nilüfer Meteorolojik Tahmin Raporu
+📅 ${dateStr}
+🌡️ Sıcaklık: ${Math.round(cur.sicaklik)}°C (Hissedilen: ${Math.round(cur.hissedilenSicaklik)}°C)
+🌤️ Durum: ${hadise.name}
+📊 Günün Aralığı: ▲ ${dayMax}° / ▼ ${dayMin}°C
+💧 Bağıl Nem: %${cur.nem} · Çiy Noktası: ${cur.dewPoint != null ? Math.round(cur.dewPoint) + '°C' : '--'}
+🌧️ Yağış: ${cur.saatlikToplamYagis} mm ${cur.precipProb != null ? `(İhtimal: %${cur.precipProb})` : ''}
+💨 Rüzgar: ${cur.ruzgarHizi} km/h (${windDir} ${cur.ruzgarYonu}°) ${cur.windGust ? `· Hamle: ${cur.windGust} km/h` : ''}
+⏱️ Basınç: ${cur.basinc} hPa · Bulut: %${cur.bulutKapaliligi}
+🛰️ Sayısal Model: ${activeConfig.name} (${activeConfig.badge})
+🔗 https://berat623.github.io/xiaomismarttemp/`;
+}
+
+// ==========================================
 // 5. GENEL OPEN-METEO MODEL SERVİSİ (YÜKSEK HIZ & DOĞRULUK)
 // ==========================================
 class OpenMeteoModelService {
@@ -1695,6 +2020,32 @@ class ModelsUIController {
       hourlyStripSection: document.getElementById('hourlyStripSection'),
       hourlyStripTrack: document.getElementById('hourlyStripTrack'),
 
+      // Kritik Hava Durumu Erken Uyarıları
+      severeWeatherAlertBanner: document.getElementById('severeWeatherAlertBanner'),
+
+      // Paylaş / Kopyala Butonları
+      btnCopyForecastSummary: document.getElementById('btnCopyForecastSummary'),
+      btnCopyForecastSummary2: document.getElementById('btnCopyForecastSummary2'),
+
+      // Gelişmiş İstasyon Merkezi (Feature Hub)
+      weatherStationHubSection: document.getElementById('weatherStationHubSection'),
+      hubTabsNav: document.getElementById('hubTabsNav'),
+      hubTabHealth: document.getElementById('hubTabHealth'),
+      hubTabAstronomy: document.getElementById('hubTabAstronomy'),
+      hubTabConsensus: document.getElementById('hubTabConsensus'),
+      hubTabTools: document.getElementById('hubTabTools'),
+
+      // Hızlı Hesaplama Girdileri
+      calcTempC: document.getElementById('calcTempC'),
+      calcTempF: document.getElementById('calcTempF'),
+      calcTempK: document.getElementById('calcTempK'),
+      calcWindKmh: document.getElementById('calcWindKmh'),
+      calcWindKt: document.getElementById('calcWindKt'),
+      calcWindMs: document.getElementById('calcWindMs'),
+      calcPressHpa: document.getElementById('calcPressHpa'),
+      calcPressMmhg: document.getElementById('calcPressMmhg'),
+      calcPressInhg: document.getElementById('calcPressInhg'),
+
       // Günlük Filtreleme Şeridi & Tablo Filtresi
       dayFilterTrack: document.getElementById('dayFilterTrack'),
       tableFilterTrack: document.getElementById('tableFilterTrack'),
@@ -1721,6 +2072,72 @@ class ModelsUIController {
     if (this.dom.btnRefreshModel) {
       this.dom.btnRefreshModel.addEventListener('click', () => {
         this.refreshCurrentModel(false, true);
+      });
+    }
+
+    // İstasyon Merkezi Sekme Değiştirici (Sağlık / Astronomi / Konsensüs / Araçlar)
+    if (this.dom.hubTabsNav) {
+      this.dom.hubTabsNav.addEventListener('click', (e) => {
+        const btn = e.target.closest('.hub-tab-btn');
+        if (!btn) return;
+        const tab = btn.dataset.tab;
+        if (!tab) return;
+        this.switchHubTab(tab);
+      });
+    }
+
+    // Hızlı Rapor / WhatsApp Özeti Kopyalama
+    const handleCopySummary = () => {
+      const filtered = this.getFilteredRecords();
+      const cur = filtered[this.selectedIndex] || filtered[0] || (this.activeService.records ? this.activeService.records[0] : null);
+      if (!cur) return;
+      const text = formatForecastSummaryForSharing(cur, this.activeConfig, this.activeService.records);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+          if (window.app && window.app.showToast) {
+            window.app.showToast('Bursa Nilüfer tahmin özeti panoya kopyalandı!', 'success');
+          }
+        }).catch(() => {
+          this.copyFallback(text);
+        });
+      } else {
+        this.copyFallback(text);
+      }
+    };
+
+    if (this.dom.btnCopyForecastSummary) {
+      this.dom.btnCopyForecastSummary.addEventListener('click', handleCopySummary);
+    }
+    if (this.dom.btnCopyForecastSummary2) {
+      this.dom.btnCopyForecastSummary2.addEventListener('click', handleCopySummary);
+    }
+
+    // İnteraktif Hızlı Birim Çeviricileri
+    if (this.dom.calcTempC) {
+      this.dom.calcTempC.addEventListener('input', (e) => {
+        const c = parseFloat(e.target.value);
+        if (!isNaN(c)) {
+          if (this.dom.calcTempF) this.dom.calcTempF.textContent = `${((c * 9/5) + 32).toFixed(1)} °F`;
+          if (this.dom.calcTempK) this.dom.calcTempK.textContent = `${(c + 273.15).toFixed(2)} K`;
+        }
+      });
+    }
+    if (this.dom.calcWindKmh) {
+      this.dom.calcWindKmh.addEventListener('input', (e) => {
+        const kmh = parseFloat(e.target.value);
+        if (!isNaN(kmh)) {
+          if (this.dom.calcWindKt) this.dom.calcWindKt.textContent = `${(kmh * 0.539957).toFixed(1)} kt (knot)`;
+          if (this.dom.calcWindMs) this.dom.calcWindMs.textContent = `${(kmh / 3.6).toFixed(1)} m/s`;
+        }
+      });
+    }
+    if (this.dom.calcPressHpa) {
+      this.dom.calcPressHpa.addEventListener('input', (e) => {
+        const hpa = parseFloat(e.target.value);
+        if (!isNaN(hpa)) {
+          if (this.dom.calcPressMmhg) this.dom.calcPressMmhg.textContent = `${(hpa * 0.750062).toFixed(1)} mmHg`;
+          if (this.dom.calcPressInhg) this.dom.calcPressInhg.textContent = `${(hpa * 0.02953).toFixed(2)} inHg`;
+        }
       });
     }
 
@@ -1957,6 +2374,7 @@ class ModelsUIController {
     const cur = filteredRecs[this.selectedIndex];
     if (cur) {
       this.renderHeroCard(cur);
+      this.renderWeatherHub(cur, this.activeService.records || filteredRecs);
     }
 
     // 24 Saatlik Yatay Şeritte seçili kartı güncelle ve görünür alana ortala
@@ -2215,6 +2633,422 @@ class ModelsUIController {
     this.dom.hourlyStripTrack.innerHTML = html;
   }
 
+  copyFallback(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand('copy');
+      if (window.app && window.app.showToast) {
+        window.app.showToast('Bursa Nilüfer tahmin özeti panoya kopyalandı!', 'success');
+      }
+    } catch (e) {
+      alert('Kopyalanamadı, lütfen metni manuel kopyalayın:\n\n' + text);
+    }
+    document.body.removeChild(ta);
+  }
+
+  switchHubTab(tabName) {
+    this.activeHubTab = tabName;
+    if (this.dom.hubTabsNav) {
+      this.dom.hubTabsNav.querySelectorAll('.hub-tab-btn').forEach(b => {
+        if (b.dataset.tab === tabName) b.classList.add('active');
+        else b.classList.remove('active');
+      });
+    }
+
+    const panes = {
+      health: this.dom.hubTabHealth,
+      astronomy: this.dom.hubTabAstronomy,
+      consensus: this.dom.hubTabConsensus,
+      tools: this.dom.hubTabTools
+    };
+
+    Object.keys(panes).forEach(k => {
+      const pane = panes[k];
+      if (pane) {
+        if (k === tabName) pane.classList.remove('hidden');
+        else pane.classList.add('hidden');
+      }
+    });
+
+    if (window.lucide && window.lucide.createIcons) {
+      window.lucide.createIcons();
+    }
+  }
+
+  renderSevereWeatherAlerts(allRecs) {
+    if (!this.dom.severeWeatherAlertBanner) return;
+    const alerts = scanSevereWeatherAlerts(allRecs);
+
+    if (!alerts || alerts.length === 0) {
+      this.dom.severeWeatherAlertBanner.innerHTML = `
+        <div class="apple-glass p-2.5 px-3.5 flex items-center justify-between gap-2 text-xs border-emerald-500/30">
+          <div class="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 font-extrabold min-w-0">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0"></span>
+            <span class="truncate">Tüm Atmosferik Parametreler Normal ve Güvenli</span>
+          </div>
+          <span class="text-[10px] text-slate-500 dark:text-slate-400 font-semibold hidden md:inline shrink-0">
+            Önümüzdeki 72 saat içinde Bursa Nilüfer için fırtına, don veya su baskını riski beklenmiyor
+          </span>
+        </div>
+      `;
+      return;
+    }
+
+    let cardsHtml = '';
+    alerts.forEach(a => {
+      cardsHtml += `
+        <div class="p-2.5 rounded-xl border ${a.border} ${a.bg} flex flex-col justify-between gap-1 shadow-sm">
+          <div class="flex items-center justify-between gap-1">
+            <span class="font-extrabold text-xs flex items-center gap-1.5">
+              <span>${a.icon}</span>
+              <span>${a.title}</span>
+            </span>
+            <span class="text-[10px] font-mono font-black px-1.5 py-0.5 rounded bg-black/10 dark:bg-white/10 shrink-0">${a.timeStr}</span>
+          </div>
+          <p class="text-[10px] font-semibold opacity-90 line-clamp-2">${a.desc}</p>
+          <div class="text-[10px] font-mono font-bold pt-0.5">${a.value}</div>
+        </div>
+      `;
+    });
+
+    this.dom.severeWeatherAlertBanner.innerHTML = `
+      <div class="apple-glass p-3 sm:p-3.5 space-y-2 border-l-4 border-l-amber-500 shadow-sm">
+        <div class="flex items-center justify-between gap-2 flex-wrap">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
+            <h3 class="text-xs font-black uppercase tracking-wider text-rose-700 dark:text-rose-400 font-mono">
+              ⚠️ KRİTİK HAVA UYARISI (${alerts.length} RİSK TESPİT EDİLDİ)
+            </h3>
+          </div>
+          <span class="text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">Önümüzdeki 72 Saat</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          ${cardsHtml}
+        </div>
+      </div>
+    `;
+  }
+
+  renderWeatherHub(cur, allRecs) {
+    if (!cur) return;
+    this.renderHubHealth(cur, allRecs);
+    this.renderHubAstronomy(cur);
+    this.renderHubConsensus(cur);
+  }
+
+  renderHubHealth(cur, allRecs) {
+    if (!this.dom.hubTabHealth || !cur) return;
+    const curIdx = allRecs.findIndex(r => r.time === cur.time);
+    const prevRec = curIdx > 0 ? allRecs[curIdx - 1] : null;
+    const next48 = allRecs.slice(curIdx, curIdx + 48);
+    const indices = getBiometeorologyIndices(cur, prevRec, next48);
+
+    this.dom.hubTabHealth.innerHTML = `
+      <!-- 1. Migren & Baş Ağrısı -->
+      <div class="hub-card">
+        <div class="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-extrabold tracking-wider flex items-center justify-between">
+          <span>Migren & Baş Ağrısı</span>
+          <span>🧠</span>
+        </div>
+        <div>
+          <div class="text-sm font-black ${indices.migraine.color} font-mono">${indices.migraine.level}</div>
+          <p class="text-[10px] text-slate-600 dark:text-slate-300 font-medium mt-1 leading-snug">${indices.migraine.desc}</p>
+        </div>
+      </div>
+
+      <!-- 2. Romatizma & Eklem Hassasiyeti -->
+      <div class="hub-card">
+        <div class="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-extrabold tracking-wider flex items-center justify-between">
+          <span>Romatizma & Eklem</span>
+          <span>🦴</span>
+        </div>
+        <div>
+          <div class="text-sm font-black ${indices.joint.color} font-mono">${indices.joint.level}</div>
+          <p class="text-[10px] text-slate-600 dark:text-slate-300 font-medium mt-1 leading-snug">${indices.joint.desc}</p>
+        </div>
+      </div>
+
+      <!-- 3. Açık Hava Spor / Koşu Skoru -->
+      <div class="hub-card">
+        <div class="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-extrabold tracking-wider flex items-center justify-between">
+          <span>Açık Hava Sporu</span>
+          <span>🏃</span>
+        </div>
+        <div>
+          <div class="flex items-baseline justify-between">
+            <span class="text-base sm:text-lg font-black ${indices.sports.color} font-mono">${indices.sports.score}/100</span>
+            <span class="text-xs font-bold ${indices.sports.color}">${indices.sports.level}</span>
+          </div>
+          <div class="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden mt-1.5">
+            <div class="h-full bg-blue-500 rounded-full" style="width: ${indices.sports.score}%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. Araç Yıkama İndeksi -->
+      <div class="hub-card">
+        <div class="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-extrabold tracking-wider flex items-center justify-between">
+          <span>Araç Yıkama</span>
+          <span>🚗</span>
+        </div>
+        <div>
+          <div class="text-xs font-black ${indices.carWash.color} font-mono">${indices.carWash.status}</div>
+          <p class="text-[10px] text-slate-600 dark:text-slate-300 font-medium mt-1 leading-snug">${indices.carWash.desc}</p>
+        </div>
+      </div>
+
+      <!-- 5. Çamaşır Kurutma Hızı -->
+      <div class="hub-card">
+        <div class="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-extrabold tracking-wider flex items-center justify-between">
+          <span>Çamaşır Kurutma</span>
+          <span>🧺</span>
+        </div>
+        <div>
+          <div class="text-xs font-black ${indices.laundry.color} font-mono">${indices.laundry.status}</div>
+          <p class="text-[10px] text-slate-600 dark:text-slate-300 font-medium mt-1 leading-snug">${indices.laundry.desc}</p>
+        </div>
+      </div>
+
+      <!-- 6. Astrofotografi & Yıldız Gözlemi -->
+      <div class="hub-card">
+        <div class="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-extrabold tracking-wider flex items-center justify-between">
+          <span>Yıldız Gözlemi</span>
+          <span>🌌</span>
+        </div>
+        <div>
+          <div class="text-xs font-black ${indices.stargazing.color} font-mono">${indices.stargazing.status}</div>
+          <p class="text-[10px] text-slate-600 dark:text-slate-300 font-medium mt-1 leading-snug">${indices.stargazing.desc}</p>
+        </div>
+      </div>
+    `;
+  }
+
+  renderHubAstronomy(cur) {
+    if (!this.dom.hubTabAstronomy || !cur) return;
+    const astro = getSunAndMoon(cur.time);
+
+    const t = astro.sunProgress / 100;
+    const sunX = (1 - t) * (1 - t) * 20 + 2 * (1 - t) * t * 150 + t * t * 280;
+    const sunY = (1 - t) * (1 - t) * 80 + 2 * (1 - t) * t * 10 + t * t * 80;
+
+    this.dom.hubTabAstronomy.innerHTML = `
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <!-- Sol: Güneş Arkı ve Gün Işığı -->
+        <div class="hub-card p-4">
+          <div class="flex items-center justify-between gap-2 border-b border-black/5 dark:border-white/10 pb-2">
+            <span class="text-xs font-black text-[#0f172a] dark:text-[#f8fafc] flex items-center gap-1.5 font-parkinsans">
+              <span>☀️</span>
+              <span>Güneş Yolu ve Gün Işığı Döngüsü</span>
+            </span>
+            <span class="text-[10px] font-mono font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800/40">
+              ${astro.daylight} Gün Işığı
+            </span>
+          </div>
+
+          <div class="relative w-full h-24 my-2 flex items-center justify-center">
+            <svg viewBox="0 0 300 95" class="w-full h-full overflow-visible">
+              <defs>
+                <linearGradient id="sunArcGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.3"/>
+                  <stop offset="50%" stop-color="#fbbf24" stop-opacity="0.8"/>
+                  <stop offset="100%" stop-color="#f97316" stop-opacity="0.3"/>
+                </linearGradient>
+              </defs>
+              <line x1="10" y1="80" x2="290" y2="80" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="3,3" stroke-opacity="0.5"/>
+              <path d="M 20 80 Q 150 10 280 80" fill="none" stroke="url(#sunArcGrad)" stroke-width="3" stroke-linecap="round"/>
+              ${astro.isDaylight ? `
+                <circle cx="${sunX}" cy="${sunY}" r="7" fill="#f59e0b" stroke="#ffffff" stroke-width="2" class="drop-shadow-lg"/>
+                <circle cx="${sunX}" cy="${sunY}" r="12" fill="#f59e0b" fill-opacity="0.25"/>
+              ` : `
+                <text x="150" y="60" text-anchor="middle" font-size="10" font-weight="bold" fill="#64748b" font-family="monospace">Güneş Ufkun Altında (Gece)</text>
+              `}
+            </svg>
+          </div>
+
+          <div class="flex items-center justify-between text-xs font-mono font-bold pt-1 border-t border-black/5 dark:border-white/10">
+            <div class="text-left">
+              <span class="text-[9px] text-slate-400 block font-sans uppercase">Gün Doğumu</span>
+              <span class="text-amber-600 dark:text-amber-400 text-sm">🌅 ${astro.sunrise}</span>
+            </div>
+            <div class="text-center">
+              <span class="text-[9px] text-slate-400 block font-sans uppercase">Güneş İlerlemesi</span>
+              <span class="text-blue-600 dark:text-sky-400 text-xs">${astro.sunProgress}%</span>
+            </div>
+            <div class="text-right">
+              <span class="text-[9px] text-slate-400 block font-sans uppercase">Gün Batımı</span>
+              <span class="text-orange-600 dark:text-orange-400 text-sm">🌇 ${astro.sunset}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sağ: Ay Evresi ve Gece Gökyüzü -->
+        <div class="hub-card p-4">
+          <div class="flex items-center justify-between gap-2 border-b border-black/5 dark:border-white/10 pb-2">
+            <span class="text-xs font-black text-[#0f172a] dark:text-[#f8fafc] flex items-center gap-1.5 font-parkinsans">
+              <span>🌙</span>
+              <span>Ay Döngüsü ve Aydınlanma Oranı</span>
+            </span>
+            <span class="text-[10px] font-mono font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 rounded-full border border-indigo-200 dark:border-indigo-800/40">
+              Aydınlanma: ${astro.illumination}
+            </span>
+          </div>
+
+          <div class="flex items-center justify-between gap-4 py-3">
+            <div class="w-16 h-16 rounded-2xl bg-indigo-500/10 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/40 flex items-center justify-center text-4xl shrink-0 drop-shadow-md">
+              ${astro.moonIcon}
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-black text-[#0f172a] dark:text-[#f8fafc] font-parkinsans truncate">${astro.moonPhaseName}</div>
+              <p class="text-[11px] text-slate-600 dark:text-slate-300 font-medium mt-0.5 leading-snug">
+                Bursa semalarında ayın anlık aydınlanma oranı %${astro.illumination.replace('%', '')} seviyesindedir. 29.5 günlük sinodik kavuşum ayı takip edilmektedir.
+              </p>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between text-xs font-mono font-bold pt-2 border-t border-black/5 dark:border-white/10 text-[11px]">
+            <span class="text-slate-500 dark:text-slate-400">Sinodik Döngü: 29.53 Gün</span>
+            <span class="text-indigo-600 dark:text-indigo-400">Evre: ${astro.moonPhaseName}</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  renderHubConsensus(cur) {
+    if (!this.dom.hubTabConsensus || !cur) return;
+    const curTimeMs = new Date(cur.time).getTime();
+    
+    const modelKeys = Object.keys(MODEL_CONFIGS);
+    const comparison = [];
+
+    modelKeys.forEach(k => {
+      const cfg = MODEL_CONFIGS[k];
+      const s = this.services[k];
+      if (s && s.records && s.records.length > 0) {
+        let closest = s.records[0];
+        let minDiff = Math.abs(new Date(closest.time).getTime() - curTimeMs);
+        for (let i = 1; i < s.records.length; i++) {
+          const diff = Math.abs(new Date(s.records[i].time).getTime() - curTimeMs);
+          if (diff < minDiff) {
+            minDiff = diff;
+            closest = s.records[i];
+          }
+        }
+        if (minDiff <= 3600000 * 3) {
+          comparison.push({
+            key: k,
+            name: cfg.name,
+            badge: cfg.badge,
+            isActive: k === this.activeModelKey,
+            temp: closest.sicaklik,
+            rain: closest.saatlikToplamYagis,
+            wind: closest.ruzgarHizi,
+            hadise: closest.hadise
+          });
+        }
+      }
+    });
+
+    let agreementScore = 95;
+    let agreementText = 'Çok Yüksek Güvenilirlik';
+    let agreementColor = 'text-emerald-600 dark:text-emerald-400';
+    let agreementBarBg = 'bg-emerald-500';
+
+    if (comparison.length >= 2) {
+      const temps = comparison.map(c => c.temp);
+      const mean = temps.reduce((a, b) => a + b, 0) / temps.length;
+      const variance = temps.reduce((sum, t) => sum + Math.pow(t - mean, 2), 0) / temps.length;
+      const stdDev = Math.sqrt(variance);
+
+      if (stdDev <= 0.8) {
+        agreementScore = 96;
+        agreementText = 'Çok Yüksek Güvenilirlik (%96) — Modeller Tam Mutabakat Halinde';
+        agreementColor = 'text-emerald-600 dark:text-emerald-400';
+        agreementBarBg = 'bg-emerald-500';
+      } else if (stdDev <= 1.6) {
+        agreementScore = 86;
+        agreementText = 'Yüksek Güvenilirlik (%86) — Modeller Genel Seyirde Anlaşıyor';
+        agreementColor = 'text-sky-600 dark:text-sky-400';
+        agreementBarBg = 'bg-sky-500';
+      } else if (stdDev <= 2.8) {
+        agreementScore = 68;
+        agreementText = 'Orta Güvenilirlik (%68) — Modeller Arasında Yerel Farklılıklar Var';
+        agreementColor = 'text-amber-600 dark:text-amber-400';
+        agreementBarBg = 'bg-amber-500';
+      } else {
+        agreementScore = 48;
+        agreementText = 'Değişken / Belirsiz (%48) — Modeller Ayrışıyor, Hava Değişken';
+        agreementColor = 'text-rose-600 dark:text-rose-400';
+        agreementBarBg = 'bg-rose-500';
+      }
+    }
+
+    let cardsHtml = '';
+    modelKeys.forEach(k => {
+      const cfg = MODEL_CONFIGS[k];
+      const match = comparison.find(c => c.key === k);
+      const isActive = k === this.activeModelKey;
+
+      if (match) {
+        cardsHtml += `
+          <div class="consensus-card cursor-pointer select-none ${isActive ? 'is-active-model' : 'hover:border-blue-300 dark:hover:border-slate-600'}" data-model="${k}" onclick="window.modelsUI.switchModel('${k}')">
+            <div class="flex items-center justify-between gap-1 mb-1">
+              <span class="font-extrabold text-xs text-[#0f172a] dark:text-[#f8fafc] truncate flex items-center gap-1">
+                ${isActive ? '<span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>' : ''}
+                ${match.name}
+              </span>
+              <span class="text-[10px] font-mono font-black text-blue-600 dark:text-sky-400">${Math.round(match.temp)}°C</span>
+            </div>
+            <div class="flex items-center justify-between text-[11px] font-mono text-slate-500 dark:text-slate-400">
+              <span>💧 ${match.rain} mm</span>
+              <span>💨 ${match.wind} km/h</span>
+            </div>
+            <div class="text-[9px] text-slate-400 truncate mt-1">${cfg.badge.split('·')[0]}</div>
+          </div>
+        `;
+      } else {
+        cardsHtml += `
+          <div class="consensus-card opacity-60 cursor-pointer select-none" data-model="${k}" onclick="window.modelsUI.switchModel('${k}')">
+            <div class="flex items-center justify-between gap-1 mb-1">
+              <span class="font-bold text-xs truncate">${cfg.name}</span>
+              <span class="text-[10px] text-slate-400 font-mono">Tıkla Yükle</span>
+            </div>
+            <div class="text-[9px] text-slate-400 truncate">${cfg.badge.split('·')[0]}</div>
+          </div>
+        `;
+      }
+    });
+
+    this.dom.hubTabConsensus.innerHTML = `
+      <div class="space-y-3">
+        <div class="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 space-y-1.5">
+          <div class="flex items-center justify-between gap-2 flex-wrap">
+            <span class="text-xs font-black text-[#0f172a] dark:text-[#f8fafc] flex items-center gap-1.5">
+              <span>🤝</span>
+              <span>7 Küresel Model Mutabakatı</span>
+            </span>
+            <span class="text-xs font-black ${agreementColor} font-mono">${agreementText}</span>
+          </div>
+          <div class="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+            <div class="h-full ${agreementBarBg} rounded-full transition-all duration-500" style="width: ${agreementScore}%;"></div>
+          </div>
+          <p class="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+            ECMWF, AIFS, ALADIN, UKMO, GFS, AIGFS ve GEM modellerinin Bursa Nilüfer için anlık tahmin korelasyonu ve standart sapması incelenmektedir.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+          ${cardsHtml}
+        </div>
+      </div>
+    `;
+  }
+
   render() {
     const cfg = this.activeConfig;
     const s = this.activeService;
@@ -2278,6 +3112,12 @@ class ModelsUIController {
 
     // 24 Saatlik Yatay Carousel Şeridi
     this.renderHourlyStrip(allRecs, cur);
+
+    // Kritik Hava Durumu Erken Uyarıları
+    this.renderSevereWeatherAlerts(allRecs);
+
+    // Gelişmiş İstasyon Merkezi (Sağlık, Astronomi, Konsensüs)
+    this.renderWeatherHub(cur, allRecs);
 
     // Grafik Güncellemesi: Varsayılan tüm veriyi gösterir, seçili gün istenirse o güne odaklanır
     if (this.chartManager) {

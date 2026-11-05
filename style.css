@@ -572,3 +572,89 @@ table th, table td {
     min-height: 36px;
   }
 }
+
+/* ==========================================
+   12. FEATURE HUB & ADVANCED WEATHER WIDGETS
+   ========================================== */
+.hub-tab-btn {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  color: #64748b;
+  border-radius: 8px;
+  user-select: none;
+}
+.hub-tab-btn:hover {
+  color: #0f172a;
+}
+.dark .hub-tab-btn {
+  color: #94a3b8;
+}
+.dark .hub-tab-btn:hover {
+  color: #f8fafc;
+}
+.hub-tab-btn.active {
+  background: #ffffff !important;
+  color: #2563eb !important;
+  box-shadow: 0 2px 8px -1px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.dark .hub-tab-btn.active {
+  background: #1e293b !important;
+  color: #38bdf8 !important;
+  box-shadow: 0 2px 8px -1px rgba(0, 0, 0, 0.4);
+}
+
+.hub-card {
+  background: rgba(248, 250, 252, 0.75);
+  border: 1px solid rgba(226, 232, 240, 0.85);
+  border-radius: 16px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.dark .hub-card {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.hub-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px -2px rgba(15, 23, 42, 0.06);
+  border-color: rgba(37, 99, 235, 0.3);
+}
+.dark .hub-card:hover {
+  box-shadow: 0 6px 20px -2px rgba(0, 0, 0, 0.4);
+  border-color: rgba(56, 189, 248, 0.3);
+}
+
+.consensus-card {
+  background: rgba(248, 250, 252, 0.85);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 14px;
+  padding: 10px 12px;
+  transition: all 0.2s ease;
+}
+.dark .consensus-card {
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+.consensus-card.is-active-model {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.08);
+}
+.dark .consensus-card.is-active-model {
+  border-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.1);
+}
+
+/* Solar Arc Gauge Animation */
+.sun-arc-path {
+  stroke-dasharray: 4, 4;
+  animation: strokeDash 20s linear infinite;
+}
+@keyframes strokeDash {
+  to {
+    stroke-dashoffset: -80;
+  }
+}
+
