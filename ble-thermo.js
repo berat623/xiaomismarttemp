@@ -659,6 +659,13 @@ class XiaomiBleManager {
 
   renderDeviceList() {
     if (!this.dom.deviceCardsTrack) return;
+    if (this.dom.deviceListContainer) {
+      if (this.devices.size > 1) {
+        this.dom.deviceListContainer.classList.remove('hidden');
+      } else {
+        this.dom.deviceListContainer.classList.add('hidden');
+      }
+    }
     if (this.devices.size === 0) return;
 
     let html = '';
@@ -849,6 +856,14 @@ class XiaomiBleManager {
             });
 
             // GraphMemo & TelinkMiFlasher Komut Akışı:
+            // 0. Saat Senkronizasyonu (0x23)
+            setTimeout(async () => {
+              const sec = Math.floor(Date.now() / 1000);
+              const timeCmd = new Uint8Array([0x23, sec & 0xff, (sec >> 8) & 0xff, (sec >> 16) & 0xff, (sec >> 24) & 0xff]);
+              await char1f1f.writeValue(timeCmd).catch(e => console.warn(e));
+              this.log(`Termometre saati eşitlendi [0x23]: ${new Date().toLocaleTimeString('tr-TR')}`);
+            }, 100);
+
             // 1. Get Config (0x55)
             setTimeout(async () => {
               this.log('PVVX Cihaz konfigürasyonu isteniyor [0x55]...');
@@ -859,14 +874,14 @@ class XiaomiBleManager {
             setTimeout(async () => {
               this.log('PVVX Canlı telemetri akışı başlatılıyor [0x33, 0xC8]...');
               await char1f1f.writeValue(new Uint8Array([0x33, 0xC8])).catch(e => console.warn(e));
-            }, 800);
+            }, 700);
 
             // 3. Hafızadaki tüm kayıtları çek (0x35, 0xff, 0xff, 0, 0)
             setTimeout(async () => {
               this.log('PVVX Flash hafıza kayıtları isteniyor [0x35, 0xff, 0xff, 0, 0]...');
               this.memoCount = 0;
               await char1f1f.writeValue(new Uint8Array([0x35, 0xff, 0xff, 0, 0])).catch(e => console.warn(e));
-            }, 1600);
+            }, 1400);
           }
         } catch (pvvxErr) {
           this.log('PVVX 0x1f10 servisi başlatma uyarısı: ' + pvvxErr.message, 'warn');
@@ -1032,7 +1047,11 @@ class XiaomiBleManager {
         const volt = Number((vb / 1000.0).toFixed(3));
 
         // Tarih doğrulaması (2021 ile 2040 arası mantıklı Unix damgası)
-        const date = (tc > 1609459200 && tc < 2200000000) ? new Date(tc * 1000) : new Date();
+        // Eğer cihazın RTC saati senkronize edilmeden önce kaydedilmiş ham veri varsa (tc < 1609459200) GraphMemo spec gereği atlanır
+        if (tc < 1609459200 || tc > 2200000000) {
+          return;
+        }
+        const date = new Date(tc * 1000);
 
         this.addMeasurementToHistory({
           timestamp: date.toISOString(),
@@ -1051,6 +1070,7 @@ class XiaomiBleManager {
       } else if (len >= 3) {
         // Memo aktarımı bitti sinyali
         this.log(`🎉 Flash hafıza aktarımı tamamlandı! Toplam ${this.memoCount || 0} kayıt grafiklere döküldü.`, 'live');
+        this.sortAndDeduplicateHistory();
         this.updateChart();
         this.renderHistoryTable();
       }
@@ -1121,21 +1141,70 @@ class XiaomiBleManager {
   // ==========================================
   addMeasurementToHistory(item) {
     if (!item || item.temp === null || isNaN(item.temp)) return;
+    const t = new Date(item.timestamp).getTime();
+    if (isNaN(t) || t < 1609459200000 || t > 2200000000000) return;
 
-    // Son 1500 kaydı bellekte tut
+    // Son kayıt ile çok yakınsa (örneğin 15 saniyeden az) son kaydı güncelle
+    const len = this.historyData.length;
+    if (len > 0) {
+      const last = this.historyData[len - 1];
+      const lastT = new Date(last.timestamp).getTime();
+      if (Math.abs(t - lastT) < 15000 && last.devId === item.devId) {
+        this.historyData[len - 1] = item;
+        this.saveHistoryDebounced();
+        return;
+      }
+    }
+
     this.historyData.push(item);
-    if (this.historyData.length > 1500) {
-      this.historyData = this.historyData.slice(-1500);
+
+    // Periyodik olarak 30 kayıtta bir kronolojik sırala ve tekilleştir
+    if (this.historyData.length % 30 === 0) {
+      this.sortAndDeduplicateHistory();
+    } else if (this.historyData.length > 2000) {
+      this.historyData = this.historyData.slice(-2000);
     }
 
     this.saveHistoryDebounced();
+  }
+
+  // Kronolojik kesin sıralama (küçükten büyüğe) ve mükerrer kayıt temizliği
+  sortAndDeduplicateHistory() {
+    if (!this.historyData || this.historyData.length <= 1) return;
+
+    // 1. Zamana göre artan sırala (küçükten büyüğe)
+    this.historyData.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+    // 2. 20 saniye içindeki mükerrer ölçümleri tekilleştir
+    const deduped = [];
+    for (let i = 0; i < this.historyData.length; i++) {
+      const curr = this.historyData[i];
+      const currTime = new Date(curr.timestamp).getTime();
+      if (isNaN(currTime) || currTime < 1609459200000 || currTime > 2200000000000) continue;
+
+      if (deduped.length === 0) {
+        deduped.push(curr);
+        continue;
+      }
+
+      const prev = deduped[deduped.length - 1];
+      const prevTime = new Date(prev.timestamp).getTime();
+
+      if (Math.abs(currTime - prevTime) >= 20000 || curr.devId !== prev.devId) {
+        deduped.push(curr);
+      } else {
+        deduped[deduped.length - 1] = curr;
+      }
+    }
+
+    this.historyData = deduped.slice(-2000);
   }
 
   saveHistoryDebounced() {
     clearTimeout(this._saveTimer);
     this._saveTimer = setTimeout(() => {
       try {
-        localStorage.setItem('xiaomi_smarttemp_history_v1', JSON.stringify(this.historyData.slice(-1500)));
+        localStorage.setItem('xiaomi_smarttemp_history_v1', JSON.stringify(this.historyData.slice(-2000)));
       } catch (e) {}
     }, 1200);
   }
@@ -1146,16 +1215,19 @@ class XiaomiBleManager {
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Varsa eski demo artıklarını tamamen temizle
-          const cleanList = parsed.filter(item => item && !String(item.devId || '').startsWith('DEMO_'));
-          if (cleanList.length !== parsed.length) {
-            try {
-              localStorage.setItem('xiaomi_smarttemp_history_v1', JSON.stringify(cleanList));
-            } catch (e) {}
-          }
-          if (cleanList.length > 0) {
-            this.historyData = cleanList;
-            const last = cleanList[cleanList.length - 1];
+          // Varsa eski demo veya geçersiz saat damgalı kayıtları temizle
+          const cleanList = parsed.filter(item => {
+            if (!item || item.temp === null || isNaN(item.temp)) return false;
+            if (String(item.devId || '').startsWith('DEMO_')) return false;
+            const t = new Date(item.timestamp).getTime();
+            return !isNaN(t) && t >= 1609459200000 && t <= 2200000000000;
+          });
+
+          this.historyData = cleanList;
+          this.sortAndDeduplicateHistory();
+
+          if (this.historyData.length > 0) {
+            const last = this.historyData[this.historyData.length - 1];
             if (last) {
               this.renderHeroDisplay({
                 id: last.devId || 'Termometre',
@@ -1167,13 +1239,13 @@ class XiaomiBleManager {
                 bat: last.bat || 100,
                 volt: last.volt || 3.0,
                 rssi: last.rssi || -60,
-                packetCount: cleanList.length,
+                packetCount: this.historyData.length,
                 lastSeen: new Date(last.timestamp)
               });
             }
             this.updateChart();
             this.renderHistoryTable();
-            this.log(`Kayıtlı yerel hafızadan ${cleanList.length} ölçüm başarıyla yüklendi.`);
+            this.log(`Kayıtlı yerel hafızadan ${this.historyData.length} ölçüm başarıyla yüklendi.`);
           } else {
             this.historyData = [];
             this.updateChart();
@@ -1322,6 +1394,9 @@ class XiaomiBleManager {
 
   updateChart() {
     if (!this.chart) return;
+
+    // Her grafik çizimi öncesinde verilerin kronolojik sıralı ve tekil olduğundan emin ol
+    this.sortAndDeduplicateHistory();
     const all = this.historyData;
 
     if (!all || all.length === 0) {
@@ -1333,22 +1408,36 @@ class XiaomiBleManager {
     }
 
     // 1. Aralık Filtresi (6h, 24h, 7d, all)
-    const now = Date.now();
+    // Referans zaman: en son ölçüm zamanı ile şu an arasından en büyüğü
+    const lastRecordTime = new Date(all[all.length - 1].timestamp).getTime();
+    const refTime = Math.max(Date.now(), lastRecordTime);
     let filtered = all;
 
     if (this.chartRange === '6h') {
-      filtered = all.filter(d => (now - new Date(d.timestamp).getTime()) <= 6 * 3600 * 1000);
+      filtered = all.filter(d => (refTime - new Date(d.timestamp).getTime()) <= 6 * 3600 * 1000);
     } else if (this.chartRange === '24h') {
-      filtered = all.filter(d => (now - new Date(d.timestamp).getTime()) <= 24 * 3600 * 1000);
+      filtered = all.filter(d => (refTime - new Date(d.timestamp).getTime()) <= 24 * 3600 * 1000);
     } else if (this.chartRange === '7d') {
-      filtered = all.filter(d => (now - new Date(d.timestamp).getTime()) <= 7 * 24 * 3600 * 1000);
+      filtered = all.filter(d => (refTime - new Date(d.timestamp).getTime()) <= 7 * 24 * 3600 * 1000);
     }
 
     if (filtered.length === 0) filtered = all.slice(-48);
 
+    // KESİN KRONOLOJİK SIRALAMA: Küçükten büyüğe (artan)
+    filtered.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+    // Zaman aralığı birden çok günü kapsıyor mu kontrol et
+    const firstT = new Date(filtered[0].timestamp).getTime();
+    const lastT = new Date(filtered[filtered.length - 1].timestamp).getTime();
+    const isMultiDay = (lastT - firstT) > 20 * 3600 * 1000;
+
     // 2. Etiketler ve Veri Dizileri
     const labels = filtered.map(d => {
       const dt = new Date(d.timestamp);
+      if (isMultiDay) {
+        return dt.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' }) + ' ' +
+               dt.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+      }
       return dt.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
     });
 
@@ -1367,7 +1456,17 @@ class XiaomiBleManager {
     this.chart.data.datasets[1].data = humData;
     this.chart.data.datasets[2].data = batData;
 
-    this.chart.update();
+    // Tooltip başlığında net ve detaylı tarih/saat gösterimi (karışıklığı önler)
+    this.chart.options.plugins.tooltip.callbacks.title = (items) => {
+      if (!items || !items.length) return '';
+      const item = filtered[items[0].dataIndex];
+      if (!item) return '';
+      const d = new Date(item.timestamp);
+      return d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }) + ' ' +
+             d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    };
+
+    this.chart.update('none');
     this.renderSummaryStats(filtered);
   }
 
