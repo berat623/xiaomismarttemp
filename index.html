@@ -313,6 +313,37 @@
       </div>
     </div>
 
+    <!-- REAL-TIME BLE COMMUNICATION & TELEMETRY TERMINAL (TELINK LOG) -->
+    <div class="apple-glass p-3 sm:p-4 space-y-2.5 w-full">
+      <div class="flex items-center justify-between gap-2 border-b border-black/5 dark:border-white/10 pb-2">
+        <div class="flex items-center gap-2">
+          <div class="w-6 h-6 rounded-lg bg-indigo-500/15 text-indigo-600 dark:text-sky-400 flex items-center justify-center">
+            <i data-lucide="terminal" class="w-3.5 h-3.5"></i>
+          </div>
+          <div>
+            <h2 class="text-xs sm:text-sm font-extrabold text-[#0f172a] dark:text-[#f8fafc] font-parkinsans">Canlı BLE İletişim Konsolu & Telemetri Günlüğü</h2>
+            <p class="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">TelinkMiFlasher ve GraphMemo GATT / Reklam Veri Akışı</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-1.5 shrink-0">
+          <button id="btnRequeryLive" class="px-2.5 py-1 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-sky-400 text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-all active:scale-95" title="Cihaza 0x33 komutu göndererek anlık canlı ölçüm iste">
+            <i data-lucide="refresh-cw" class="w-3 h-3"></i>
+            <span>Anlık Oku (0x33)</span>
+          </button>
+          <button id="btnRequeryMemo" class="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-all active:scale-95" title="Cihaza 0x35 komutu göndererek hafızadaki tüm ölçümleri çek">
+            <i data-lucide="download" class="w-3 h-3"></i>
+            <span>Hafızayı Çek (0x35)</span>
+          </button>
+          <button id="btnClearLog" class="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer" title="Konsolu Temizle">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+      </div>
+      <div id="bleTerminalLog" class="h-32 sm:h-36 overflow-y-auto font-mono text-[11px] bg-slate-950/90 text-emerald-400 p-3 rounded-xl border border-white/5 space-y-1 select-text scroll-smooth shadow-inner">
+        <div class="text-slate-400">// TelinkMiFlasher & BTHome BLE İletişim Konsolu Hazır...</div>
+      </div>
+    </div>
+
     <!-- DETAILED MEASUREMENT HISTORY TABLE -->
     <div class="apple-glass p-3 sm:p-5 space-y-3 w-full">
       <div class="flex items-center justify-between gap-2 border-b border-black/5 dark:border-white/10 pb-2.5">
@@ -379,7 +410,7 @@
   <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm pointer-events-none"></div>
 
   <!-- Scripts -->
-  <script src="app.js?v=10.0"></script>
-  <script src="ble-thermo.js?v=10.0"></script>
+  <script src="app.js?v=10.2"></script>
+  <script src="ble-thermo.js?v=10.2"></script>
 </body>
 </html>
