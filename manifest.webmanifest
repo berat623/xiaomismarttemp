@@ -1,11 +1,11 @@
 {
-  "name": "Models",
-  "short_name": "Models",
-  "description": "CHMI ALADIN (CZ 2km) ve MGM ALADIN (TR) Sayısal Hava Tahmin Modelleri İstasyonu",
+  "name": "Xiaomi SmartTemp",
+  "short_name": "SmartTemp",
+  "description": "Xiaomi & ATC BLE Termometre ve Sayısal Hava Tahmin İstasyonu",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#e2e8f0",
+  "background_color": "#070b12",
   "theme_color": "#2563eb",
   "orientation": "portrait-primary",
   "icons": [

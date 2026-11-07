@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="tr" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Models — Sayısal Hava Tahmin Modelleri İstasyonu</title>
+  
+  <!-- PWA & Meta Tags -->
+  <meta name="description" content="ECMWF, CZ ALADIN, UKMO, GFS ve GEM Yüksek Çözünürlüklü Sayısal Hava Tahmin Modelleri İstasyonu" />
+  <meta id="metaThemeColor" name="theme-color" content="#070b14" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Models" />
+  
+  <!-- Web Manifest & Favicon -->
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/svg+xml" href="icon.svg" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+
+  <!-- Tailwind CSS Runtime -->
+  <script src="vendor/tailwind.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            poppins: ['Poppins', 'sans-serif'],
+            parkinsans: ['Parkinsans', 'sans-serif']
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Lucide Icons & Chart.js (Offline-First Local Vendors) -->
+  <script src="vendor/lucide.min.js"></script>
+  <script src="vendor/chart.umd.min.js"></script>
+
+  <!-- Core App Styling -->
+  <link rel="stylesheet" href="style.css?v=9.0" />
+</head>
+<body class="bg-[#f8fafc] dark:bg-[#070b14] text-[#0f172a] dark:text-[#f8fafc] min-h-screen flex flex-col font-poppins selection:bg-blue-500/20 selection:text-current overflow-x-hidden w-full relative">
+
+  <!-- Ambient Dynamic Atmospheric Glow Backdrop -->
+  <div id="ambientWeatherGlow" class="ambient-weather-glow bg-blue-500"></div>
+
+  <!-- Mobile-Optimized Modern Header -->
+  <header class="sticky top-0 z-30 border-b border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-[#0a0f1d]/90 backdrop-blur-xl px-3 sm:px-6 py-2.5 shadow-sm w-full">
+    <div class="max-w-6xl mx-auto flex flex-col gap-2.5 w-full">
+      
+      <!-- Top Row: Logo & Title + Action Buttons -->
+      <div class="flex items-center justify-between gap-2 w-full">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 text-white flex items-center justify-center shadow-md shadow-blue-500/20 shrink-0">
+            <i data-lucide="layers" class="w-4 h-4"></i>
+          </div>
+          <div class="flex flex-col min-w-0">
+            <div class="flex items-center gap-1.5 min-w-0">
+              <span class="text-base sm:text-lg font-black tracking-tight text-[#0f172a] dark:text-[#f8fafc] font-parkinsans">Models</span>
+              <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[9px] font-black tracking-wider uppercase border border-emerald-500/20">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> CANLI
+              </span>
+            </div>
+            <span class="text-[10px] text-slate-500 dark:text-slate-400 font-semibold truncate flex items-center gap-1">
+              <span>📍 Bursa Nilüfer</span>
+              <span>·</span>
+              <span class="font-mono">40.231°K, 28.840°D</span>
+            </span>
+          </div>
+        </div>
+
+        <!-- Right Action Buttons -->
+        <div class="flex items-center gap-1.5 shrink-0">
+          <a href="index.html" class="px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-500/20 active:scale-95 transition-all" title="Xiaomi BLE Termometre İstasyonuna Geç">
+            <i data-lucide="bluetooth" class="w-3.5 h-3.5"></i>
+            <span class="hidden sm:inline">BLE Termometre</span>
+          </a>
+
+          <button id="btnRefreshModel" class="px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#2563eb] hover:bg-blue-700 text-white flex items-center gap-1.5 cursor-pointer shadow-md shadow-blue-500/20 active:scale-95" title="Canlı ve güncel verileri sorgula">
+            <i id="modelRefreshSpinner" data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+            <span>Güncelle</span>
+          </button>
+
+          <button id="btnThemeToggle" title="Temayı Değiştir" aria-label="Temayı Değiştir" class="p-2 rounded-xl text-slate-600 dark:text-slate-300 bg-white dark:bg-[#131c2e] hover:bg-slate-100 dark:hover:bg-[#1e293b] border border-slate-200 dark:border-white/10 flex items-center justify-center cursor-pointer shadow-xs active:scale-95">
+            <i id="themeIcon" data-lucide="moon" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Bottom Row: 7 Model Switcher Pills (Horizontal Scroll) -->
+      <div id="modelTabsContainer" class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 w-full min-w-0">
+        <button data-model="ecmwf" class="model-tab-btn active text-xs font-bold shrink-0">
+          ECMWF 9km
+        </button>
+        <button data-model="aifs" class="model-tab-btn text-xs font-bold shrink-0 flex items-center gap-1">
+          <span>ECMWF AIFS</span>
+          <span class="text-[9px] px-1 py-0.2 rounded bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-extrabold">AI</span>
+        </button>
+        <button data-model="chmi" class="model-tab-btn text-xs font-bold shrink-0 flex items-center gap-1">
+          <span>CZ ALADIN 2km</span>
+          <span class="text-[9px] px-1 py-0.2 rounded bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 font-extrabold">2km</span>
+        </button>
+        <button data-model="ukmo" class="model-tab-btn text-xs font-bold shrink-0">
+          UKMO 10km
+        </button>
+        <button data-model="gfs" class="model-tab-btn text-xs font-bold shrink-0">
+          GFS 22km
+        </button>
+        <button data-model="aigfs" class="model-tab-btn text-xs font-bold shrink-0 flex items-center gap-1">
+          <span>GFS AI</span>
+          <span class="text-[9px] px-1 py-0.2 rounded bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-extrabold">AI</span>
+        </button>
+        <button data-model="gem" class="model-tab-btn text-xs font-bold shrink-0">
+          GEM 15km
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="flex-1 max-w-6xl w-full mx-auto p-3 sm:p-5 space-y-4 pb-14 overflow-hidden relative z-10">
+
+    <!-- Top Action & Model Status Bar -->
+    <div class="apple-glass p-3 sm:p-3.5 flex flex-wrap items-center justify-between gap-2 w-full">
+      <div class="flex items-center gap-2.5 min-w-0 flex-1">
+        <div class="w-8 h-8 rounded-xl bg-blue-500/15 text-[#2563eb] dark:text-[#60a5fa] flex items-center justify-center shrink-0">
+          <i data-lucide="cloud-lightning" class="w-4 h-4"></i>
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-2 flex-wrap">
+            <h1 id="modelTitleText" class="text-xs sm:text-sm font-extrabold text-[#0f172a] dark:text-[#f8fafc]">ECMWF IFS HRES 9km Modeli</h1>
+            <span id="modelBadgeText" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-[#2563eb] dark:text-[#60a5fa] border border-blue-200 dark:border-blue-800/40">Avrupa Merkezi · 9 km · 15 Gün (360 Saat)</span>
+          </div>
+          <div class="text-[10px] text-[#475569] dark:text-[#94a3b8] font-semibold flex items-center gap-1.5 truncate mt-0.5">
+            <span id="modelLocationText">Bursa Nilüfer (40.231°K, 28.840°D)</span>
+            <span>·</span>
+            <span id="modelLastUpdateText">Son Güncelleme: --:--:--</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Share / Copy Action Button -->
+      <button id="btnCopyForecastSummary" class="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950/50 text-[#0f172a] dark:text-[#f8fafc] hover:text-blue-600 dark:hover:text-sky-400 border border-slate-200 dark:border-slate-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all shrink-0 select-none shadow-sm" title="Anlık hava durumu özetini panoya kopyala">
+        <i data-lucide="share-2" class="w-3.5 h-3.5"></i>
+        <span class="hidden sm:inline">Özeti Paylaş</span>
+      </button>
+    </div>
+
+    <!-- SEVERE WEATHER ALERT & CRITICAL RADAR BANNER -->
+    <div id="severeWeatherAlertBanner" class="w-full">
+      <!-- JS tarafından anlık riskler veya güvenli durumu yerleştirilir -->
+    </div>
+
+    <!-- HERO FORECAST DASHBOARD (APPLE WEATHER BENTO SUITE) -->
+    <div class="apple-glass p-4 sm:p-6 space-y-4 w-full">
+      
+      <!-- Top Row: Station Pulse, Date and High/Low Range -->
+      <div class="flex items-center justify-between gap-2 flex-wrap border-b border-black/5 dark:border-white/10 pb-3">
+        <div class="flex items-center gap-2">
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-black tracking-wider uppercase font-mono">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> CANLI MODEL TAHMİNİ
+          </span>
+          <span id="heroDateText" class="text-xs font-bold text-slate-500 dark:text-slate-400 font-mono">Bugün, --:--</span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <span id="heroTempRange" class="px-2.5 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-mono font-bold text-xs border border-slate-200 dark:border-slate-700">
+            ▲ --° / ▼ --°
+          </span>
+        </div>
+      </div>
+
+      <!-- Main Visual Row: Icon, Temperature, Feeling and Condition Narrative -->
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 w-full">
+        
+        <!-- Left: Static Weather Icon & Temperature -->
+        <div class="flex items-center gap-4 shrink-0">
+          <div id="heroIcon" class="w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0 flex items-center justify-center drop-shadow-md">
+            <!-- Meteocons SVG buraya enjekte edilir -->
+          </div>
+          <div>
+            <div class="flex items-baseline gap-1">
+              <span id="heroTemp" class="text-4xl sm:text-5xl lg:text-6xl font-black text-[#0f172a] dark:text-[#f8fafc] font-parkinsans tracking-tight">--</span>
+              <span class="text-2xl sm:text-3xl font-extrabold text-[#e11d48] dark:text-[#fb7185] font-parkinsans">°C</span>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap mt-0.5">
+              <span id="heroFeels" class="text-xs sm:text-sm font-bold text-slate-600 dark:text-slate-300 font-mono">Hissedilen: --°C</span>
+              <span id="heroDewPoint" class="text-xs sm:text-sm font-bold text-[#0284c7] dark:text-[#38bdf8] font-mono">Çiy: --°C</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Condition Title, Desc & Smart Atmospheric Advice -->
+        <div class="flex-1 md:text-right min-w-0">
+          <div id="heroConditionName" class="text-base sm:text-xl font-black text-[#0f172a] dark:text-[#f8fafc] truncate font-parkinsans">
+            Model Verisi Yükleniyor...
+          </div>
+          <p id="heroConditionDesc" class="text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-300 mt-1 line-clamp-2">
+            Canlı sayısal tahmin çıktısı taranıyor...
+          </p>
+          <div id="heroSmartAdvice" class="mt-2 text-xs font-bold text-blue-700 dark:text-sky-300 bg-blue-50/80 dark:bg-blue-950/40 p-2 rounded-xl border border-blue-200 dark:border-blue-800/40 inline-block md:max-w-md">
+            ⚡ Güncel atmosferik durum analiz ediliyor...
+          </div>
+        </div>
+      </div>
+
+      <!-- Bento Grid (8 Modern Parametre Kartı) -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 text-xs w-full pt-1">
+        
+        <!-- 1. Rüzgar & Hamle -->
+        <div class="bento-card">
+          <div class="text-[9px] text-slate-500 dark:text-slate-400 uppercase font-extrabold tracking-wider flex items-center justify-between">
+            <span>Rüzgar</span>
+            <span id="heroWindBeaufort" class="font-mono text-emerald-600 dark:text-emerald-400 font-bold text-[9px]">B0 Sakin</span>
+          </div>
+          <div class="my-1">
+            <div class="flex items-center gap-1 text-[#15803d] dark:text-[#4ade80] font-mono font-black text-sm">
+              <span id="heroWindArrow" class="inline-block transform shrink-0 text-xs">➤</span>
+              <span id="heroWind">-- km/h</span>
+            </div>
+            <div id="heroWindName" class="text-[10px] text-slate-600 dark:text-slate-300 font-bold truncate">Poyraz · KD</div>
+          </div>
+          <div id="heroWindGust" class="text-[9px] text-amber-700 dark:text-amber-400 font-mono font-bold truncate">Hamle: -- km/h</div>
+        </div>
+
+        <!-- 2. Nem & Çiy -->
+        <div class="bento-card">
+          <div class="text-[9px] text-slate-500 dark:text-slate-400 uppercase font-extrabold tracking-wider flex items-center justify-between">
+            <span>Bağıl Nem</span>
+            <span>💧</span>
+          </div>
+          <div class="my-1">
+            <div id="heroHumidity" class="font-black font-mono text-[#0f766e] dark:text-[#2dd4bf] text-sm sm:text-base">--%</div>
+            <div id="heroDewPointBento" class="text-[10px] text-slate-500 dark:text-slate-400 font-mono font-bold truncate">Çiy: --°C</div>
+          </div>
+          <div id="heroHumidityComfort" class="text-[9px] text-slate-600 dark:text-slate-300 font-bold truncate">İdeal Nem</div>
+        </div>
+
+        <!-- 3. Yağış & İhtimal -->
+        <div class="bento-card">
+          <div class="text-[9px] text-slate-500 dark:text-slate-400 uppercase font-extrabold tracking-wider flex items-center justify-between">
+            <span>Saatlik Yağış</span>
+            <span>🌧️</span>
+          </div>
+          <div class="my-1">
+            <div id="heroRain" class="font-black font-mono text-[#2563eb] dark:text-[#60a5fa] text-sm sm:text-base">-- mm</div>
+            <div id="heroRainProb" class="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold truncate">İhtimal: --%</div>
+          </div>
+          <div id="heroRainSnow" class="text-[9px] text-slate-500 dark:text-slate-400 font-semibold truncate">Kar: 0 cm</div>
+        </div>
+
+        <!-- 4. Barometre (Basınç) -->
+        <div class="bento-card">
+          <div class="text-[9px] text-slate-500 dark:text-slate-400 uppercase font-extrabold tracking-wider flex items-center justify-between">
+            <span>Basınç (MSL)</span>
+            <span>⏱️</span>
+          </div>
+          <div class="my-1">
+            <div id="heroPressure" class="font-black font-mono text-[#7e22ce] dark:text-[#c084fc] text-sm">-- hPa</div>
+            <div id="heroSurfacePressure" class="text-[10px] text-slate-500 dark:text-slate-400 font-mono font-bold truncate">Yüzey: -- hPa</div>
+          </div>
+          <div id="heroPressureTrend" class="text-[9px] text-slate-600 dark:text-slate-300 font-bold truncate">Kararlı</div>
+        </div>
+
+        <!-- 5. Bulutluluk -->
+        <div class="bento-card">
+          <div class="text-[9px] text-slate-500 dark:text-slate-400 uppercase font-extrabold tracking-wider flex items-center justify-between">
+            <span>Bulut</span>
+            <span>☁️</span>
+          </div>
+          <div class="my-1">
+            <div id="heroCloud" class="font-black font-mono text-slate-700 dark:text-slate-300 text-sm sm:text-base">--%</div>
+            <div id="heroCloudDesc" class="text-[10px] text-slate-500 dark:text-slate-400 font-bold truncate">Parçalı</div>
+          </div>
+          <div id="heroCloudLayers" class="text-[9px] text-slate-500 dark:text-slate-400 font-semibold truncate">Orta/Yüksek</div>
+        </div>
+
+        <!-- 6. CAPE / Kararsızlık -->
+        <div class="bento-card">
+          <div class="text-[9px] text-slate-500 dark:text-slate-400 uppercase font-extrabold tracking-wider flex items-center justify-between">
+            <span>CAPE Enerjisi</span>
+            <span>⚡</span>
+          </div>
+          <div class="my-1">
+            <div id="heroCape" class="font-black font-mono text-[#ea580c] dark:text-[#fb923c] text-sm">-- J/kg</div>
+            <div id="heroCapeStatus" class="text-[10px] text-slate-600 dark:text-slate-300 font-bold truncate">Sakin</div>
+          </div>
+          <div class="text-[9px] text-slate-500 dark:text-slate-400 font-semibold truncate">Fırtına Radarı</div>
+        </div>
+
+        <!-- 7. UV & Güneş -->
+        <div class="bento-card">
+          <div class="text-[9px] text-slate-500 dark:text-slate-400 uppercase font-extrabold tracking-wider flex items-center justify-between">
+            <span>UV İndeksi</span>
+            <span>☀️</span>
+          </div>
+          <div class="my-1">
+            <div id="heroUv" class="font-black font-mono text-amber-600 dark:text-amber-400 text-sm sm:text-base">--</div>
+            <div id="heroSunshine" class="text-[10px] text-slate-500 dark:text-slate-400 font-mono font-bold truncate">Güneş: -- dk</div>
+          </div>
+          <div id="heroUvAdvice" class="text-[9px] text-slate-600 dark:text-slate-300 font-bold truncate">Güvenli</div>
+        </div>
+
+        <!-- 8. Görüş & Buhar -->
+        <div class="bento-card">
+          <div class="text-[9px] text-slate-500 dark:text-slate-400 uppercase font-extrabold tracking-wider flex items-center justify-between">
+            <span>Görüş / VPD</span>
+            <span>👁️</span>
+          </div>
+          <div class="my-1">
+            <div id="heroVisibility" class="font-black font-mono text-sky-600 dark:text-sky-400 text-sm sm:text-base">-- km</div>
+            <div id="heroVpd" class="text-[10px] text-slate-500 dark:text-slate-400 font-mono font-bold truncate">VPD: -- kPa</div>
+          </div>
+          <div id="heroAirClarity" class="text-[9px] text-slate-600 dark:text-slate-300 font-bold truncate">Net Görüş</div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- 24 SAATLİK ZAMAN AKIŞI ŞERİDİ (HOURLY FORECAST CAROUSEL) -->
+    <div id="hourlyStripSection" class="apple-glass p-3 sm:p-4 space-y-2.5 w-full overflow-hidden">
+      <div class="flex items-center justify-between gap-2 border-b border-black/5 dark:border-white/10 pb-2">
+        <div class="flex items-center gap-2">
+          <div class="w-6 h-6 rounded-lg bg-blue-500/15 text-blue-600 dark:text-sky-400 flex items-center justify-center">
+            <i data-lucide="clock" class="w-3.5 h-3.5"></i>
+          </div>
+          <h2 class="text-xs sm:text-sm font-extrabold text-[#0f172a] dark:text-[#f8fafc] font-parkinsans">24 Saatlik Zaman Akışı</h2>
+          <span class="text-[10px] text-slate-500 dark:text-slate-400 font-semibold hidden sm:inline">· Hızlı odaklanmak için bir saate dokunun</span>
+        </div>
+        <span class="text-[10px] font-mono text-slate-500 dark:text-slate-400 font-bold bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-700">24 Saat</span>
+      </div>
+
+      <!-- Yatay Kaydırılabilir Akış Şeridi -->
+      <div id="hourlyStripTrack" class="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 text-xs w-full min-w-0 snap-x">
+        <!-- JS dinamik dolduracak -->
+      </div>
+    </div>
+
+    <!-- WEATHER STATION MULTI-FEATURE HUB (SAĞLIK, ASTRONOMİ, KONSENSÜS, ARAÇLAR) -->
+    <div id="weatherStationHubSection" class="apple-glass p-3.5 sm:p-5 space-y-4 w-full">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-black/5 dark:border-white/10 pb-3">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-xl bg-purple-500/15 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
+            <i data-lucide="sparkles" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h2 class="text-xs sm:text-sm font-extrabold text-[#0f172a] dark:text-[#f8fafc] font-parkinsans">Gelişmiş İstasyon Merkezi & İndeksler</h2>
+            <p class="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">Biyometeoroloji, Astronomi, Model Konsensüsü ve Meteorolojik Araçlar</p>
+          </div>
+        </div>
+
+        <!-- Segmented Tab Navigation -->
+        <div id="hubTabsNav" class="inline-flex rounded-xl bg-slate-100 dark:bg-[#131c2e] p-1 border border-slate-200 dark:border-white/10 text-xs gap-1 overflow-x-auto no-scrollbar w-full sm:w-auto">
+          <button class="hub-tab-btn active px-3 py-1.5 font-bold cursor-pointer shrink-0 rounded-lg flex items-center gap-1.5" data-tab="health">
+            <span>🏃</span>
+            <span>Sağlık & Yaşam</span>
+          </button>
+          <button class="hub-tab-btn px-3 py-1.5 font-bold cursor-pointer shrink-0 rounded-lg flex items-center gap-1.5" data-tab="astronomy">
+            <span>🌞🌙</span>
+            <span>Güneş & Ay</span>
+          </button>
+          <button class="hub-tab-btn px-3 py-1.5 font-bold cursor-pointer shrink-0 rounded-lg flex items-center gap-1.5" data-tab="consensus">
+            <span>📊</span>
+            <span>Model Konsensüsü</span>
+          </button>
+          <button class="hub-tab-btn px-3 py-1.5 font-bold cursor-pointer shrink-0 rounded-lg flex items-center gap-1.5" data-tab="tools">
+            <span>🖩</span>
+            <span>Araçlar</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Tab Content 1: Biyometeoroloji & Yaşam İndeksleri -->
+      <div id="hubTabHealth" class="hub-tab-pane grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+        <!-- JS tarafından 6 dinamik yaşam kartı doldurulur -->
+      </div>
+
+      <!-- Tab Content 2: Güneş & Ay Astronomi Paneli -->
+      <div id="hubTabAstronomy" class="hub-tab-pane hidden space-y-3">
+        <!-- JS tarafından güneş arkı, gün doğumu/batımı, ay evresi ve aydınlık doldurulur -->
+      </div>
+
+      <!-- Tab Content 3: Model Konsensüsü & Güvenilirlik Skoru -->
+      <div id="hubTabConsensus" class="hub-tab-pane hidden space-y-3">
+        <!-- JS tarafından çoklu model mutabakatı ve karşılaştırma matrisi doldurulur -->
+      </div>
+
+      <!-- Tab Content 4: Meteorolojik Çevirici ve Araçlar -->
+      <div id="hubTabTools" class="hub-tab-pane hidden space-y-3">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <!-- Sıcaklık Dönüştürücü -->
+          <div class="hub-card">
+            <div class="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-extrabold tracking-wider flex items-center justify-between">
+              <span>Sıcaklık Çevirici</span>
+              <span>🌡️</span>
+            </div>
+            <div class="space-y-1.5">
+              <div class="flex items-center gap-2">
+                <input id="calcTempC" type="number" step="0.5" class="w-full px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono font-bold text-xs" placeholder="°C" value="20" />
+                <span class="text-xs font-bold text-slate-400 shrink-0">°C</span>
+              </div>
+              <div class="text-xs font-mono font-bold text-blue-600 dark:text-sky-400 flex justify-between pt-1">
+                <span id="calcTempF">68.0 °F</span>
+                <span id="calcTempK">293.15 K</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Rüzgar Dönüştürücü -->
+          <div class="hub-card">
+            <div class="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-extrabold tracking-wider flex items-center justify-between">
+              <span>Rüzgar Çevirici</span>
+              <span>💨</span>
+            </div>
+            <div class="space-y-1.5">
+              <div class="flex items-center gap-2">
+                <input id="calcWindKmh" type="number" step="1" class="w-full px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono font-bold text-xs" placeholder="km/h" value="25" />
+                <span class="text-xs font-bold text-slate-400 shrink-0">km/h</span>
+              </div>
+              <div class="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 flex justify-between pt-1">
+                <span id="calcWindKt">13.5 kt (knot)</span>
+                <span id="calcWindMs">6.9 m/s</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Basınç Dönüştürücü -->
+          <div class="hub-card">
+            <div class="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-extrabold tracking-wider flex items-center justify-between">
+              <span>Basınç Çevirici</span>
+              <span>⏱️</span>
+            </div>
+            <div class="space-y-1.5">
+              <div class="flex items-center gap-2">
+                <input id="calcPressHpa" type="number" step="1" class="w-full px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono font-bold text-xs" placeholder="hPa" value="1013" />
+                <span class="text-xs font-bold text-slate-400 shrink-0">hPa</span>
+              </div>
+              <div class="text-xs font-mono font-bold text-purple-600 dark:text-purple-400 flex justify-between pt-1">
+                <span id="calcPressMmhg">759.8 mmHg</span>
+                <span id="calcPressInhg">29.91 inHg</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Copy Forecast Button Box -->
+        <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div class="text-left w-full sm:w-auto">
+            <div class="text-xs font-extrabold text-[#0f172a] dark:text-[#f8fafc] flex items-center gap-1.5">
+              <span>📋</span>
+              <span>Hızlı Meteoroloji Raporu & WhatsApp Özeti</span>
+            </div>
+            <div class="text-[10px] text-slate-500 dark:text-slate-400 font-semibold mt-0.5">
+              Bursa Nilüfer anlık hava durumu ve tahmin özetini kopyalayıp WhatsApp, Telegram veya notlarınıza yapıştırabilirsiniz.
+            </div>
+          </div>
+          <button id="btnCopyForecastSummary2" class="w-full sm:w-auto px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all shrink-0">
+            <i data-lucide="copy" class="w-4 h-4"></i>
+            <span>Özeti Kopyala</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODEL EĞRİLERİ GRAFİK BÖLÜMÜ -->
+    <div id="modelsChartSection" class="apple-glass p-3 sm:p-5 space-y-3.5 w-full overflow-hidden" style="touch-action: pan-y;">
+      <div class="flex flex-col gap-2.5 border-b border-black/5 dark:border-white/10 pb-3 w-full">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 w-full">
+          <div class="flex items-center gap-2 min-w-0">
+            <h2 class="text-xs sm:text-sm font-extrabold text-[#0f172a] dark:text-[#f8fafc] flex items-center gap-1.5 shrink-0 font-parkinsans">
+              <i data-lucide="line-chart" class="w-4 h-4 text-[#2563eb]"></i>
+              <span>Model Zaman Serisi ve Eğrileri</span>
+            </h2>
+            <span id="chartStatPill" class="hidden sm:inline-block text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-[#2563eb] dark:text-[#60a5fa] border border-blue-200 dark:border-blue-800/40 truncate">
+              Hesaplanıyor...
+            </span>
+          </div>
+
+          <!-- Kapsam Seçici: Tüm Günler vs Seçili Gün -->
+          <div class="inline-flex rounded-xl bg-slate-100 dark:bg-[#131c2e] p-0.5 border border-slate-200 dark:border-white/10 text-xs shrink-0 self-start sm:self-auto">
+            <button class="chart-scope-btn active px-3 py-1 font-bold cursor-pointer" data-scope="all">Tüm Günler</button>
+            <button class="chart-scope-btn px-3 py-1 font-bold cursor-pointer" data-scope="day">Seçili Gün</button>
+          </div>
+        </div>
+
+        <!-- Mode Buttons (Tek Tek Parametre Seçici - Mobil Kaydırılabilir) -->
+        <div class="w-full overflow-x-auto no-scrollbar py-0.5">
+          <div class="inline-flex rounded-xl bg-slate-100 dark:bg-[#131c2e] p-0.5 border border-slate-200 dark:border-white/10 text-xs gap-0.5">
+            <button class="models-chart-btn active px-3 py-1 font-bold cursor-pointer shrink-0 flex items-center gap-1.5" data-mode="temp">
+              <span>🌡️</span>
+              <span>Sıcaklık</span>
+            </button>
+            <button class="models-chart-btn px-3 py-1 font-bold cursor-pointer shrink-0 flex items-center gap-1.5" data-mode="rain">
+              <span>🌧️</span>
+              <span>Yağış & Kar</span>
+            </button>
+            <button class="models-chart-btn px-3 py-1 font-bold cursor-pointer shrink-0 flex items-center gap-1.5" data-mode="wind">
+              <span>💨</span>
+              <span>Rüzgar</span>
+            </button>
+            <button class="models-chart-btn px-3 py-1 font-bold cursor-pointer shrink-0 flex items-center gap-1.5" data-mode="hum_cloud">
+              <span>💧</span>
+              <span>Nem & Bulut</span>
+            </button>
+            <button class="models-chart-btn px-3 py-1 font-bold cursor-pointer shrink-0 flex items-center gap-1.5" data-mode="pressure">
+              <span>⏱️</span>
+              <span>Basınç</span>
+            </button>
+            <button class="models-chart-btn px-3 py-1 font-bold cursor-pointer shrink-0 flex items-center gap-1.5" data-mode="cape">
+              <span>⚡</span>
+              <span>CAPE</span>
+            </button>
+            <button class="models-chart-btn px-3 py-1 font-bold cursor-pointer shrink-0 flex items-center gap-1.5" data-mode="solar_uv">
+              <span>☀️</span>
+              <span>Güneş/UV</span>
+            </button>
+            <button class="models-chart-btn px-3 py-1 font-bold cursor-pointer shrink-0 flex items-center gap-1.5" data-mode="visibility">
+              <span>👁️</span>
+              <span>Görüş/VPD</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dinamik Özet İstatistik Metrik Kartları (4 Kolonlu Grid) -->
+      <div id="chartMetricsSummary" class="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full">
+        <!-- JS tarafından parametreye göre canlı kartlar yerleştirilir -->
+      </div>
+
+      <!-- İnteraktif Grafik Göstergesi (Legend - Tıklandığında Çizgiyi Gizler/Açar) -->
+      <div class="flex items-center justify-between gap-2 flex-wrap pt-0.5">
+        <div id="chartInteractiveLegend" class="flex items-center gap-1.5 flex-wrap">
+          <!-- JS dinamik göstergeleri yerleştirir -->
+        </div>
+        <span class="text-[10px] text-slate-500 dark:text-slate-400 font-semibold hidden md:inline-block">
+          💡 Göstergelere tıklayarak eğrileri açıp kapatabilirsiniz · Çizgiye tıklayarak saati seçebilirsiniz
+        </span>
+      </div>
+
+      <!-- Chart Canvas Container -->
+      <div class="relative w-full h-56 sm:h-64 lg:h-76 overflow-hidden" style="touch-action: pan-y;">
+        <canvas id="modelsChartCanvas" style="touch-action: pan-y;"></canvas>
+      </div>
+    </div>
+
+    <!-- DETAILED HOURLY FORECAST -->
+    <div class="apple-glass p-3 sm:p-5 space-y-3.5 w-full overflow-hidden">
+      
+      <!-- Üst Bar: Başlık & Gün Filtreleme Şeridi -->
+      <div class="flex flex-col gap-2.5 border-b border-black/5 dark:border-white/10 pb-3 w-full">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 w-full">
+          <div class="flex items-center gap-2 shrink-0">
+            <h2 class="text-xs sm:text-sm font-extrabold text-[#0f172a] dark:text-[#f8fafc] flex items-center gap-1.5 font-parkinsans">
+              <i data-lucide="calendar" class="w-4 h-4 text-[#2563eb]"></i>
+              <span>Saatlik Model Dökümü</span>
+            </h2>
+            <span id="tableRecordCountBadge" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+              0 saat
+            </span>
+          </div>
+
+          <!-- Gün Filtreleme Şeridi (Yatay Kaydırılabilir Track) -->
+          <div id="dayFilterTrack" class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 text-xs w-full sm:w-auto min-w-0">
+            <!-- Dinamik gün butonları enjekte edilir -->
+          </div>
+        </div>
+
+        <!-- Hızlı Saat / Hadise Filtreleme Sekmeleri -->
+        <div class="flex items-center justify-between gap-2 flex-wrap pt-0.5">
+          <div id="tableFilterTrack" class="flex items-center gap-1 overflow-x-auto no-scrollbar text-xs">
+            <button class="table-filter-btn active px-2.5 py-1 rounded-lg font-bold cursor-pointer" data-filter="all">
+              <span>🕒</span> Tüm Saatler
+            </button>
+            <button class="table-filter-btn px-2.5 py-1 rounded-lg font-bold cursor-pointer" data-filter="rain">
+              <span>🌧️</span> Sadece Yağışlı
+            </button>
+            <button class="table-filter-btn px-2.5 py-1 rounded-lg font-bold cursor-pointer" data-filter="daytime">
+              <span>☀️</span> Gündüz (06-20)
+            </button>
+            <button class="table-filter-btn px-2.5 py-1 rounded-lg font-bold cursor-pointer" data-filter="nighttime">
+              <span>🌙</span> Gece (20-06)
+            </button>
+          </div>
+
+          <div class="text-[10px] text-slate-500 dark:text-slate-400 font-semibold hidden lg:flex items-center gap-1">
+            <span>ℹ️ Tablodan bir saate tıklayarak detaylarını yukarıdaki panele yansıtabilirsiniz.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 1. BİLGİSAYAR GÖRÜNÜMÜ: Geniş Tablo (Desktop/Tablet) -->
+      <div class="hidden md:block overflow-x-auto rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-[#111827]">
+        <table class="w-full text-left text-xs text-[#0f172a] dark:text-[#f8fafc]">
+          <thead class="bg-slate-50 dark:bg-[#131c2e] uppercase font-mono text-[10px] text-slate-700 dark:text-slate-300 font-bold border-b border-slate-200 dark:border-white/10">
+            <tr>
+              <th scope="col" class="py-2.5 px-3" title="Tahmin zamanı (GMT+3 Türkiye Saati)">🕒 Zaman</th>
+              <th scope="col" class="py-2.5 px-3" title="WMO standart hava hadisesi ve simgesi">🌤️ Hadise</th>
+              <th scope="col" class="py-2.5 px-3" title="2 metre sıcaklığı ve hissedilen eşdeğeri">🌡️ Sıcaklık (His.)</th>
+              <th scope="col" class="py-2.5 px-3" title="Saatlik toplam yağış miktarı (mm) ve yağış ihtimali (%)">🌧️ Yağış / İhtimal</th>
+              <th scope="col" class="py-2.5 px-3" title="10 metre ortalama rüzgar hızı, yönü ve hamlesi">💨 Rüzgar / Hamle</th>
+              <th scope="col" class="py-2.5 px-3" title="Bağıl nem oranı ve yoğuşma çiy sıcaklığı">💧 Nem / Çiy</th>
+              <th scope="col" class="py-2.5 px-3" title="Deniz seviyesine indirgenmiş barometrik basınç">⏱️ Basınç</th>
+              <th scope="col" class="py-2.5 px-3" title="Gökyüzü toplam bulut kapalılığı">☁️ Bulut</th>
+              <th scope="col" class="py-2.5 px-3" title="Konvektif kararsızlık enerjisi (Şimşek/Dolu/Fırtına potansiyeli)">⚡ CAPE</th>
+            </tr>
+          </thead>
+          <tbody id="desktopTableBody" class="divide-y divide-slate-100 dark:divide-slate-800/80 text-[11px] font-semibold">
+            <tr>
+              <td colspan="9" class="py-6 text-center text-[#475569] dark:text-[#94a3b8] font-bold">
+                Model verisi yükleniyor...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 2. TELEFON GÖRÜNÜMÜ: Sleek Row / Liste Yapısı (Ultra-Hafif & Hızlı) -->
+      <div id="mobileListContainer" class="md:hidden space-y-2 w-full">
+        <div class="p-4 text-center text-xs text-[#475569] dark:text-[#94a3b8] font-bold">
+          Model verisi yükleniyor...
+        </div>
+      </div>
+
+      <!-- 3. PARAMETRE VE KISALTMA REHBERİ (Açılır/Kapanır Modern Kart) -->
+      <details class="group rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-900/50 p-3 text-xs">
+        <summary class="flex items-center justify-between cursor-pointer select-none font-bold text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-sky-400">
+          <div class="flex items-center gap-1.5 font-parkinsans">
+            <i data-lucide="help-circle" class="w-3.5 h-3.5 text-blue-500"></i>
+            <span>Hava Durumu Parametreleri ve Kısaltmalar Rehberi</span>
+          </div>
+          <span class="text-[10px] text-slate-400 group-open:rotate-180 transform font-mono">▼</span>
+        </summary>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-3 text-[11px] text-slate-600 dark:text-slate-300 font-medium border-t border-slate-200 dark:border-slate-800 mt-2.5">
+          <div class="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 space-y-1">
+            <div class="font-bold text-slate-900 dark:text-white flex items-center gap-1">🌡️ Sıcaklık & Hissedilen:</div>
+            <p class="leading-relaxed">Termometreyle ölçülen 2 metre hava sıcaklığıdır. Hissedilen sıcaklık ise rüzgar hızı ve nem oranı eklenerek vücudun algıladığı değeri ifade eder.</p>
+          </div>
+          <div class="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 space-y-1">
+            <div class="font-bold text-slate-900 dark:text-white flex items-center gap-1">🌧️ Yağış & İhtimal:</div>
+            <p class="leading-relaxed">O 1 saatlik dilimde beklenen toplam sıvı yağış miktarı (mm) ve modelin yağış öngörme olasılığıdır (%). 1 mm yağış metrekareye 1 kg suya eşittir.</p>
+          </div>
+          <div class="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 space-y-1">
+            <div class="font-bold text-slate-900 dark:text-white flex items-center gap-1">💨 Rüzgar & Hamle (Gust):</div>
+            <p class="leading-relaxed">10 metre yükseklikteki ortalama rüzgar hızı ve yönüdür. Hamle (gust) ise ani ve kısa süreli en sert rüzgar darbesini gösterir.</p>
+          </div>
+          <div class="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 space-y-1">
+            <div class="font-bold text-slate-900 dark:text-white flex items-center gap-1">💧 Bağıl Nem & Çiy Noktası:</div>
+            <p class="leading-relaxed">Havanın su buharına doyma yüzdesidir. Çiy noktası ise su buharının yoğuşmaya başladığı sıcaklıktır; hava sıcaklığına yaklaştıkça sis ve bunaltıcılık artar.</p>
+          </div>
+          <div class="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 space-y-1">
+            <div class="font-bold text-slate-900 dark:text-white flex items-center gap-1">⏱️ Basınç (MSL):</div>
+            <p class="leading-relaxed">Deniz seviyesine indirgenmiş atmosfer basıncıdır. Normal değer ~1013 hPa'dır. Hızlı basınç düşüşleri kuvvetli cephe ve fırtına habercisidir.</p>
+          </div>
+          <div class="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 space-y-1">
+            <div class="font-bold text-slate-900 dark:text-white flex items-center gap-1">⚡ CAPE (Kararsızlık Enerjisi):</div>
+            <p class="leading-relaxed">Atmosferin dikey fırtına potansiyeli. 0-300: Sakin, 300-1000: Gök gürültülü sağanak riski, 1000+ J/kg: Şiddetli fırtına, yıldırım ve dolu tehlikesi.</p>
+          </div>
+        </div>
+      </details>
+
+    </div>
+
+  </main>
+
+  <!-- Toast Container -->
+  <div id="toastContainer" class="fixed bottom-3 left-3 right-3 sm:left-auto sm:right-5 z-50 flex flex-col gap-1.5 pointer-events-none max-w-sm mx-auto sm:mx-0"></div>
+
+  <!-- Scripts -->
+  <script src="app.js?v=9.0"></script>
+  <script src="aladin.js?v=9.0"></script>
+</body>
+</html>

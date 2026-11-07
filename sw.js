@@ -3,11 +3,13 @@
  * Sayısal Hava Tahmin Modelleri İstasyonu
  */
 
-const CACHE_NAME = 'models-forecast-v7.0';
+const CACHE_NAME = 'smarttemp-models-v10.0';
 
 const PRECACHE_ASSETS = [
   './',
   './index.html',
+  './models.html',
+  './ble-thermo.js',
   './style.css',
   './style.css?v=7.0',
   './app.js',
