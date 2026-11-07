@@ -10,7 +10,7 @@
  * - Canlı BLE Reklam Taraması (Pasif Broadcast / Eşlemesiz Anlık Telemetri)
  * - GATT Bağlantısı ile Cihaz Hafızasındaki Tüm Kayıtları Çekme
  * - Sıcaklık, Nem ve Batarya Chart.js Çoklu Zaman Serisi Grafiği
- * - Çevrimdışı Örnek / Demo Veri Modu ve CSV/JSON Dışa Aktarımı
+ * - CSV ve JSON Formatında Ölçüm Verilerini Dışa Aktarma
  */
 
 class XiaomiBleManager {
@@ -58,7 +58,6 @@ class XiaomiBleManager {
       btnStartScan: document.getElementById('btnStartScan'),
       btnConnectGatt: document.getElementById('btnConnectGatt'),
       btnDisconnect: document.getElementById('btnDisconnect'),
-      btnLoadDemoData: document.getElementById('btnLoadDemoData'),
       btnClearHistory: document.getElementById('btnClearHistory'),
       btnExportCsv: document.getElementById('btnExportCsv'),
       btnExportJson: document.getElementById('btnExportJson'),
@@ -83,6 +82,20 @@ class XiaomiBleManager {
     };
   }
 
+  isUserCancellation(err) {
+    if (!err) return false;
+    const msg = String(err.message || '').toLowerCase();
+    const name = String(err.name || '');
+    return name === 'NotFoundError' ||
+           name === 'AbortError' ||
+           (name === 'SecurityError' && msg.includes('gesture')) ||
+           msg.includes('canceled') ||
+           msg.includes('cancelled') ||
+           msg.includes('cancel') ||
+           msg.includes('permission denied') ||
+           msg.includes('user denied');
+  }
+
   checkBluetoothAvailability() {
     if (!navigator.bluetooth) {
       if (this.dom.bleStatusText) {
@@ -92,7 +105,7 @@ class XiaomiBleManager {
         this.dom.bleStatusBadge.className = 'w-2 h-2 rounded-full bg-rose-500';
       }
       if (window.app && window.app.showToast) {
-        window.app.showToast('Tarayıcınızda Web Bluetooth kapalı veya desteklenmiyor. Demo modunu test edebilirsiniz.', 'error');
+        window.app.showToast('Tarayıcınızda Web Bluetooth kapalı veya desteklenmiyor. Lütfen güncel Google Chrome veya Edge kullanın.', 'error');
       }
     }
   }
@@ -123,14 +136,7 @@ class XiaomiBleManager {
       });
     }
 
-    // 4. Demo Veri Yükle Butonu
-    if (this.dom.btnLoadDemoData) {
-      this.dom.btnLoadDemoData.addEventListener('click', () => {
-        this.loadDemoData();
-      });
-    }
-
-    // 5. Hafızayı Temizle Butonu
+    // 4. Hafızayı Temizle Butonu
     if (this.dom.btnClearHistory) {
       this.dom.btnClearHistory.addEventListener('click', () => {
         if (confirm('Tüm geçmiş ölçüm kayıtları silinsin mi?')) {
@@ -528,11 +534,12 @@ class XiaomiBleManager {
     try {
       this.isScanning = true;
       if (this.dom.btnStartScan) {
-        this.dom.btnStartScan.innerHTML = `<i data-lucide="square" class="w-3.5 h-3.5 text-rose-500"></i><span>Taramayı Durdur</span>`;
-        this.dom.btnStartScan.classList.replace('bg-blue-600', 'bg-rose-600');
+        this.dom.btnStartScan.innerHTML = `<i data-lucide="square" class="w-3.5 h-3.5 text-white"></i><span>Dinlemeyi Durdur</span>`;
+        this.dom.btnStartScan.className = 'px-3.5 sm:px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center gap-2 cursor-pointer shadow-md shadow-rose-500/20 active:scale-95 transition-all';
       }
       if (this.dom.bleStatusText) this.dom.bleStatusText.textContent = 'BLE Yayınları Dinleniyor (BTHome / ATC / Xiaomi)...';
       if (this.dom.bleStatusBadge) this.dom.bleStatusBadge.className = 'w-2 h-2 rounded-full bg-amber-500 animate-ping';
+      if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
 
       // 1. Yol: navigator.bluetooth.requestLEScan (Pasif Broadcast Yakalama)
       if (typeof navigator.bluetooth.requestLEScan === 'function') {
@@ -546,22 +553,32 @@ class XiaomiBleManager {
         });
 
         if (window.app && window.app.showToast) {
-          window.app.showToast('Kablosuz BLE reklam tarayıcısı aktif! Havadaki BTHome ve ATC paketleri gerçek zamanlı yakalanıyor.', 'success');
+          window.app.showToast('Kablosuz BLE reklam tarayıcısı aktif! Havadaki BTHome ve ATC paketleri anlık dinleniyor.', 'success');
         }
       } else {
         // 2. Yol: requestLEScan desteklenmiyorsa, doğrudan GATT Cihaz Seçimini başlat
         if (window.app && window.app.showToast) {
-          window.app.showToast('Pasif reklam tarayıcı yerine GATT canlı bağlantısı başlatılıyor...', 'info');
+          window.app.showToast('Havadaki genel reklam taraması bu tarayıcıda kapalı; doğrudan cihaz seçimi açılıyor...', 'info');
         }
         await this.connectAndDownloadHistory();
       }
 
       if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
     } catch (err) {
-      console.warn('BLE Tarama başlatılamadı:', err);
+      console.warn('BLE Tarama hatası veya iptali:', err);
       this.stopScan();
-      if (window.app && window.app.showToast) {
-        window.app.showToast(`Tarama başlatılamadı: ${err.message}`, 'error');
+
+      if (this.isUserCancellation(err)) {
+        // Kullanıcı tarama iznini reddetti veya kapattı - Hata değildir, bilgilendirici mesaj ver
+        if (this.dom.bleStatusText) this.dom.bleStatusText.textContent = 'Tarama izni verilmedi · Hazır';
+        if (this.dom.bleStatusBadge) this.dom.bleStatusBadge.className = 'w-2 h-2 rounded-full bg-slate-400';
+        if (window.app && window.app.showToast) {
+          window.app.showToast('Bluetooth tarama izni verilmedi veya kapatıldı. Termometrenize doğrudan bağlanmak için "Termometreye Bağlan & Hafızayı Oku" butonunu kullanabilirsiniz.', 'info');
+        }
+      } else {
+        if (window.app && window.app.showToast) {
+          window.app.showToast(`Tarama başlatılamadı: ${err.message}`, 'error');
+        }
       }
     }
   }
@@ -569,11 +586,11 @@ class XiaomiBleManager {
   stopScan() {
     this.isScanning = false;
     if (this.dom.btnStartScan) {
-      this.dom.btnStartScan.innerHTML = `<i data-lucide="radio" class="w-3.5 h-3.5"></i><span>Canlı BLE Dinle</span>`;
-      this.dom.btnStartScan.classList.replace('bg-rose-600', 'bg-blue-600');
+      this.dom.btnStartScan.innerHTML = `<i data-lucide="radio" class="w-4 h-4 text-blue-500"></i><span>Havadaki Yayınları Dinle</span>`;
+      this.dom.btnStartScan.className = 'px-3.5 sm:px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 font-bold text-xs flex items-center gap-2 cursor-pointer active:scale-95 transition-all';
     }
-    if (this.dom.bleStatusText) this.dom.bleStatusText.textContent = 'Dinleme Duraklatıldı';
-    if (this.dom.bleStatusBadge) this.dom.bleStatusBadge.className = 'w-2 h-2 rounded-full bg-slate-400';
+    if (this.dom.bleStatusText && !this.isConnected) this.dom.bleStatusText.textContent = 'Yayın Dinleme Durduruldu · Hazır';
+    if (this.dom.bleStatusBadge && !this.isConnected) this.dom.bleStatusBadge.className = 'w-2 h-2 rounded-full bg-slate-400';
     if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
   }
 
@@ -582,12 +599,12 @@ class XiaomiBleManager {
   // ==========================================
   async connectAndDownloadHistory() {
     if (!navigator.bluetooth) {
-      alert('Tarayıcınızda Web Bluetooth desteği bulunamadı.');
+      alert('Tarayıcınızda Web Bluetooth desteği bulunamadı. Lütfen Google Chrome veya Microsoft Edge kullanın.');
       return;
     }
 
     try {
-      if (this.dom.bleStatusText) this.dom.bleStatusText.textContent = 'Cihaz Seçimi Bekleniyor...';
+      if (this.dom.bleStatusText) this.dom.bleStatusText.textContent = 'Termometre Seçimi Bekleniyor (Açılan listeden cihazınızı seçip Eşle\'ye basın)...';
       if (this.dom.bleStatusBadge) this.dom.bleStatusBadge.className = 'w-2 h-2 rounded-full bg-blue-500 animate-pulse';
 
       // Çevredeki tüm termometreleri tara (ATC, PVVX, LYWSD03, BTHome)
@@ -596,8 +613,11 @@ class XiaomiBleManager {
         optionalServices: [
           '0000181a-0000-1000-8000-00805f9b34fb', // Environmental Sensing (ATC / PVVX)
           '0000180f-0000-1000-8000-00805f9b34fb', // Battery
+          '0000180a-0000-1000-8000-00805f9b34fb', // Device Information
           '00001f10-0000-1000-8000-00805f9b34fb', // PVVX Custom Log Service
-          'ebe0ccb0-7a0a-4b0c-8a1a-6ff2997da3a6'  // Stock Xiaomi Service
+          'ebe0ccb0-7a0a-4b0c-8a1a-6ff2997da3a6', // Stock Xiaomi Service
+          '0000fcd2-0000-1000-8000-00805f9b34fb', // BTHome Service
+          '0000fe95-0000-1000-8000-00805f9b34fb'  // Xiaomi MiBeacon Service
         ]
       });
 
@@ -607,6 +627,16 @@ class XiaomiBleManager {
       device.addEventListener('gattserverdisconnected', () => {
         this.onDisconnected();
       });
+
+      // Tarayıcı destekliyorsa doğrudan seçilen cihazın reklamlarını da arka planda dinle
+      if (typeof device.watchAdvertisements === 'function') {
+        try {
+          await device.watchAdvertisements();
+          device.addEventListener('advertisementreceived', (event) => {
+            this.parseAdvertisementPacket(event.serviceData, event.device, event.rssi);
+          });
+        } catch (advErr) {}
+      }
 
       const server = await device.gatt.connect();
       this.gattServer = server;
@@ -619,7 +649,7 @@ class XiaomiBleManager {
       if (this.dom.bleStatusBadge) this.dom.bleStatusBadge.className = 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
 
       if (window.app && window.app.showToast) {
-        window.app.showToast(`✅ ${device.name || 'Termometre'} ile GATT bağlantısı kuruldu! Hafıza çekiliyor...`, 'success');
+        window.app.showToast(`✅ ${device.name || 'Termometre'} ile bağlantı kuruldu! Canlı veriler ve hafıza çekiliyor...`, 'success');
       }
 
       // Servisleri Keşfet
@@ -728,10 +758,19 @@ class XiaomiBleManager {
       }, 3000);
 
     } catch (err) {
-      console.warn('GATT Bağlantı hatası:', err);
+      console.warn('GATT Bağlantı hatası veya iptali:', err);
       this.onDisconnected();
-      if (err.name !== 'NotFoundError') {
-        alert('Cihaza bağlanılamadı: ' + err.message);
+
+      if (this.isUserCancellation(err)) {
+        if (this.dom.bleStatusText) this.dom.bleStatusText.textContent = 'Cihaz seçimi iptal edildi · Hazır';
+        if (this.dom.bleStatusBadge) this.dom.bleStatusBadge.className = 'w-2 h-2 rounded-full bg-slate-400';
+        if (window.app && window.app.showToast) {
+          window.app.showToast('Cihaz seçimi iptal edildi.', 'info');
+        }
+      } else {
+        if (window.app && window.app.showToast) {
+          window.app.showToast(`Cihaza bağlanılamadı: ${err.message}`, 'error');
+        }
       }
     }
   }
@@ -844,24 +883,37 @@ class XiaomiBleManager {
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          this.historyData = parsed;
-          const last = parsed[parsed.length - 1];
-          if (last) {
-            this.renderHeroDisplay({
-              id: last.devId || 'Kayıtlı Cihaz',
-              name: 'Xiaomi Termometre',
-              format: 'Kayıtlı Hafıza',
-              temp: last.temp,
-              hum: last.hum,
-              bat: last.bat || 88,
-              volt: last.volt || 3.01,
-              rssi: last.rssi || -60,
-              packetCount: parsed.length,
-              lastSeen: new Date(last.timestamp)
-            });
+          // Varsa eski demo artıklarını tamamen temizle
+          const cleanList = parsed.filter(item => item && !String(item.devId || '').startsWith('DEMO_'));
+          if (cleanList.length !== parsed.length) {
+            try {
+              localStorage.setItem('xiaomi_smarttemp_history_v1', JSON.stringify(cleanList));
+            } catch (e) {}
           }
-          this.updateChart();
-          this.renderHistoryTable();
+          if (cleanList.length > 0) {
+            this.historyData = cleanList;
+            const last = cleanList[cleanList.length - 1];
+            if (last) {
+              this.renderHeroDisplay({
+                id: last.devId || 'Termometre',
+                name: 'Kayıtlı Termometre',
+                format: 'Kayıtlı Hafıza',
+                temp: last.temp,
+                hum: last.hum,
+                bat: last.bat || 100,
+                volt: last.volt || 3.0,
+                rssi: last.rssi || -60,
+                packetCount: cleanList.length,
+                lastSeen: new Date(last.timestamp)
+              });
+            }
+            this.updateChart();
+            this.renderHistoryTable();
+          } else {
+            this.historyData = [];
+            this.updateChart();
+            this.renderHistoryTable();
+          }
         }
       }
     } catch (e) {}
@@ -874,74 +926,6 @@ class XiaomiBleManager {
     this.renderHistoryTable();
     if (window.app && window.app.showToast) {
       window.app.showToast('Tüm hafıza ve grafik kayıtları sıfırlandı.', 'info');
-    }
-  }
-
-  // ==========================================
-  // DEMO / ÖRNEK HAFIZA ÜRETECİSİ
-  // ==========================================
-  loadDemoData() {
-    const demoItems = [];
-    const now = Date.now();
-    const count = 144; // 3 gün, her 30 dakikada bir ölçüm
-    const stepMs = 30 * 60 * 1000;
-
-    let currentTemp = 21.5;
-    let currentHum = 48.0;
-    let currentBat = 96;
-
-    for (let i = count - 1; i >= 0; i--) {
-      const tMs = now - (i * stepMs);
-      const d = new Date(tMs);
-      const hour = d.getHours();
-
-      // Gece daha serin, gündüz daha ılık simülasyonu
-      const diurnalCycle = Math.sin((hour - 8) / 24 * Math.PI * 2);
-      const noiseT = (Math.random() - 0.5) * 0.4;
-      const noiseH = (Math.random() - 0.5) * 1.5;
-
-      const temp = Number((21.0 + (diurnalCycle * 2.8) + noiseT).toFixed(1));
-      const hum = Number((50.0 - (diurnalCycle * 8.0) + noiseH).toFixed(1));
-      const bat = Math.max(85, Math.round(currentBat - (count - i) * 0.04));
-
-      demoItems.push({
-        timestamp: d.toISOString(),
-        temp: temp,
-        hum: hum,
-        bat: bat,
-        volt: Number((2.8 + (bat / 100 * 0.35)).toFixed(3)),
-        rssi: -58 - Math.floor(Math.random() * 12),
-        devId: 'DEMO_ATC_LYWSD03'
-      });
-    }
-
-    this.historyData = demoItems;
-    this.saveHistoryDebounced();
-
-    // Aktif cihaz olarak son kaydı ata
-    const last = demoItems[demoItems.length - 1];
-    const dev = {
-      id: 'DEMO_ATC_A4C138',
-      name: 'Oturma Odası (ATC Demo)',
-      format: 'PVVX / BTHome (Demo)',
-      temp: last.temp,
-      hum: last.hum,
-      bat: last.bat,
-      volt: last.volt,
-      rssi: last.rssi,
-      packetCount: demoItems.length,
-      lastSeen: new Date(last.timestamp)
-    };
-    this.devices.set(dev.id, dev);
-    this.activeDeviceKey = dev.id;
-
-    this.renderHeroDisplay(dev);
-    this.renderDeviceList();
-    this.updateChart();
-    this.renderHistoryTable();
-
-    if (window.app && window.app.showToast) {
-      window.app.showToast('✅ 144 adet 3 günlük örnek termometre hafıza kaydı yüklendi!', 'success');
     }
   }
 
@@ -1133,7 +1117,14 @@ class XiaomiBleManager {
 
   renderSummaryStats(filtered) {
     if (!filtered || filtered.length === 0) {
-      if (this.dom.chartStatCount) this.dom.chartStatCount.textContent = '0 Kayıt';
+      if (this.dom.chartStatCount) this.dom.chartStatCount.textContent = '0 Ölçüm';
+      if (this.dom.chartMinTemp) this.dom.chartMinTemp.textContent = '--°C';
+      if (this.dom.chartMaxTemp) this.dom.chartMaxTemp.textContent = '--°C';
+      if (this.dom.chartAvgTemp) this.dom.chartAvgTemp.textContent = '--°C';
+      if (this.dom.chartMinHum) this.dom.chartMinHum.textContent = '%--';
+      if (this.dom.chartMaxHum) this.dom.chartMaxHum.textContent = '%--';
+      if (this.dom.chartAvgHum) this.dom.chartAvgHum.textContent = '%--';
+      if (this.dom.chartBatStat) this.dom.chartBatStat.textContent = '%--';
       return;
     }
 

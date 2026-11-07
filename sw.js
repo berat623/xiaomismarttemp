@@ -3,7 +3,7 @@
  * Sayısal Hava Tahmin Modelleri İstasyonu
  */
 
-const CACHE_NAME = 'smarttemp-models-v10.0';
+const CACHE_NAME = 'smarttemp-models-v10.1';
 
 const PRECACHE_ASSETS = [
   './',

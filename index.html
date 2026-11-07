@@ -182,16 +182,16 @@
       <!-- Quick Action Controls -->
       <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-black/5 dark:border-white/10">
         
-        <!-- 1. Pasif Reklam Dinle (Eşleme Gerektirmez) -->
-        <button id="btnStartScan" class="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-2 cursor-pointer shadow-md shadow-blue-500/20 active:scale-95 transition-all">
-          <i data-lucide="radio" class="w-4 h-4"></i>
-          <span>Canlı BLE Dinle (BTHome & ATC)</span>
+        <!-- 1. GATT Cihaza Bağlan & Hafızayı Çek (Birincil İşlem) -->
+        <button id="btnConnectGatt" class="px-4 sm:px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-500 hover:from-blue-700 hover:to-indigo-700 text-white font-extrabold text-xs flex items-center gap-2 cursor-pointer shadow-lg shadow-blue-500/25 active:scale-95 transition-all" title="Xiaomi, ATC veya BTHome termometrenizi seçerek canlı verileri izleyin ve hafıza kayıtlarını çekin">
+          <i data-lucide="bluetooth" class="w-4 h-4"></i>
+          <span>Termometreye Bağlan & Hafızayı Oku</span>
         </button>
 
-        <!-- 2. GATT Cihaza Bağlan & Hafızayı Çek -->
-        <button id="btnConnectGatt" class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-2 cursor-pointer shadow-md shadow-emerald-500/20 active:scale-95 transition-all" title="Termometreye bağlanıp kaydedilmiş tüm geçmiş ölçümleri indir">
-          <i data-lucide="download-cloud" class="w-4 h-4"></i>
-          <span>Cihaza Bağlan & Hafızayı Çek</span>
+        <!-- 2. Pasif Reklam Dinle (Eşleme Gerektirmez) -->
+        <button id="btnStartScan" class="px-3.5 sm:px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 font-bold text-xs flex items-center gap-2 cursor-pointer active:scale-95 transition-all" title="Cihaza bağlanmadan ortamdaki şifresiz BTHome ve ATC BLE reklam yayınlarını dinler">
+          <i data-lucide="radio" class="w-4 h-4 text-blue-500"></i>
+          <span>Havadaki Yayınları Dinle</span>
         </button>
 
         <!-- 3. Bağlantıyı Kes (Gizli) -->
@@ -200,22 +200,22 @@
           <span>Bağlantıyı Kes</span>
         </button>
 
-        <!-- 4. Demo / Örnek Veri Yükle -->
-        <button id="btnLoadDemoData" class="px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all" title="Grafikleri ve istatistikleri test etmek için 144 adet gerçekçi örnek ölçüm yükler">
-          <i data-lucide="flask-conical" class="w-4 h-4 text-purple-500"></i>
-          <span>Demo Hafıza Yükle</span>
-        </button>
-
-        <!-- 5. CSV Dışa Aktar -->
+        <!-- 4. CSV Dışa Aktar -->
         <button id="btnExportCsv" class="px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all ml-auto">
           <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-500"></i>
           <span class="hidden sm:inline">CSV İndir</span>
         </button>
 
-        <!-- 6. Temizle -->
+        <!-- 5. Temizle -->
         <button id="btnClearHistory" class="px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-600 dark:text-slate-400 hover:text-rose-600 border border-slate-200 dark:border-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all" title="Kayıtlı hafızayı temizle">
           <i data-lucide="trash-2" class="w-4 h-4"></i>
         </button>
+      </div>
+
+      <!-- Bilgilendirme ve Bağlantı Rehberi Şeridi -->
+      <div class="flex items-center gap-2 p-2.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/60 dark:border-blue-800/40 text-[11px] text-blue-800 dark:text-blue-300 mt-2">
+        <i data-lucide="info" class="w-4 h-4 shrink-0 text-blue-500"></i>
+        <span><strong>Nasıl Bağlanılır:</strong> <strong>"Termometreye Bağlan & Hafızayı Oku"</strong> butonuna tıklayın, açılan listeden termometrenizi seçip <strong>"Eşle" (Pair)</strong> butonuna basın. Anlık sıcaklık, nem ve tüm hafıza otomatik aktarılır.</span>
       </div>
     </div>
 
@@ -232,7 +232,7 @@
       </div>
 
       <div id="deviceCardsTrack" class="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 text-xs w-full min-w-0">
-        <div class="p-3 text-xs text-slate-400 font-medium">Henüz bir sensör bulunamadı. "Canlı BLE Dinle" veya "Cihaza Bağlan" butonunu kullanın.</div>
+        <div class="p-3 text-xs text-slate-400 font-medium">Henüz bir sensör bulunamadı. "Termometreye Bağlan & Hafızayı Oku" butonuna basarak termometrenizi seçin.</div>
       </div>
     </div>
 
