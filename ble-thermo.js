@@ -82,7 +82,7 @@ class XiaomiBleManager {
     this.gattServer = null;
     this.custom1f1fChar = null;
     this.chart = null;
-    this.chartRange = '24h'; // '6h', '24h', '7d', 'all'
+    this.chartRange = 'all'; // '6h', '24h', '7d', 'all' (varsayılan: tüm kayıtlar)
     this.chartMetric = 'all'; // 'all', 'temp', 'hum', 'bat'
     this.historyData = [];
     this._saveTimer = null;
@@ -119,6 +119,7 @@ class XiaomiBleManager {
       btnStartScan: document.getElementById('btnStartScan'),
       btnConnectGatt: document.getElementById('btnConnectGatt'),
       btnDisconnect: document.getElementById('btnDisconnect'),
+      btnDownloadRecords: document.getElementById('btnDownloadRecords'),
       btnClearHistory: document.getElementById('btnClearHistory'),
       btnExportCsv: document.getElementById('btnExportCsv'),
       btnExportJson: document.getElementById('btnExportJson'),
@@ -224,6 +225,13 @@ class XiaomiBleManager {
     if (this.dom.btnDisconnect) {
       this.dom.btnDisconnect.addEventListener('click', () => {
         this.disconnect();
+      });
+    }
+
+    // 3.1. Kayıtları İndir Butonu
+    if (this.dom.btnDownloadRecords) {
+      this.dom.btnDownloadRecords.addEventListener('click', () => {
+        this.downloadRecords();
       });
     }
 
@@ -1107,7 +1115,7 @@ class XiaomiBleManager {
   // Yeniden Tüm Hafıza Kayıtlarını İste (0x35 komutu)
   async requeryMemo() {
     if (!this.isConnected || !this.custom1f1fChar) {
-      alert('Önce "Termometreye Bağlan" butonunu kullanarak termometrenize bağlanın.');
+      alert('Önce "Bağlan" butonunu kullanarak termometrenize bağlanın.');
       return;
     }
     try {
@@ -1116,6 +1124,33 @@ class XiaomiBleManager {
       await this.custom1f1fChar.writeValue(new Uint8Array([0x35, 0xff, 0xff, 0, 0]));
     } catch (e) {
       this.log('Hafıza isteme hatası: ' + e.message, 'error');
+    }
+  }
+
+  // Kayıtları İndir Butonu Aksiyonu (Hafıza aktarımı + CSV İndirme)
+  async downloadRecords() {
+    if (this.isConnected && this.custom1f1fChar) {
+      this.log('📥 Kayıtları İndir: Cihaz hafızasındaki kayıtlar çekiliyor [0x35]...');
+      if (window.app && window.app.showToast) {
+        window.app.showToast('Termometre hafızasındaki tüm kayıtlar çekiliyor...', 'info');
+      }
+      await this.requeryMemo();
+      setTimeout(() => {
+        if (this.historyData.length > 0) {
+          this.exportCsv();
+        }
+      }, 2500);
+    } else if (this.historyData && this.historyData.length > 0) {
+      this.exportCsv();
+      if (window.app && window.app.showToast) {
+        window.app.showToast('Kayıtlı ölçümler CSV olarak indirildi.', 'success');
+      }
+    } else {
+      if (window.app && window.app.showToast) {
+        window.app.showToast('İndirilecek kayıt bulunamadı. Lütfen önce "Bağlan" butonuyla termometrenize bağlanın.', 'info');
+      } else {
+        alert('İndirilecek kayıt bulunamadı. Lütfen önce "Bağlan" butonuyla termometrenize bağlanın.');
+      }
     }
   }
 
@@ -1314,6 +1349,7 @@ class XiaomiBleManager {
             pointRadius: 0,
             pointHoverRadius: 4,
             tension: 0.2,
+            hidden: true,
             yAxisID: 'yHum'
           }
         ]
@@ -1324,7 +1360,20 @@ class XiaomiBleManager {
         animation: { duration: 400 },
         interaction: { mode: 'index', intersect: false },
         plugins: {
-          legend: { display: false },
+          legend: {
+            display: true,
+            position: 'top',
+            align: 'end',
+            labels: {
+              usePointStyle: true,
+              pointStyle: 'circle',
+              boxWidth: 8,
+              boxHeight: 8,
+              padding: 14,
+              font: { family: 'Poppins, sans-serif', size: 11, weight: 'bold' },
+              color: isDark ? '#cbd5e1' : '#475569'
+            }
+          },
           tooltip: {
             backgroundColor: isDark ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.95)',
             titleColor: isDark ? '#f8fafc' : '#0f172a',
@@ -1429,7 +1478,7 @@ class XiaomiBleManager {
     // Zaman aralığı birden çok günü kapsıyor mu kontrol et
     const firstT = new Date(filtered[0].timestamp).getTime();
     const lastT = new Date(filtered[filtered.length - 1].timestamp).getTime();
-    const isMultiDay = (lastT - firstT) > 20 * 3600 * 1000;
+    const isMultiDay = (new Date(firstT).toDateString() !== new Date(lastT).toDateString()) || ((lastT - firstT) > 18 * 3600 * 1000);
 
     // 2. Etiketler ve Veri Dizileri
     const labels = filtered.map(d => {
@@ -1447,10 +1496,10 @@ class XiaomiBleManager {
 
     this.chart.data.labels = labels;
 
-    // Metrik Görünürlüğü (all, temp, hum, bat)
+    // Sadece Sıcaklık ve Nem Gösterimi (Batarya varsayılan olarak gizli tutulur)
     this.chart.data.datasets[0].hidden = !(this.chartMetric === 'all' || this.chartMetric === 'temp');
     this.chart.data.datasets[1].hidden = !(this.chartMetric === 'all' || this.chartMetric === 'hum');
-    this.chart.data.datasets[2].hidden = !(this.chartMetric === 'all' || this.chartMetric === 'bat');
+    this.chart.data.datasets[2].hidden = true;
 
     this.chart.data.datasets[0].data = tempData;
     this.chart.data.datasets[1].data = humData;
